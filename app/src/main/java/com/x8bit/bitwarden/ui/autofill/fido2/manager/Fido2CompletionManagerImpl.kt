@@ -5,37 +5,77 @@ import android.content.Intent
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.credentials.CreatePublicKeyCredentialResponse
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.PublicKeyCredential
+import androidx.credentials.exceptions.CreateCredentialCancellationException
+import androidx.credentials.exceptions.CreateCredentialUnknownException
+import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
-import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CreateCredentialResult
-import com.x8bit.bitwarden.data.platform.annotation.OmitFromCoverage
+import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialAssertionResult
+import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2RegisterCredentialResult
 
 /**
- * Primary implementation of [Fido2CompletionManager].
+ * Primary implementation of [Fido2CompletionManager] when the build version is
+ * UPSIDE_DOWN_CAKE (34) or above.
  */
-@OmitFromCoverage
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class Fido2CompletionManagerImpl(
     private val activity: Activity,
 ) : Fido2CompletionManager {
 
-    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    override fun completeFido2Create(result: Fido2CreateCredentialResult) {
+    override fun completeFido2Registration(result: Fido2RegisterCredentialResult) {
         activity.also {
             val intent = Intent()
             when (result) {
-                is Fido2CreateCredentialResult.Error -> {
+                is Fido2RegisterCredentialResult.Error -> {
                     PendingIntentHandler
                         .setCreateCredentialException(
                             intent = intent,
-                            exception = result.exception,
+                            exception = CreateCredentialUnknownException(),
                         )
                 }
 
-                is Fido2CreateCredentialResult.Success -> {
+                is Fido2RegisterCredentialResult.Success -> {
                     PendingIntentHandler
                         .setCreateCredentialResponse(
                             intent = intent,
                             response = CreatePublicKeyCredentialResponse(
                                 registrationResponseJson = result.registrationResponse,
+                            ),
+                        )
+                }
+
+                is Fido2RegisterCredentialResult.Cancelled -> {
+                    PendingIntentHandler
+                        .setCreateCredentialException(
+                            intent = intent,
+                            exception = CreateCredentialCancellationException(),
+                        )
+                }
+            }
+            it.setResult(Activity.RESULT_OK, intent)
+            it.finish()
+        }
+    }
+
+    override fun completeFido2Assertion(result: Fido2CredentialAssertionResult) {
+        activity.also {
+            val intent = Intent()
+            when (result) {
+                Fido2CredentialAssertionResult.Error -> {
+                    PendingIntentHandler
+                        .setGetCredentialException(
+                            intent = intent,
+                            exception = GetCredentialUnknownException(),
+                        )
+                }
+
+                is Fido2CredentialAssertionResult.Success -> {
+                    PendingIntentHandler
+                        .setGetCredentialResponse(
+                            intent = intent,
+                            response = GetCredentialResponse(
+                                credential = PublicKeyCredential(result.responseJson),
                             ),
                         )
                 }

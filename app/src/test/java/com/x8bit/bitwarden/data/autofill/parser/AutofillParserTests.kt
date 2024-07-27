@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@Suppress("LargeClass")
 class AutofillParserTests {
     private lateinit var parser: AutofillParser
 
@@ -377,6 +378,105 @@ class AutofillParserTests {
         }
     }
 
+    @Suppress("MaxLineLength")
+    @Test
+    fun `parse should have Username and Password AutofillView when the Username field is not identifiable but directly above the Password field in the hierarchy`() {
+        // Setup
+        val hiddenUserNameViewNode: AssistStructure.ViewNode = mockk {
+            every { this@mockk.autofillHints } returns emptyArray()
+            every { this@mockk.autofillId } returns loginAutofillId
+            every { this@mockk.childCount } returns 0
+            every { this@mockk.idPackage } returns ID_PACKAGE
+            every { this@mockk.website } returns WEBSITE
+        }
+        val passwordAutofillId = mockk<AutofillId>()
+        val passwordViewNode: AssistStructure.ViewNode = mockk {
+            every { this@mockk.autofillHints } returns emptyArray()
+            every { this@mockk.autofillId } returns passwordAutofillId
+            every { this@mockk.childCount } returns 0
+            every { this@mockk.idPackage } returns ID_PACKAGE
+            every { this@mockk.website } returns WEBSITE
+        }
+        val rootAutofillId = mockk<AutofillId>()
+        val rootViewNode: AssistStructure.ViewNode = mockk {
+            every { this@mockk.autofillHints } returns emptyArray()
+            every { this@mockk.autofillId } returns rootAutofillId
+            every { this@mockk.childCount } returns 0
+            every { this@mockk.idPackage } returns ID_PACKAGE
+            every { this@mockk.website } returns WEBSITE
+            every { this@mockk.childCount } returns 2
+            every { this@mockk.getChildAt(0) } returns hiddenUserNameViewNode
+            every { this@mockk.getChildAt(1) } returns passwordViewNode
+        }
+        val windowNode: AssistStructure.WindowNode = mockk {
+            every { this@mockk.rootViewNode } returns rootViewNode
+        }
+        every { assistStructure.windowNodeCount } returns 1
+        every { assistStructure.getWindowNodeAt(0) } returns windowNode
+        val unusedAutofillView: AutofillView.Unused = AutofillView.Unused(
+            data = AutofillView.Data(
+                autofillId = loginAutofillId,
+                autofillOptions = emptyList(),
+                autofillType = AUTOFILL_TYPE,
+                isFocused = true,
+                textValue = null,
+            ),
+        )
+        val loginUsernameAutofillView: AutofillView.Login = AutofillView.Login.Username(
+            data = AutofillView.Data(
+                autofillId = loginAutofillId,
+                autofillOptions = emptyList(),
+                autofillType = AUTOFILL_TYPE,
+                isFocused = true,
+                textValue = null,
+            ),
+        )
+        val loginPasswordAutofillView: AutofillView.Login = AutofillView.Login.Password(
+            data = AutofillView.Data(
+                autofillId = passwordAutofillId,
+                autofillOptions = emptyList(),
+                autofillType = AUTOFILL_TYPE,
+                isFocused = false,
+                textValue = null,
+            ),
+        )
+        val autofillPartition = AutofillPartition.Login(
+            views = listOf(loginUsernameAutofillView, loginPasswordAutofillView),
+        )
+        val expected = AutofillRequest.Fillable(
+            ignoreAutofillIds = listOf(rootAutofillId),
+            inlinePresentationSpecs = inlinePresentationSpecs,
+            maxInlineSuggestionsCount = MAX_INLINE_SUGGESTION_COUNT,
+            packageName = PACKAGE_NAME,
+            partition = autofillPartition,
+            uri = URI,
+        )
+        every { rootViewNode.toAutofillView() } returns null
+        every { hiddenUserNameViewNode.toAutofillView() } returns unusedAutofillView
+        every { passwordViewNode.toAutofillView() } returns loginPasswordAutofillView
+
+        // Test
+        val actual = parser.parse(
+            autofillAppInfo = autofillAppInfo,
+            fillRequest = fillRequest,
+        )
+
+        // Verify
+        assertEquals(expected, actual)
+        verify(exactly = 1) {
+            fillRequest.getInlinePresentationSpecs(
+                autofillAppInfo = autofillAppInfo,
+                isInlineAutofillEnabled = true,
+            )
+            fillRequest.getMaxInlineSuggestionsCount(
+                autofillAppInfo = autofillAppInfo,
+                isInlineAutofillEnabled = true,
+            )
+            any<List<ViewNodeTraversalData>>().buildPackageNameOrNull(assistStructure)
+            any<List<ViewNodeTraversalData>>().buildUriOrNull(PACKAGE_NAME)
+        }
+    }
+
     @Test
     fun `parse should choose first focused AutofillView for partition when there are multiple`() {
         // Setup
@@ -397,6 +497,66 @@ class AutofillParserTests {
                 autofillOptions = emptyList(),
                 autofillType = AUTOFILL_TYPE,
                 isFocused = true,
+                textValue = null,
+            ),
+        )
+        val autofillPartition = AutofillPartition.Card(
+            views = listOf(cardAutofillView),
+        )
+        val expected = AutofillRequest.Fillable(
+            ignoreAutofillIds = emptyList(),
+            inlinePresentationSpecs = inlinePresentationSpecs,
+            maxInlineSuggestionsCount = MAX_INLINE_SUGGESTION_COUNT,
+            packageName = PACKAGE_NAME,
+            partition = autofillPartition,
+            uri = URI,
+        )
+        every { cardViewNode.toAutofillView() } returns cardAutofillView
+        every { loginViewNode.toAutofillView() } returns loginAutofillView
+
+        // Test
+        val actual = parser.parse(
+            autofillAppInfo = autofillAppInfo,
+            fillRequest = fillRequest,
+        )
+
+        // Verify
+        assertEquals(expected, actual)
+        verify(exactly = 1) {
+            fillRequest.getInlinePresentationSpecs(
+                autofillAppInfo = autofillAppInfo,
+                isInlineAutofillEnabled = true,
+            )
+            fillRequest.getMaxInlineSuggestionsCount(
+                autofillAppInfo = autofillAppInfo,
+                isInlineAutofillEnabled = true,
+            )
+            any<List<ViewNodeTraversalData>>().buildPackageNameOrNull(assistStructure)
+            any<List<ViewNodeTraversalData>>().buildUriOrNull(PACKAGE_NAME)
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `parse should choose first fillable AutofillView for partition when there is no focused view`() {
+        // Setup
+        setupAssistStructureWithAllAutofillViewTypes()
+        val cardAutofillView: AutofillView.Card = AutofillView.Card.ExpirationMonth(
+            data = AutofillView.Data(
+                autofillId = cardAutofillId,
+                autofillOptions = emptyList(),
+                autofillType = AUTOFILL_TYPE,
+                isFocused = false,
+                textValue = null,
+            ),
+            monthValue = null,
+        )
+        val loginAutofillView: AutofillView.Login = AutofillView.Login.Username(
+            data = AutofillView.Data(
+                autofillId = loginAutofillId,
+                autofillOptions = emptyList(),
+                autofillType = AUTOFILL_TYPE,
+                isFocused = false,
                 textValue = null,
             ),
         )

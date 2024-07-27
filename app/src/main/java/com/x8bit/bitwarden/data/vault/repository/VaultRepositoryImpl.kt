@@ -1,11 +1,13 @@
 package com.x8bit.bitwarden.data.vault.repository
 
 import android.net.Uri
-import com.bitwarden.bitwarden.ExportFormat
-import com.bitwarden.bitwarden.InitOrgCryptoRequest
-import com.bitwarden.bitwarden.InitUserCryptoMethod
 import com.bitwarden.core.DateTime
+import com.bitwarden.core.InitOrgCryptoRequest
+import com.bitwarden.core.InitUserCryptoMethod
 import com.bitwarden.crypto.Kdf
+import com.bitwarden.exporters.ExportFormat
+import com.bitwarden.fido.Fido2CredentialAutofillView
+import com.bitwarden.sdk.Fido2CredentialStore
 import com.bitwarden.send.Send
 import com.bitwarden.send.SendType
 import com.bitwarden.send.SendView
@@ -56,6 +58,7 @@ import com.x8bit.bitwarden.data.vault.manager.VaultLockManager
 import com.x8bit.bitwarden.data.vault.manager.model.VerificationCodeItem
 import com.x8bit.bitwarden.data.vault.repository.model.CreateFolderResult
 import com.x8bit.bitwarden.data.vault.repository.model.CreateSendResult
+import com.x8bit.bitwarden.data.vault.repository.model.DecryptFido2CredentialAutofillViewResult
 import com.x8bit.bitwarden.data.vault.repository.model.DeleteFolderResult
 import com.x8bit.bitwarden.data.vault.repository.model.DeleteSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.DomainsData
@@ -105,6 +108,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import retrofit2.HttpException
 import java.time.Clock
 import java.time.temporal.ChronoUnit
@@ -135,6 +139,7 @@ class VaultRepositoryImpl(
     private val userLogoutManager: UserLogoutManager,
     pushManager: PushManager,
     private val clock: Clock,
+    private val json: Json,
     dispatcherManager: DispatcherManager,
 ) : VaultRepository,
     CipherManager by cipherManager,
@@ -180,6 +185,7 @@ class VaultRepositoryImpl(
             ) { ciphersData, foldersData, collectionsData, sendsData ->
                 VaultData(
                     cipherViewList = ciphersData,
+                    fido2CredentialAutofillViewList = null,
                     folderViewList = foldersData,
                     collectionViewList = collectionsData,
                     sendViewList = sendsData.sendViewList,
@@ -520,11 +526,36 @@ class VaultRepositoryImpl(
             )
     }
 
+    override suspend fun getDecryptedFido2CredentialAutofillViews(
+        cipherViewList: List<CipherView>,
+    ): DecryptFido2CredentialAutofillViewResult {
+        return vaultSdkSource
+            .decryptFido2CredentialAutofillViews(
+                userId = activeUserId ?: return DecryptFido2CredentialAutofillViewResult.Error,
+                cipherViews = cipherViewList.toTypedArray(),
+            )
+            .fold(
+                onFailure = { DecryptFido2CredentialAutofillViewResult.Error },
+                onSuccess = { DecryptFido2CredentialAutofillViewResult.Success(it) },
+            )
+    }
+
+    override suspend fun silentlyDiscoverCredentials(
+        userId: String,
+        fido2CredentialStore: Fido2CredentialStore,
+        relyingPartyId: String,
+    ): Result<List<Fido2CredentialAutofillView>> =
+        vaultSdkSource
+            .silentlyDiscoverCredentials(
+                userId = userId,
+                fido2CredentialStore = fido2CredentialStore,
+                relyingPartyId = relyingPartyId,
+            )
+
     override fun emitTotpCodeResult(totpCodeResult: TotpCodeResult) {
         mutableTotpCodeResultFlow.tryEmit(totpCodeResult)
     }
 
-    @Suppress("ReturnCount")
     override suspend fun unlockVaultWithBiometrics(): VaultUnlockResult {
         val userId = activeUserId ?: return VaultUnlockResult.InvalidStateError
         val biometricsKey = authDiskSource
@@ -543,7 +574,6 @@ class VaultRepositoryImpl(
             }
     }
 
-    @Suppress("ReturnCount")
     override suspend fun unlockVaultWithMasterPassword(
         masterPassword: String,
     ): VaultUnlockResult {
@@ -564,7 +594,6 @@ class VaultRepositoryImpl(
             }
     }
 
-    @Suppress("ReturnCount")
     override suspend fun unlockVaultWithPin(
         pin: String,
     ): VaultUnlockResult {
@@ -601,7 +630,6 @@ class VaultRepositoryImpl(
             organizationKeys = organizationKeys,
         )
 
-    @Suppress("ReturnCount")
     override suspend fun createSend(
         sendView: SendView,
         fileUri: Uri?,
@@ -834,7 +862,6 @@ class VaultRepositoryImpl(
         }
     }
 
-    @Suppress("ReturnCount")
     override suspend fun exportVaultDataToString(format: ExportFormat): ExportVaultDataResult {
         val userId = activeUserId ?: return ExportVaultDataResult.Error
         val folders = vaultDiskSource
@@ -920,7 +947,6 @@ class VaultRepositoryImpl(
         }
     }
 
-    @Suppress("ReturnCount")
     private suspend fun unlockVaultForUser(
         userId: String,
         initUserCryptoMethod: InitUserCryptoMethod,
@@ -1059,7 +1085,7 @@ class VaultRepositoryImpl(
                         sendList = it.toEncryptedSdkSendList(),
                     )
                     .fold(
-                        onSuccess = { sends -> DataState.Loaded(sends) },
+                        onSuccess = { sends -> DataState.Loaded(sends.sortAlphabetically()) },
                         onFailure = { throwable -> DataState.Error(throwable) },
                     )
             }
@@ -1128,7 +1154,6 @@ class VaultRepositoryImpl(
      * are met. If the resource cannot be found cloud-side, and it was updated, delete it from disk
      * for now.
      */
-    @Suppress("ReturnCount")
     private suspend fun syncCipherIfNecessary(syncCipherUpsertData: SyncCipherUpsertData) {
         val userId = activeUserId ?: return
         val cipherId = syncCipherUpsertData.cipherId

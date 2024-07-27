@@ -64,6 +64,7 @@ class AutofillParserImpl(
     /**
      * Parse the [AssistStructure] into an [AutofillRequest].
      */
+    @Suppress("LongMethod")
     private fun parseInternal(
         assistStructure: AssistStructure,
         autofillAppInfo: AutofillAppInfo,
@@ -71,13 +72,24 @@ class AutofillParserImpl(
     ): AutofillRequest {
         // Parse the `assistStructure` into internal models.
         val traversalDataList = assistStructure.traverse()
-        // Flatten the autofill views for processing.
-        val autofillViews = traversalDataList
-            .map { it.autofillViews }
+        // Take only the autofill views from the node that currently has focus.
+        // Then remove all the fields that cannot be filled with data.
+        // We fallback to taking all the fillable views if nothing has focus.
+        val autofillViewsList = traversalDataList.map { it.autofillViews }
+        val autofillViews = autofillViewsList
+            .filter { views -> views.any { it.data.isFocused } }
             .flatten()
+            .filter { it !is AutofillView.Unused }
+            .takeUnless { it.isEmpty() }
+            ?: autofillViewsList
+                .flatten()
+                .filter { it !is AutofillView.Unused }
 
-        // Find the focused view.
-        val focusedView = autofillViews.firstOrNull { it.data.isFocused }
+        // Find the focused view, or fallback to the first fillable item on the screen (so
+        // we at least have something to hook into)
+        val focusedView = autofillViews
+            .firstOrNull { it.data.isFocused }
+            ?: autofillViews.firstOrNull()
 
         val packageName = traversalDataList.buildPackageNameOrNull(
             assistStructure = assistStructure,
@@ -104,6 +116,12 @@ class AutofillParserImpl(
                 AutofillPartition.Login(
                     views = autofillViews.filterIsInstance<AutofillView.Login>(),
                 )
+            }
+
+            is AutofillView.Unused -> {
+                // The view is unfillable since the field is not meant to be used for autofill.
+                // This will never happen since we filter out all unused views above.
+                return AutofillRequest.Unfillable
             }
         }
         // Flatten the ignorable autofill ids.
@@ -139,7 +157,52 @@ class AutofillParserImpl(
 private fun AssistStructure.traverse(): List<ViewNodeTraversalData> =
     (0 until windowNodeCount)
         .map { getWindowNodeAt(it) }
-        .mapNotNull { windowNode -> windowNode.rootViewNode?.traverse() }
+        .mapNotNull { windowNode ->
+            windowNode
+                .rootViewNode
+                ?.traverse()
+                ?.updateForMissingUsernameFields()
+        }
+
+/**
+ * This helper function updates the [ViewNodeTraversalData] if necessary for missing username
+ * fields that could have been missed. If the current `ViewNodeTraversalData` contains password
+ * fields but no username fields, we check to see if there are any unused fields directly above
+ * the password fields and we assume that those are the missing username fields.
+ */
+private fun ViewNodeTraversalData.updateForMissingUsernameFields(): ViewNodeTraversalData {
+    val passwordPositions = this.autofillViews.mapIndexedNotNull { index, autofillView ->
+        (autofillView as? AutofillView.Login.Password)?.let { index }
+    }
+    return if (passwordPositions.any() &&
+        this.autofillViews.none { it is AutofillView.Login.Username }
+    ) {
+        val updatedAutofillViews = autofillViews.mapIndexed { index, autofillView ->
+            if (autofillView is AutofillView.Unused && passwordPositions.contains(index + 1)) {
+                AutofillView.Login.Username(data = autofillView.data)
+            } else {
+                autofillView
+            }
+        }
+        val previousUnusedIds = autofillViews
+            .filterIsInstance<AutofillView.Unused>()
+            .map { it.data.autofillId }
+            .toSet()
+        val currentUnusedIds = updatedAutofillViews
+            .filterIsInstance<AutofillView.Unused>()
+            .map { it.data.autofillId }
+            .toSet()
+        val unignoredAutofillIds = previousUnusedIds - currentUnusedIds
+        this.copy(
+            autofillViews = updatedAutofillViews,
+            ignoreAutofillIds = this.ignoreAutofillIds - unignoredAutofillIds,
+        )
+    } else {
+        // We already have username fields available or there are no password fields, so no need
+        // to search for them.
+        this
+    }
+}
 
 /**
  * Recursively traverse this [AssistStructure.ViewNode] and all of its descendants. Convert the

@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.bitwarden.vault.CipherView
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.util.getPasswordlessRequestDataIntentOrNull
+import com.x8bit.bitwarden.data.autofill.fido2.manager.Fido2CredentialManager
+import com.x8bit.bitwarden.data.autofill.fido2.util.getFido2AssertionRequestOrNull
 import com.x8bit.bitwarden.data.autofill.fido2.util.getFido2CredentialRequestOrNull
 import com.x8bit.bitwarden.data.autofill.manager.AutofillSelectionManager
 import com.x8bit.bitwarden.data.autofill.util.getAutofillSaveItemOrNull
@@ -44,9 +46,10 @@ class MainViewModel @Inject constructor(
     autofillSelectionManager: AutofillSelectionManager,
     private val specialCircumstanceManager: SpecialCircumstanceManager,
     private val garbageCollectionManager: GarbageCollectionManager,
+    private val fido2CredentialManager: Fido2CredentialManager,
     private val intentManager: IntentManager,
     settingsRepository: SettingsRepository,
-    vaultRepository: VaultRepository,
+    private val vaultRepository: VaultRepository,
     private val authRepository: AuthRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : BaseViewModel<MainState, MainEvent, MainAction>(
@@ -168,6 +171,7 @@ class MainViewModel @Inject constructor(
         )
     }
 
+    @Suppress("LongMethod")
     private fun handleIntent(
         intent: Intent,
         isFirstIntent: Boolean,
@@ -179,6 +183,7 @@ class MainViewModel @Inject constructor(
         val hasGeneratorShortcut = intent.isPasswordGeneratorShortcut
         val hasVaultShortcut = intent.isMyVaultShortcut
         val fido2CredentialRequestData = intent.getFido2CredentialRequestOrNull()
+        val fido2CredentialAssertionRequest = intent.getFido2AssertionRequestOrNull()
         when {
             passwordlessRequestData != null -> {
                 specialCircumstanceManager.specialCircumstance =
@@ -218,6 +223,10 @@ class MainViewModel @Inject constructor(
             }
 
             fido2CredentialRequestData != null -> {
+                // Set the user's verification status when a new FIDO 2 request is received to force
+                // explicit verification if the user's vault is unlocked when the request is
+                // received.
+                fido2CredentialManager.isUserVerified = false
                 specialCircumstanceManager.specialCircumstance =
                     SpecialCircumstance.Fido2Save(
                         fido2CredentialRequest = fido2CredentialRequestData,
@@ -229,6 +238,13 @@ class MainViewModel @Inject constructor(
                 ) {
                     authRepository.switchAccount(fido2CredentialRequestData.userId)
                 }
+            }
+
+            fido2CredentialAssertionRequest != null -> {
+                specialCircumstanceManager.specialCircumstance =
+                    SpecialCircumstance.Fido2Assertion(
+                        fido2AssertionRequest = fido2CredentialAssertionRequest,
+                    )
             }
 
             hasGeneratorShortcut -> {

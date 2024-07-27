@@ -107,6 +107,7 @@ fun RootNavScreen(
         is RootNavState.VaultUnlockedForNewSend,
         is RootNavState.VaultUnlockedForAuthRequest,
         is RootNavState.VaultUnlockedForFido2Save,
+        is RootNavState.VaultUnlockedForFido2Assertion,
         -> VAULT_UNLOCKED_GRAPH_ROUTE
     }
     val currentRoute = navController.currentDestination?.rootLevelRoute()
@@ -192,6 +193,14 @@ fun RootNavScreen(
                     navOptions = rootNavOptions,
                 )
             }
+
+            is RootNavState.VaultUnlockedForFido2Assertion -> {
+                navController.navigateToVaultUnlockedGraph(rootNavOptions)
+                navController.navigateToVaultItemListingAsRoot(
+                    vaultItemListingType = VaultItemListingType.Login,
+                    navOptions = rootNavOptions,
+                )
+            }
         }
     }
 }
@@ -202,7 +211,6 @@ fun RootNavScreen(
  * As noted above, this can be removed after upgrading to latest compose navigation, since
  * the nav args can prevent us from having to do this check.
  */
-@Suppress("ReturnCount")
 private fun NavDestination?.rootLevelRoute(): String? {
     if (this == null) {
         return null

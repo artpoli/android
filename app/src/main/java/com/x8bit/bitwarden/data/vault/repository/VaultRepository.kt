@@ -1,9 +1,11 @@
 package com.x8bit.bitwarden.data.vault.repository
 
 import android.net.Uri
-import com.bitwarden.bitwarden.ExportFormat
 import com.bitwarden.core.DateTime
 import com.bitwarden.crypto.Kdf
+import com.bitwarden.exporters.ExportFormat
+import com.bitwarden.fido.Fido2CredentialAutofillView
+import com.bitwarden.sdk.Fido2CredentialStore
 import com.bitwarden.send.SendType
 import com.bitwarden.send.SendView
 import com.bitwarden.vault.CipherView
@@ -15,6 +17,7 @@ import com.x8bit.bitwarden.data.vault.manager.VaultLockManager
 import com.x8bit.bitwarden.data.vault.manager.model.VerificationCodeItem
 import com.x8bit.bitwarden.data.vault.repository.model.CreateFolderResult
 import com.x8bit.bitwarden.data.vault.repository.model.CreateSendResult
+import com.x8bit.bitwarden.data.vault.repository.model.DecryptFido2CredentialAutofillViewResult
 import com.x8bit.bitwarden.data.vault.repository.model.DeleteFolderResult
 import com.x8bit.bitwarden.data.vault.repository.model.DeleteSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.DomainsData
@@ -143,6 +146,22 @@ interface VaultRepository : CipherManager, VaultLockManager {
      * This may emit an empty list if any issues arise during code generation.
      */
     fun getAuthCodesFlow(): StateFlow<DataState<List<VerificationCodeItem>>>
+
+    /**
+     * Get the decrypted list of fido credentials for the current ciphers and user id.
+     */
+    suspend fun getDecryptedFido2CredentialAutofillViews(
+        cipherViewList: List<CipherView>,
+    ): DecryptFido2CredentialAutofillViewResult
+
+    /**
+     * Silently discovers FIDO 2 credentials for a given [userId] and [relyingPartyId].
+     */
+    suspend fun silentlyDiscoverCredentials(
+        userId: String,
+        fido2CredentialStore: Fido2CredentialStore,
+        relyingPartyId: String,
+    ): Result<List<Fido2CredentialAutofillView>>
 
     /**
      * Emits the totp code result flow to listeners.

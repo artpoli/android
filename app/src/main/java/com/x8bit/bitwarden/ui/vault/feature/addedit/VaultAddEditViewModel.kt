@@ -8,7 +8,14 @@ import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
+import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
+import com.x8bit.bitwarden.data.auth.repository.model.ValidatePinResult
+import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
 import com.x8bit.bitwarden.data.autofill.fido2.manager.Fido2CredentialManager
+import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialRequest
+import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2RegisterCredentialResult
+import com.x8bit.bitwarden.data.autofill.fido2.model.UserVerificationRequirement
+import com.x8bit.bitwarden.data.autofill.util.isActiveWithFido2Credentials
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
@@ -112,10 +119,10 @@ class VaultAddEditViewModel @Inject constructor(
                 .specialCircumstance
                 ?.toFido2RequestOrNull()
 
-            val fido2CreationOptions = fido2CreationRequest
+            val fido2AttestationOptions = fido2CreationRequest
                 ?.let { request ->
                     fido2CredentialManager
-                        .getPasskeyCreateOptionsOrNull(request.requestJson)
+                        .getPasskeyAttestationOptionsOrNull(request.requestJson)
                 }
 
             val dialogState =
@@ -138,7 +145,7 @@ class VaultAddEditViewModel @Inject constructor(
                                 ?.toDefaultAddTypeContent(isIndividualVaultDisabled)
                             ?: fido2CreationRequest
                                 ?.toDefaultAddTypeContent(
-                                    creationOptions = fido2CreationOptions,
+                                    attestationOptions = fido2AttestationOptions,
                                     isIndividualVaultDisabled = isIndividualVaultDisabled,
                                 )
                             ?: VaultAddEditState.ViewState.Content(
@@ -153,8 +160,8 @@ class VaultAddEditViewModel @Inject constructor(
                 },
                 dialog = dialogState,
                 // Set special conditions for autofill and fido2 save
-                shouldShowCloseButton = autofillSaveItem == null && fido2CreationOptions == null,
-                shouldExitOnSave = autofillSaveItem != null || fido2CreationOptions != null,
+                shouldShowCloseButton = autofillSaveItem == null && fido2AttestationOptions == null,
+                shouldExitOnSave = autofillSaveItem != null || fido2AttestationOptions != null,
             )
         },
 ) {
@@ -212,6 +219,7 @@ class VaultAddEditViewModel @Inject constructor(
 
     //region Common Handlers
 
+    @Suppress("LongMethod")
     private fun handleCommonActions(action: VaultAddEditAction.Common) {
         when (action) {
             is VaultAddEditAction.Common.CustomFieldValueChange -> {
@@ -251,6 +259,57 @@ class VaultAddEditViewModel @Inject constructor(
 
             is VaultAddEditAction.Common.HiddenFieldVisibilityChange -> {
                 handleHiddenFieldVisibilityChange(action)
+            }
+
+            is VaultAddEditAction.Common.ConfirmOverwriteExistingPasskeyClick -> {
+                handleConfirmOverwriteExistingPasskeyClick()
+            }
+
+            VaultAddEditAction.Common.UserVerificationSuccess -> {
+                handleUserVerificationSuccess()
+            }
+
+            VaultAddEditAction.Common.UserVerificationLockOut -> {
+                handleUserVerificationLockOut()
+            }
+
+            VaultAddEditAction.Common.UserVerificationFail -> {
+                handleUserVerificationFail()
+            }
+
+            VaultAddEditAction.Common.UserVerificationCancelled -> {
+                handleUserVerificationCancelled()
+            }
+
+            VaultAddEditAction.Common.Fido2ErrorDialogDismissed -> {
+                handleFido2ErrorDialogDismissed()
+            }
+
+            VaultAddEditAction.Common.UserVerificationNotSupported -> {
+                handleUserVerificationNotSupported()
+            }
+
+            is VaultAddEditAction.Common.MasterPasswordFido2VerificationSubmit -> {
+                handleMasterPasswordFido2VerificationSubmit(action)
+            }
+
+            VaultAddEditAction.Common.RetryFido2PasswordVerificationClick -> {
+                handleRetryFido2PasswordVerificationClick()
+            }
+
+            is VaultAddEditAction.Common.PinFido2VerificationSubmit -> {
+                handlePinFido2VerificationSubmit(action)
+            }
+
+            VaultAddEditAction.Common.RetryFido2PinVerificationClick -> {
+                handleRetryFido2PinVerificationClick()
+            }
+
+            is VaultAddEditAction.Common.PinFido2SetUpSubmit -> handlePinFido2SetUpSubmit(action)
+            VaultAddEditAction.Common.PinFido2SetUpRetryClick -> handlePinFido2SetUpRetryClick()
+
+            VaultAddEditAction.Common.DismissFido2VerificationDialogClick -> {
+                handleDismissFido2VerificationDialogClick()
             }
         }
     }
@@ -315,28 +374,17 @@ class VaultAddEditViewModel @Inject constructor(
     @Suppress("LongMethod")
     private fun handleSaveClick() = onContent { content ->
         if (content.common.name.isBlank()) {
-            mutableStateFlow.update {
-                it.copy(
-                    dialog = VaultAddEditState.DialogState.Generic(
-                        title = R.string.an_error_has_occurred.asText(),
-                        message = R.string.validation_field_required
-                            .asText(R.string.name.asText()),
-                    ),
-                )
-            }
+            showGenericErrorDialog(
+                message = R.string.validation_field_required.asText(R.string.name.asText()),
+            )
             return@onContent
         } else if (
             content.common.selectedOwnerId != null &&
             content.common.selectedOwner?.collections?.all { !it.isSelected } == true
         ) {
-            mutableStateFlow.update {
-                it.copy(
-                    dialog = VaultAddEditState.DialogState.Generic(
-                        title = R.string.an_error_has_occurred.asText(),
-                        message = R.string.select_one_collection.asText(),
-                    ),
-                )
-            }
+            showGenericErrorDialog(
+                message = R.string.select_one_collection.asText(),
+            )
             return@onContent
         }
 
@@ -347,6 +395,13 @@ class VaultAddEditViewModel @Inject constructor(
                 ),
             )
         }
+
+        specialCircumstanceManager.specialCircumstance
+            ?.toFido2RequestOrNull()
+            ?.let { request ->
+                handleFido2RequestSpecialCircumstance(request, content.toCipherView())
+                return@onContent
+            }
 
         viewModelScope.launch {
             when (val vaultAddEditType = state.vaultAddEditType) {
@@ -368,6 +423,79 @@ class VaultAddEditViewModel @Inject constructor(
                     sendAction(VaultAddEditAction.Internal.CreateCipherResultReceive(result))
                 }
             }
+        }
+    }
+
+    private fun handleFido2RequestSpecialCircumstance(
+        request: Fido2CredentialRequest,
+        cipherView: CipherView,
+    ) {
+        if (cipherView.isActiveWithFido2Credentials) {
+            mutableStateFlow.update {
+                it.copy(dialog = VaultAddEditState.DialogState.OverwritePasskeyConfirmationPrompt)
+            }
+        } else {
+            registerFido2Credential(request, cipherView)
+        }
+    }
+
+    private fun registerFido2Credential(
+        request: Fido2CredentialRequest,
+        cipherView: CipherView,
+    ) {
+
+        if (fido2CredentialManager.isUserVerified) {
+            registerFido2CredentialToCipher(request, cipherView)
+            return
+        }
+
+        val createOptions = fido2CredentialManager
+            .getPasskeyAttestationOptionsOrNull(request.requestJson)
+            ?: run {
+                showFido2ErrorDialog()
+                return
+            }
+
+        when (createOptions.authenticatorSelection.userVerification) {
+            UserVerificationRequirement.DISCOURAGED -> {
+                registerFido2CredentialToCipher(request, cipherView)
+            }
+
+            UserVerificationRequirement.PREFERRED -> {
+                sendEvent(VaultAddEditEvent.Fido2UserVerification(isRequired = false))
+            }
+
+            UserVerificationRequirement.REQUIRED -> {
+                sendEvent(VaultAddEditEvent.Fido2UserVerification(isRequired = true))
+            }
+
+            null -> {
+                // Per WebAuthn spec members should be ignored when invalid. Since the request
+                // violates spec we display an error and terminate the operation.
+                showFido2ErrorDialog()
+            }
+        }
+    }
+
+    private fun registerFido2CredentialToCipher(
+        request: Fido2CredentialRequest,
+        cipherView: CipherView,
+    ) {
+        viewModelScope.launch {
+            val userId = authRepository.activeUserId
+                ?: run {
+                    showFido2ErrorDialog()
+                    return@launch
+                }
+            val result: Fido2RegisterCredentialResult =
+                fido2CredentialManager.registerFido2Credential(
+                    userId = userId,
+                    fido2CredentialRequest = request,
+                    selectedCipherView = cipherView,
+                )
+            sendAction(
+                VaultAddEditAction.Internal.Fido2RegisterCredentialResultReceive(result),
+            )
         }
     }
 
@@ -414,16 +542,12 @@ class VaultAddEditViewModel @Inject constructor(
     }
 
     private fun handleDismissDialog() {
-        mutableStateFlow.update {
-            it.copy(dialog = null)
-        }
+        clearDialogState()
     }
 
     private fun handleInitialAutofillDialogDismissed() {
         settingsRepository.initialAutofillDialogShown = true
-        mutableStateFlow.update {
-            it.copy(dialog = null)
-        }
+        clearDialogState()
     }
 
     private fun handleHiddenFieldVisibilityChange(
@@ -438,6 +562,163 @@ class VaultAddEditViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun handleConfirmOverwriteExistingPasskeyClick() {
+        specialCircumstanceManager
+            .specialCircumstance
+            ?.toFido2RequestOrNull()
+            ?.let { request ->
+                onContent { content ->
+                    registerFido2Credential(request, content.toCipherView())
+                }
+            }
+            ?: showFido2ErrorDialog()
+    }
+
+    private fun handleUserVerificationLockOut() {
+        fido2CredentialManager.isUserVerified = false
+        showFido2ErrorDialog()
+    }
+
+    private fun handleUserVerificationSuccess() {
+        fido2CredentialManager.isUserVerified = true
+        getRequestAndRegisterCredential()
+    }
+
+    private fun getRequestAndRegisterCredential() =
+        specialCircumstanceManager
+            .specialCircumstance
+            ?.toFido2RequestOrNull()
+            ?.let { request ->
+                onContent { content ->
+                    registerFido2CredentialToCipher(
+                        request = request,
+                        cipherView = content.toCipherView(),
+                    )
+                }
+            }
+            ?: showFido2ErrorDialog()
+
+    private fun handleUserVerificationFail() {
+        fido2CredentialManager.isUserVerified = false
+        showFido2ErrorDialog()
+    }
+
+    private fun handleFido2ErrorDialogDismissed() {
+        fido2CredentialManager.isUserVerified = false
+        clearDialogState()
+        sendEvent(
+            VaultAddEditEvent.CompleteFido2Registration(
+                result = Fido2RegisterCredentialResult.Error,
+            ),
+        )
+    }
+
+    private fun handleUserVerificationCancelled() {
+        fido2CredentialManager.isUserVerified = false
+        clearDialogState()
+        sendEvent(
+            VaultAddEditEvent.CompleteFido2Registration(
+                result = Fido2RegisterCredentialResult.Cancelled,
+            ),
+        )
+    }
+
+    private fun handleUserVerificationNotSupported() {
+        fido2CredentialManager.isUserVerified = false
+
+        val activeAccount = authRepository
+            .userStateFlow
+            .value
+            ?.activeAccount
+            ?: run {
+                showFido2ErrorDialog()
+                return
+            }
+
+        if (activeAccount.vaultUnlockType == VaultUnlockType.PIN) {
+            mutableStateFlow.update {
+                it.copy(dialog = VaultAddEditState.DialogState.Fido2PinPrompt)
+            }
+        } else if (activeAccount.hasMasterPassword) {
+            mutableStateFlow.update {
+                it.copy(dialog = VaultAddEditState.DialogState.Fido2MasterPasswordPrompt)
+            }
+        } else {
+            // Prompt the user to set up a PIN for their account.
+            mutableStateFlow.update {
+                it.copy(dialog = VaultAddEditState.DialogState.Fido2PinSetUpPrompt)
+            }
+        }
+    }
+
+    private fun handleMasterPasswordFido2VerificationSubmit(
+        action: VaultAddEditAction.Common.MasterPasswordFido2VerificationSubmit,
+    ) {
+        viewModelScope.launch {
+            val result = authRepository.validatePassword(action.password)
+            sendAction(
+                VaultAddEditAction.Internal.ValidateFido2PasswordResultReceive(
+                    result = result,
+                ),
+            )
+        }
+    }
+
+    private fun handleRetryFido2PasswordVerificationClick() {
+        mutableStateFlow.update {
+            it.copy(dialog = VaultAddEditState.DialogState.Fido2MasterPasswordPrompt)
+        }
+    }
+
+    private fun handlePinFido2VerificationSubmit(
+        action: VaultAddEditAction.Common.PinFido2VerificationSubmit,
+    ) {
+        viewModelScope.launch {
+            val result = authRepository.validatePin(action.pin)
+            sendAction(
+                VaultAddEditAction.Internal.ValidateFido2PinResultReceive(
+                    result = result,
+                ),
+            )
+        }
+    }
+
+    private fun handleRetryFido2PinVerificationClick() {
+        mutableStateFlow.update {
+            it.copy(dialog = VaultAddEditState.DialogState.Fido2PinPrompt)
+        }
+    }
+
+    private fun handlePinFido2SetUpSubmit(action: VaultAddEditAction.Common.PinFido2SetUpSubmit) {
+        if (action.pin.isBlank()) {
+            mutableStateFlow.update {
+                it.copy(dialog = VaultAddEditState.DialogState.Fido2PinSetUpError)
+            }
+            return
+        }
+
+        // There's no need to ask the user whether or not they want to use their master password
+        // on login, and shouldRequireMasterPasswordOnRestart is hardcoded to false, because the
+        // user can only reach this part of the flow if they have no master password.
+        settingsRepository.storeUnlockPin(
+            pin = action.pin,
+            shouldRequireMasterPasswordOnRestart = false,
+        )
+
+        // After storing the PIN, the user can proceed with their original FIDO 2 request.
+        handleValidAuthentication()
+    }
+
+    private fun handlePinFido2SetUpRetryClick() {
+        mutableStateFlow.update {
+            it.copy(dialog = VaultAddEditState.DialogState.Fido2PinSetUpPrompt)
+        }
+    }
+
+    private fun handleDismissFido2VerificationDialogClick() {
+        showFido2ErrorDialog()
     }
 
     private fun handleAddNewCustomFieldClick(
@@ -1099,26 +1380,29 @@ class VaultAddEditViewModel @Inject constructor(
             is VaultAddEditAction.Internal.PasswordBreachReceive -> {
                 handlePasswordBreachReceive(action)
             }
+
+            is VaultAddEditAction.Internal.Fido2RegisterCredentialResultReceive -> {
+                handleFido2RegisterCredentialResultReceive(action)
+            }
+
+            is VaultAddEditAction.Internal.ValidateFido2PasswordResultReceive -> {
+                handleValidateFido2PasswordResultReceive(action)
+            }
+
+            is VaultAddEditAction.Internal.ValidateFido2PinResultReceive -> {
+                handleValidateFido2PinResultReceive(action)
+            }
         }
     }
 
     private fun handleCreateCipherResultReceive(
         action: VaultAddEditAction.Internal.CreateCipherResultReceive,
     ) {
-        mutableStateFlow.update {
-            it.copy(dialog = null)
-        }
+        clearDialogState()
 
         when (action.createCipherResult) {
             is CreateCipherResult.Error -> {
-                mutableStateFlow.update {
-                    it.copy(
-                        dialog = VaultAddEditState.DialogState.Generic(
-                            title = R.string.an_error_has_occurred.asText(),
-                            message = R.string.generic_error_message.asText(),
-                        ),
-                    )
-                }
+                showGenericErrorDialog()
             }
 
             is CreateCipherResult.Success -> {
@@ -1142,20 +1426,15 @@ class VaultAddEditViewModel @Inject constructor(
     private fun handleUpdateCipherResultReceive(
         action: VaultAddEditAction.Internal.UpdateCipherResultReceive,
     ) {
-        mutableStateFlow.update { it.copy(dialog = null) }
+        clearDialogState()
         when (val result = action.updateCipherResult) {
             is UpdateCipherResult.Error -> {
-                mutableStateFlow.update {
-                    it.copy(
-                        dialog = VaultAddEditState.DialogState.Generic(
-                            title = R.string.an_error_has_occurred.asText(),
-                            message = result
-                                .errorMessage
-                                ?.asText()
-                                ?: R.string.generic_error_message.asText(),
-                        ),
-                    )
-                }
+                showGenericErrorDialog(
+                    message = result
+                        .errorMessage
+                        ?.asText()
+                        ?: R.string.generic_error_message.asText(),
+                )
             }
 
             is UpdateCipherResult.Success -> {
@@ -1170,17 +1449,11 @@ class VaultAddEditViewModel @Inject constructor(
     private fun handleDeleteCipherReceive(action: VaultAddEditAction.Internal.DeleteCipherReceive) {
         when (action.result) {
             DeleteCipherResult.Error -> {
-                mutableStateFlow.update {
-                    it.copy(
-                        dialog = VaultAddEditState.DialogState.Generic(
-                            message = R.string.generic_error_message.asText(),
-                        ),
-                    )
-                }
+                showErrorDialog(message = R.string.generic_error_message.asText())
             }
 
             DeleteCipherResult.Success -> {
-                mutableStateFlow.update { it.copy(dialog = null) }
+                clearDialogState()
                 sendEvent(
                     VaultAddEditEvent.ShowToast(
                         message = R.string.item_soft_deleted.asText(),
@@ -1229,7 +1502,10 @@ class VaultAddEditViewModel @Inject constructor(
                         viewState = VaultAddEditState.ViewState.Error(
                             message = R.string.internet_connection_required_title
                                 .asText()
-                                .concat(R.string.internet_connection_required_message.asText()),
+                                .concat(
+                                    " ".asText(),
+                                    R.string.internet_connection_required_message.asText(),
+                                ),
                         ),
                     )
                 }
@@ -1295,14 +1571,10 @@ class VaultAddEditViewModel @Inject constructor(
             }
 
             TotpCodeResult.CodeScanningError -> {
-                mutableStateFlow.update {
-                    it.copy(
-                        dialog = VaultAddEditState.DialogState.Generic(
-                            title = R.string.an_error_has_occurred.asText(),
-                            message = R.string.authenticator_key_read_error.asText(),
-                        ),
-                    )
-                }
+                showErrorDialog(
+                    title = R.string.an_error_has_occurred.asText(),
+                    message = R.string.authenticator_key_read_error.asText(),
+                )
             }
         }
     }
@@ -1342,14 +1614,129 @@ class VaultAddEditViewModel @Inject constructor(
                 }
             }
         }
-        mutableStateFlow.update {
-            it.copy(dialog = VaultAddEditState.DialogState.Generic(message = message))
+        showErrorDialog(message = message)
+    }
+
+    private fun handleFido2RegisterCredentialResultReceive(
+        action: VaultAddEditAction.Internal.Fido2RegisterCredentialResultReceive,
+    ) {
+        clearDialogState()
+        when (action.result) {
+            is Fido2RegisterCredentialResult.Error -> {
+                sendEvent(VaultAddEditEvent.ShowToast(R.string.an_error_has_occurred.asText()))
+            }
+
+            is Fido2RegisterCredentialResult.Success -> {
+                sendEvent(VaultAddEditEvent.ShowToast(R.string.item_updated.asText()))
+            }
+
+            Fido2RegisterCredentialResult.Cancelled -> {
+                // no-op: The OS will handle re-displaying the system prompt.
+            }
         }
+        sendEvent(VaultAddEditEvent.CompleteFido2Registration(action.result))
+    }
+
+    private fun handleValidateFido2PasswordResultReceive(
+        action: VaultAddEditAction.Internal.ValidateFido2PasswordResultReceive,
+    ) {
+        clearDialogState()
+
+        when (action.result) {
+            ValidatePasswordResult.Error -> {
+                showFido2ErrorDialog()
+            }
+
+            is ValidatePasswordResult.Success -> {
+                if (action.result.isValid) {
+                    handleValidAuthentication()
+                } else {
+                    handleInvalidAuthentication(
+                        errorDialogState = VaultAddEditState.DialogState.Fido2MasterPasswordError,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun handleValidateFido2PinResultReceive(
+        action: VaultAddEditAction.Internal.ValidateFido2PinResultReceive,
+    ) {
+        clearDialogState()
+
+        when (action.result) {
+            ValidatePinResult.Error -> {
+                showFido2ErrorDialog()
+            }
+
+            is ValidatePinResult.Success -> {
+                if (action.result.isValid) {
+                    handleValidAuthentication()
+                } else {
+                    handleInvalidAuthentication(
+                        errorDialogState = VaultAddEditState.DialogState.Fido2PinError,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun handleInvalidAuthentication(errorDialogState: VaultAddEditState.DialogState) {
+        fido2CredentialManager.authenticationAttempts += 1
+        if (fido2CredentialManager.hasAuthenticationAttemptsRemaining()) {
+            mutableStateFlow.update {
+                it.copy(dialog = errorDialogState)
+            }
+        } else {
+            showFido2ErrorDialog()
+        }
+    }
+
+    private fun handleValidAuthentication() {
+        fido2CredentialManager.isUserVerified = true
+        fido2CredentialManager.authenticationAttempts = 0
+
+        getRequestAndRegisterCredential()
     }
 
     //endregion Internal Type Handlers
 
     //region Utility Functions
+
+    private fun clearDialogState() {
+        mutableStateFlow.update { it.copy(dialog = null) }
+    }
+
+    private fun showFido2ErrorDialog() {
+        mutableStateFlow.update {
+            it.copy(
+                dialog = VaultAddEditState.DialogState.Fido2Error(
+                    message = R.string.passkey_operation_failed_because_user_could_not_be_verified
+                        .asText(),
+                ),
+            )
+        }
+    }
+
+    private fun showGenericErrorDialog(
+        message: Text = R.string.generic_error_message.asText(),
+    ) {
+        showErrorDialog(
+            title = R.string.an_error_has_occurred.asText(),
+            message = message,
+        )
+    }
+
+    private fun showErrorDialog(title: Text? = null, message: Text) {
+        mutableStateFlow.update {
+            it.copy(
+                dialog = VaultAddEditState.DialogState.Generic(
+                    title = title,
+                    message = message,
+                ),
+            )
+        }
+    }
 
     private inline fun onContent(
         crossinline block: (VaultAddEditState.ViewState.Content) -> Unit,
@@ -1877,6 +2264,59 @@ data class VaultAddEditState(
          */
         @Parcelize
         data object InitialAutofillPrompt : DialogState()
+
+        /**
+         * Displays a FIDO 2 operation error dialog to the user.
+         */
+        @Parcelize
+        data class Fido2Error(val message: Text) : DialogState()
+
+        /**
+         * Displays the overwrite passkey confirmation prompt to the user.
+         */
+        @Parcelize
+        data object OverwritePasskeyConfirmationPrompt : DialogState()
+
+        /**
+         * Displays a dialog to prompt the user for their master password as part of the FIDO 2
+         * user verification flow.
+         */
+        @Parcelize
+        data object Fido2MasterPasswordPrompt : DialogState()
+
+        /**
+         * Displays a dialog to alert the user that their password for the FIDO 2 user
+         * verification flow was incorrect and to retry.
+         */
+        @Parcelize
+        data object Fido2MasterPasswordError : DialogState()
+
+        /**
+         * Displays a dialog to prompt the user for their PIN as part of the FIDO 2
+         * user verification flow.
+         */
+        @Parcelize
+        data object Fido2PinPrompt : DialogState()
+
+        /**
+         * Displays a dialog to alert the user that their PIN for the FIDO 2 user
+         * verification flow was incorrect and to retry.
+         */
+        @Parcelize
+        data object Fido2PinError : DialogState()
+
+        /**
+         * Displays a dialog to prompt the user to set up a PIN as part of the FIDO 2
+         * user verification flow.
+         */
+        @Parcelize
+        data object Fido2PinSetUpPrompt : DialogState()
+
+        /**
+         * Displays a dialog to alert the user that the PIN is a required field.
+         */
+        @Parcelize
+        data object Fido2PinSetUpError : DialogState()
     }
 }
 
@@ -1943,6 +2383,24 @@ sealed class VaultAddEditEvent {
     data class NavigateToGeneratorModal(
         val generatorMode: GeneratorMode.Modal,
     ) : VaultAddEditEvent()
+
+    /**
+     * Complete the current FIDO 2 credential registration process.
+     *
+     * @property result the result of FIDO 2 credential registration.
+     */
+    data class CompleteFido2Registration(
+        val result: Fido2RegisterCredentialResult,
+    ) : VaultAddEditEvent()
+
+    /**
+     * Perform user verification for a FIDO 2 credential operation.
+     *
+     * @param isRequired When `false`, user verification can be bypassed if it is not supported.
+     */
+    data class Fido2UserVerification(
+        val isRequired: Boolean,
+    ) : VaultAddEditEvent()
 }
 
 /**
@@ -1950,7 +2408,6 @@ sealed class VaultAddEditEvent {
  * Each subclass of this sealed class denotes a distinct action that can be taken.
  */
 sealed class VaultAddEditAction {
-
     /**
      * Represents actions common across all item types.
      */
@@ -1995,6 +2452,11 @@ sealed class VaultAddEditAction {
          * The user has confirmed to deleted the cipher.
          */
         data object ConfirmDeleteClick : Common()
+
+        /**
+         * The user has confirmed overwriting the existing passkey.
+         */
+        data object ConfirmOverwriteExistingPasskeyClick : Common()
 
         /**
          * Represents the action when a type option is selected.
@@ -2089,6 +2551,78 @@ sealed class VaultAddEditAction {
          * @property isVisible the new visibility state of the hidden field.
          */
         data class HiddenFieldVisibilityChange(val isVisible: Boolean) : Common()
+
+        /**
+         * The user has too many failed verification attempts for FIDO operations and can no longer
+         * use biometric or device credential verification for some time.
+         */
+        data object UserVerificationLockOut : Common()
+
+        /**
+         * The user has failed verification for FIDO 2 operations.
+         */
+        data object UserVerificationFail : Common()
+
+        /**
+         * The user has successfully verified themself using device biometrics or credentials.
+         */
+        data object UserVerificationSuccess : Common()
+
+        /**
+         * The user has cancelled device verification.
+         */
+        data object UserVerificationCancelled : Common()
+
+        /**
+         * The user has dismissed the FIDO 2 credential error dialog.
+         */
+        data object Fido2ErrorDialogDismissed : Common()
+
+        /**
+         * User verification cannot be performed with device biometrics or credentials.
+         */
+        data object UserVerificationNotSupported : Common()
+
+        /**
+         * The user has clicked to submit their master password for FIDO 2 verification.
+         */
+        data class MasterPasswordFido2VerificationSubmit(
+            val password: String,
+        ) : Common()
+
+        /**
+         * The user has clicked to retry their FIDO 2 password verification.
+         */
+        data object RetryFido2PasswordVerificationClick : Common()
+
+        /**
+         * The user has clicked to submit their PIN for FIDO 2 verification.
+         */
+        data class PinFido2VerificationSubmit(
+            val pin: String,
+        ) : Common()
+
+        /**
+         * The user has clicked to retry their FIDO 2 PIN verification.
+         */
+        data object RetryFido2PinVerificationClick : Common()
+
+        /**
+         * The user has clicked to submit a PIN to set up for the FIDO 2 user verification flow.
+         */
+        data class PinFido2SetUpSubmit(
+            val pin: String,
+        ) : Common()
+
+        /**
+         * The user has clicked to retry setting up a PIN for the FIDO 2 user verification flow.
+         */
+        data object PinFido2SetUpRetryClick : Common()
+
+        /**
+         * The user has clicked to dismiss the FIDO 2 password or PIN verification dialog.
+         */
+        data object DismissFido2VerificationDialogClick : Common()
     }
 
     /**
@@ -2425,6 +2959,29 @@ sealed class VaultAddEditAction {
          */
         data class DeleteCipherReceive(
             val result: DeleteCipherResult,
+        ) : Internal()
+
+        /**
+         * Indicates that the FIDO 2 registration result has been received.
+         */
+        data class Fido2RegisterCredentialResultReceive(
+            val result: Fido2RegisterCredentialResult,
+        ) : Internal()
+
+        /**
+         * Indicates that the result for verifying the user's master password as part of the FIDO 2
+         * user verification flow has been received.
+         */
+        data class ValidateFido2PasswordResultReceive(
+            val result: ValidatePasswordResult,
+        ) : Internal()
+
+        /**
+         * Indicates that the result for verifying the user's PIN as part of the FIDO 2
+         * user verification flow has been received.
+         */
+        data class ValidateFido2PinResultReceive(
+            val result: ValidatePinResult,
         ) : Internal()
     }
 }
