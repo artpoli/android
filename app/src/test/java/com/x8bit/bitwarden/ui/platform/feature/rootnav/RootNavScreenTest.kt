@@ -73,6 +73,15 @@ class RootNavScreenTest : BaseComposeTest() {
         }
         assertTrue(isSplashScreenRemoved)
 
+        // Make sure navigating to Auth with the welcome route works as expected:
+        rootNavStateFlow.value = RootNavState.AuthWithWelcome
+        composeTestRule.runOnIdle {
+            fakeNavHostController.assertLastNavigation(
+                route = "welcome",
+                navOptions = expectedNavOptions,
+            )
+        }
+
         // Make sure navigating to vault locked works as expected:
         rootNavStateFlow.value = RootNavState.VaultLocked
         composeTestRule.runOnIdle {
@@ -170,6 +179,20 @@ class RootNavScreenTest : BaseComposeTest() {
             RootNavState.VaultUnlockedForFido2Assertion(
                 activeUserId = "activeUserId",
                 fido2CredentialAssertionRequest = mockk(),
+            )
+        composeTestRule
+            .runOnIdle {
+                fakeNavHostController.assertLastNavigation(
+                    route = "vault_item_listing_as_root/login",
+                    navOptions = expectedNavOptions,
+                )
+            }
+
+        // Make sure navigating to vault unlocked for Fido2GetCredentials works as expected:
+        rootNavStateFlow.value =
+            RootNavState.VaultUnlockedForFido2GetCredentials(
+                activeUserId = "activeUserId",
+                fido2GetCredentialsRequest = mockk(),
             )
         composeTestRule
             .runOnIdle {

@@ -14,17 +14,21 @@ import com.x8bit.bitwarden.ui.auth.feature.environment.environmentDestination
 import com.x8bit.bitwarden.ui.auth.feature.environment.navigateToEnvironment
 import com.x8bit.bitwarden.ui.auth.feature.landing.LANDING_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.landing.landingDestination
+import com.x8bit.bitwarden.ui.auth.feature.landing.navigateToLanding
 import com.x8bit.bitwarden.ui.auth.feature.login.loginDestination
 import com.x8bit.bitwarden.ui.auth.feature.login.navigateToLogin
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.loginWithDeviceDestination
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.model.LoginWithDeviceType
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.navigateToLoginWithDevice
+import com.x8bit.bitwarden.ui.auth.feature.masterpasswordguidance.masterPasswordGuidanceDestination
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordhint.masterPasswordHintDestination
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordhint.navigateToMasterPasswordHint
+import com.x8bit.bitwarden.ui.auth.feature.preventaccountlockout.preventAccountLockoutDestination
 import com.x8bit.bitwarden.ui.auth.feature.setpassword.navigateToSetPassword
 import com.x8bit.bitwarden.ui.auth.feature.setpassword.setPasswordDestination
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.navigateToTwoFactorLogin
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.twoFactorLoginDestination
+import com.x8bit.bitwarden.ui.auth.feature.welcome.welcomeDestination
 
 const val AUTH_GRAPH_ROUTE: String = "auth_graph"
 
@@ -32,7 +36,9 @@ const val AUTH_GRAPH_ROUTE: String = "auth_graph"
  * Add auth destinations to the nav graph.
  */
 @Suppress("LongMethod")
-fun NavGraphBuilder.authGraph(navController: NavHostController) {
+fun NavGraphBuilder.authGraph(
+    navController: NavHostController,
+) {
     navigation(
         startDestination = LANDING_ROUTE,
         route = AUTH_GRAPH_ROUTE,
@@ -71,6 +77,10 @@ fun NavGraphBuilder.authGraph(navController: NavHostController) {
             onNavigateToEnvironment = {
                 navController.navigateToEnvironment()
             },
+        )
+        welcomeDestination(
+            onNavigateToCreateAccount = { navController.navigateToCreateAccount() },
+            onNavigateToLogin = { navController.navigateToLanding() },
         )
         loginDestination(
             onNavigateBack = { navController.popBackStack() },
@@ -113,6 +123,15 @@ fun NavGraphBuilder.authGraph(navController: NavHostController) {
             onNavigateBack = { navController.popBackStack() },
         )
         twoFactorLoginDestination(
+            onNavigateBack = { navController.popBackStack() },
+        )
+        masterPasswordGuidanceDestination(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToGeneratePassword = {
+                // TODO [PM-10619](https://bitwarden.atlassian.net/browse/PM-10619)
+            },
+        )
+        preventAccountLockoutDestination(
             onNavigateBack = { navController.popBackStack() },
         )
     }

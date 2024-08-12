@@ -37,6 +37,7 @@ import com.x8bit.bitwarden.data.vault.repository.model.TotpCodeResult
 import com.x8bit.bitwarden.data.vault.repository.model.UpdateCipherResult
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
+import com.x8bit.bitwarden.ui.platform.base.util.BackgroundEvent
 import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.concat
@@ -467,12 +468,6 @@ class VaultAddEditViewModel @Inject constructor(
 
             UserVerificationRequirement.REQUIRED -> {
                 sendEvent(VaultAddEditEvent.Fido2UserVerification(isRequired = true))
-            }
-
-            null -> {
-                // Per WebAuthn spec members should be ignored when invalid. Since the request
-                // violates spec we display an error and terminate the operation.
-                showFido2ErrorDialog()
             }
         }
     }
@@ -939,6 +934,10 @@ class VaultAddEditViewModel @Inject constructor(
             is VaultAddEditAction.ItemType.LoginType.PasswordVisibilityChange -> {
                 handlePasswordVisibilityChange(action)
             }
+
+            VaultAddEditAction.ItemType.LoginType.ClearFido2CredentialClick -> {
+                handleLoginClearFido2Credential()
+            }
         }
     }
 
@@ -1037,6 +1036,13 @@ class VaultAddEditViewModel @Inject constructor(
         updateLoginContent { loginType ->
             loginType.copy(totp = null)
         }
+    }
+
+    private fun handleLoginClearFido2Credential() {
+        updateLoginContent { loginType ->
+            loginType.copy(fido2CredentialCreationDateTime = null)
+        }
+        sendEvent(event = VaultAddEditEvent.ShowToast(R.string.passkey_removed.asText()))
     }
 
     private fun handlePasswordVisibilityChange(
@@ -2364,8 +2370,7 @@ sealed class VaultAddEditEvent {
     /**
      * Navigate the user to the tooltip URI.
      */
-    data object NavigateToTooltipUri :
-        VaultAddEditEvent()
+    data object NavigateToTooltipUri : VaultAddEditEvent()
 
     /**
      * Navigate to the QR code scan screen.
@@ -2391,7 +2396,7 @@ sealed class VaultAddEditEvent {
      */
     data class CompleteFido2Registration(
         val result: Fido2RegisterCredentialResult,
-    ) : VaultAddEditEvent()
+    ) : BackgroundEvent, VaultAddEditEvent()
 
     /**
      * Perform user verification for a FIDO 2 credential operation.
@@ -2400,7 +2405,7 @@ sealed class VaultAddEditEvent {
      */
     data class Fido2UserVerification(
         val isRequired: Boolean,
-    ) : VaultAddEditEvent()
+    ) : BackgroundEvent, VaultAddEditEvent()
 }
 
 /**
@@ -2706,6 +2711,11 @@ sealed class VaultAddEditAction {
              * @property isVisible The new password visibility state.
              */
             data class PasswordVisibilityChange(val isVisible: Boolean) : LoginType()
+
+            /**
+             * Represents the action to clear the fido2 credential.
+             */
+            data object ClearFido2CredentialClick : LoginType()
         }
 
         /**

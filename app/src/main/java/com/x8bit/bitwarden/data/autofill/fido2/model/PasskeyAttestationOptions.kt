@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Models a FIDO 2 credential creation request options received from a Relying Party (RP).
+ * Models FIDO 2 credential creation request options received from a Relying Party (RP).
  */
 @Serializable
 data class PasskeyAttestationOptions(
@@ -32,7 +32,7 @@ data class PasskeyAttestationOptions(
         @SerialName("residentKey")
         val residentKeyRequirement: ResidentKeyRequirement? = null,
         @SerialName("userVerification")
-        val userVerification: UserVerificationRequirement? = null,
+        val userVerification: UserVerificationRequirement = UserVerificationRequirement.PREFERRED,
     ) {
         /**
          * Enum class representing the types of attachments associated with selection criteria.
