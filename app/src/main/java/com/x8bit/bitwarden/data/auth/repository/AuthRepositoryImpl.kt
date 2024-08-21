@@ -470,7 +470,8 @@ class AuthRepositoryImpl(
                             userId = userId,
                             email = account.profile.email,
                             orgPublicKey = organizationKeys.publicKey,
-                            rememberDevice = authDiskSource.getShouldTrustDevice(userId = userId),
+                            rememberDevice = authDiskSource
+                                .getShouldTrustDevice(userId = userId) == true,
                         )
                     }
                     .flatMap { keys ->
@@ -756,6 +757,7 @@ class AuthRepositoryImpl(
             )
             .flatMap { registerKeyResponse ->
                 if (emailVerificationToken == null) {
+                    // TODO PM-6675: Remove register call and service implementation
                     identityService.register(
                         body = RegisterRequestJson(
                             email = email,
@@ -813,10 +815,6 @@ class AuthRepositoryImpl(
                                     ?.firstOrNull()
                                     ?: it.message,
                             )
-                        }
-
-                        is RegisterResponseJson.Error -> {
-                            RegisterResult.Error(it.message)
                         }
                     }
                 },

@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
+import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
+import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
@@ -34,6 +36,7 @@ class LandingViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val vaultRepository: VaultRepository,
     private val environmentRepository: EnvironmentRepository,
+    private val featureFlagManager: FeatureFlagManager,
     savedStateHandle: SavedStateHandle,
 ) : BaseViewModel<LandingState, LandingEvent, LandingAction>(
     initialState = savedStateHandle[KEY_STATE]
@@ -191,7 +194,13 @@ class LandingViewModel @Inject constructor(
     }
 
     private fun handleCreateAccountClicked() {
-        sendEvent(LandingEvent.NavigateToCreateAccount)
+        @Suppress("MaxLineLength")
+        val navigationEvent = if (featureFlagManager.getFeatureFlag(key = FlagKey.EmailVerification)) {
+            LandingEvent.NavigateToStartRegistration
+        } else {
+            LandingEvent.NavigateToCreateAccount
+        }
+        sendEvent(navigationEvent)
     }
 
     private fun handleDialogDismiss() {
@@ -290,6 +299,11 @@ sealed class LandingEvent {
      * Navigates to the Create Account screen.
      */
     data object NavigateToCreateAccount : LandingEvent()
+
+    /**
+     * Navigates to the Start Registration screen.
+     */
+    data object NavigateToStartRegistration : LandingEvent()
 
     /**
      * Navigates to the Login screen with the given email address and region label.

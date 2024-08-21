@@ -2,16 +2,17 @@ package com.x8bit.bitwarden.data.auth.datasource.sdk
 
 import com.bitwarden.core.AuthRequestResponse
 import com.bitwarden.core.FingerprintRequest
+import com.bitwarden.core.KeyConnectorResponse
 import com.bitwarden.core.MasterPasswordPolicyOptions
 import com.bitwarden.core.RegisterKeyResponse
 import com.bitwarden.core.RegisterTdeKeyResponse
 import com.bitwarden.crypto.HashPurpose
 import com.bitwarden.crypto.Kdf
-import com.bitwarden.sdk.Client
 import com.bitwarden.sdk.ClientAuth
 import com.x8bit.bitwarden.data.auth.datasource.sdk.model.PasswordStrength
 import com.x8bit.bitwarden.data.auth.datasource.sdk.util.toPasswordStrengthOrNull
 import com.x8bit.bitwarden.data.auth.datasource.sdk.util.toUByte
+import com.x8bit.bitwarden.data.platform.datasource.sdk.BaseSdkSource
 import com.x8bit.bitwarden.data.platform.manager.SdkClientManager
 
 /**
@@ -19,12 +20,13 @@ import com.x8bit.bitwarden.data.platform.manager.SdkClientManager
  * [ClientAuth].
  */
 class AuthSdkSourceImpl(
-    private val sdkClientManager: SdkClientManager,
-) : AuthSdkSource {
+    sdkClientManager: SdkClientManager,
+) : BaseSdkSource(sdkClientManager = sdkClientManager),
+    AuthSdkSource {
 
     override suspend fun getNewAuthRequest(
         email: String,
-    ): Result<AuthRequestResponse> = runCatching {
+    ): Result<AuthRequestResponse> = runCatchingWithLogs {
         getClient()
             .auth()
             .newAuthRequest(
@@ -35,7 +37,7 @@ class AuthSdkSourceImpl(
     override suspend fun getUserFingerprint(
         email: String,
         publicKey: String,
-    ): Result<String> = runCatching {
+    ): Result<String> = runCatchingWithLogs {
         getClient()
             .platform()
             .fingerprint(
@@ -51,7 +53,7 @@ class AuthSdkSourceImpl(
         password: String,
         kdf: Kdf,
         purpose: HashPurpose,
-    ): Result<String> = runCatching {
+    ): Result<String> = runCatchingWithLogs {
         getClient()
             .auth()
             .hashPassword(
@@ -62,11 +64,18 @@ class AuthSdkSourceImpl(
             )
     }
 
+    override suspend fun makeKeyConnectorKeys(): Result<KeyConnectorResponse> =
+        runCatchingWithLogs {
+            getClient()
+                .auth()
+                .makeKeyConnectorKeys()
+        }
+
     override suspend fun makeRegisterKeys(
         email: String,
         password: String,
         kdf: Kdf,
-    ): Result<RegisterKeyResponse> = runCatching {
+    ): Result<RegisterKeyResponse> = runCatchingWithLogs {
         getClient()
             .auth()
             .makeRegisterKeys(
@@ -81,7 +90,7 @@ class AuthSdkSourceImpl(
         email: String,
         orgPublicKey: String,
         rememberDevice: Boolean,
-    ): Result<RegisterTdeKeyResponse> = runCatching {
+    ): Result<RegisterTdeKeyResponse> = runCatchingWithLogs {
         getClient(userId = userId)
             .auth()
             .makeRegisterTdeKeys(
@@ -95,7 +104,7 @@ class AuthSdkSourceImpl(
         email: String,
         password: String,
         additionalInputs: List<String>,
-    ): Result<PasswordStrength> = runCatching {
+    ): Result<PasswordStrength> = runCatchingWithLogs {
         @Suppress("UnsafeCallOnNullableType")
         getClient()
             .auth()
@@ -111,7 +120,7 @@ class AuthSdkSourceImpl(
         password: String,
         passwordStrength: PasswordStrength,
         policy: MasterPasswordPolicyOptions,
-    ): Result<Boolean> = runCatching {
+    ): Result<Boolean> = runCatchingWithLogs {
         getClient()
             .auth()
             .satisfiesPolicy(
@@ -120,8 +129,4 @@ class AuthSdkSourceImpl(
                 policy = policy,
             )
     }
-
-    private suspend fun getClient(
-        userId: String? = null,
-    ): Client = sdkClientManager.getOrCreateClient(userId = userId)
 }

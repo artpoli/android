@@ -18,6 +18,7 @@ import androidx.navigation.navOptions
 import com.x8bit.bitwarden.ui.auth.feature.auth.AUTH_GRAPH_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.auth.authGraph
 import com.x8bit.bitwarden.ui.auth.feature.auth.navigateToAuthGraph
+import com.x8bit.bitwarden.ui.auth.feature.completeregistration.navigateToCompleteRegistration
 import com.x8bit.bitwarden.ui.auth.feature.resetpassword.RESET_PASSWORD_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.resetpassword.navigateToResetPasswordGraph
 import com.x8bit.bitwarden.ui.auth.feature.resetpassword.resetPasswordDestination
@@ -85,8 +86,11 @@ fun RootNavScreen(
     }
 
     val targetRoute = when (state) {
-        RootNavState.Auth -> AUTH_GRAPH_ROUTE
-        RootNavState.AuthWithWelcome -> AUTH_GRAPH_ROUTE
+        RootNavState.Auth,
+        is RootNavState.CompleteOngoingRegistration,
+        RootNavState.AuthWithWelcome,
+        -> AUTH_GRAPH_ROUTE
+
         RootNavState.ResetPassword -> RESET_PASSWORD_ROUTE
         RootNavState.SetPassword -> SET_PASSWORD_ROUTE
         RootNavState.Splash -> SPLASH_ROUTE
@@ -136,6 +140,15 @@ fun RootNavScreen(
         when (val currentState = state) {
             RootNavState.Auth -> navController.navigateToAuthGraph(rootNavOptions)
             RootNavState.AuthWithWelcome -> navController.navigateToWelcome(rootNavOptions)
+            is RootNavState.CompleteOngoingRegistration -> {
+                navController.navigateToAuthGraph(rootNavOptions)
+                navController.navigateToCompleteRegistration(
+                    emailAddress = currentState.email,
+                    verificationToken = currentState.verificationToken,
+                    fromEmail = currentState.fromEmail,
+                )
+            }
+
             RootNavState.ResetPassword -> navController.navigateToResetPasswordGraph(rootNavOptions)
             RootNavState.SetPassword -> navController.navigateToSetPassword(rootNavOptions)
             RootNavState.Splash -> navController.navigateToSplash(rootNavOptions)

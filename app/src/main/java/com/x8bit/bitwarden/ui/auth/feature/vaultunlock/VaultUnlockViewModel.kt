@@ -16,6 +16,7 @@ import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockResult
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.model.UnlockType
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenErrorMessage
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
+import com.x8bit.bitwarden.ui.platform.base.util.BackgroundEvent
 import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.hexToColor
@@ -51,17 +52,17 @@ class VaultUnlockViewModel @Inject constructor(
     // We load the state from the savedStateHandle for testing purposes.
     initialState = savedStateHandle[KEY_STATE] ?: run {
         val userState = requireNotNull(authRepository.userStateFlow.value)
-        val trustedDevice = userState.activeAccount.trustedDevice
+        val activeAccount = userState.activeAccount
         val accountSummaries = userState.toAccountSummaries()
         val activeAccountSummary = userState.toActiveAccountSummary()
         val isBiometricsValid = biometricsEncryptionManager.isBiometricIntegrityValid(
             userId = userState.activeUserId,
             cipher = biometricsEncryptionManager.getOrCreateCipher(userState.activeUserId),
         )
-        val vaultUnlockType = userState.activeAccount.vaultUnlockType
-        val hasNoMasterPassword = trustedDevice?.hasMasterPassword == false
+        val vaultUnlockType = activeAccount.vaultUnlockType
+        val hasNoMasterPassword = !activeAccount.hasMasterPassword
         val hideInput = hasNoMasterPassword && vaultUnlockType == VaultUnlockType.MASTER_PASSWORD
-        val isBiometricsEnabled = userState.activeAccount.isBiometricsEnabled
+        val isBiometricsEnabled = activeAccount.isBiometricsEnabled
         if (hasNoMasterPassword && vaultUnlockType != VaultUnlockType.PIN && !isBiometricsEnabled) {
             // There is no valid way to unlock this app.
             authRepository.logout()
@@ -100,14 +101,7 @@ class VaultUnlockViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        val cipher = biometricsEncryptionManager.getOrCreateCipher(state.userId)
-        if (state.showBiometricLogin && cipher != null) {
-            sendEvent(
-                VaultUnlockEvent.PromptForBiometrics(
-                    cipher = cipher,
-                ),
-            )
-        }
+        promptForBiometricsIfAvailable()
     }
 
     override fun onCleared() {
@@ -319,6 +313,20 @@ class VaultUnlockViewModel @Inject constructor(
                 input = "",
             )
         }
+
+        // If the new account has biometrics available, automatically prompt for biometrics.
+        promptForBiometricsIfAvailable()
+    }
+
+    private fun promptForBiometricsIfAvailable() {
+        val cipher = biometricsEncryptionManager.getOrCreateCipher(state.userId)
+        if (state.showBiometricLogin && cipher != null) {
+            sendEvent(
+                VaultUnlockEvent.PromptForBiometrics(
+                    cipher = cipher,
+                ),
+            )
+        }
     }
 }
 
@@ -393,7 +401,7 @@ sealed class VaultUnlockEvent {
     /**
      * Prompts the user for biometrics unlock.
      */
-    data class PromptForBiometrics(val cipher: Cipher) : VaultUnlockEvent()
+    data class PromptForBiometrics(val cipher: Cipher) : BackgroundEvent, VaultUnlockEvent()
 }
 
 /**

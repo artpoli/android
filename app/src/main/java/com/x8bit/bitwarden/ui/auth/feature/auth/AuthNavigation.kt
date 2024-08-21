@@ -6,6 +6,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavOptions
 import androidx.navigation.navOptions
 import androidx.navigation.navigation
+import com.x8bit.bitwarden.ui.auth.feature.checkemail.checkEmailDestination
+import com.x8bit.bitwarden.ui.auth.feature.checkemail.navigateToCheckEmail
+import com.x8bit.bitwarden.ui.auth.feature.completeregistration.completeRegistrationDestination
+import com.x8bit.bitwarden.ui.auth.feature.completeregistration.navigateToCompleteRegistration
 import com.x8bit.bitwarden.ui.auth.feature.createaccount.createAccountDestination
 import com.x8bit.bitwarden.ui.auth.feature.createaccount.navigateToCreateAccount
 import com.x8bit.bitwarden.ui.auth.feature.enterprisesignon.enterpriseSignOnDestination
@@ -20,12 +24,17 @@ import com.x8bit.bitwarden.ui.auth.feature.login.navigateToLogin
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.loginWithDeviceDestination
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.model.LoginWithDeviceType
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.navigateToLoginWithDevice
+import com.x8bit.bitwarden.ui.auth.feature.masterpasswordgenerator.masterPasswordGeneratorDestination
+import com.x8bit.bitwarden.ui.auth.feature.masterpasswordgenerator.navigateToMasterPasswordGenerator
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordguidance.masterPasswordGuidanceDestination
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordhint.masterPasswordHintDestination
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordhint.navigateToMasterPasswordHint
+import com.x8bit.bitwarden.ui.auth.feature.preventaccountlockout.navigateToPreventAccountLockout
 import com.x8bit.bitwarden.ui.auth.feature.preventaccountlockout.preventAccountLockoutDestination
 import com.x8bit.bitwarden.ui.auth.feature.setpassword.navigateToSetPassword
 import com.x8bit.bitwarden.ui.auth.feature.setpassword.setPasswordDestination
+import com.x8bit.bitwarden.ui.auth.feature.startregistration.navigateToStartRegistration
+import com.x8bit.bitwarden.ui.auth.feature.startregistration.startRegistrationDestination
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.navigateToTwoFactorLogin
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.twoFactorLoginDestination
 import com.x8bit.bitwarden.ui.auth.feature.welcome.welcomeDestination
@@ -55,6 +64,29 @@ fun NavGraphBuilder.authGraph(
                 )
             },
         )
+        startRegistrationDestination(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToCompleteRegistration = { emailAddress, verificationToken ->
+                navController.navigateToCompleteRegistration(
+                    emailAddress = emailAddress,
+                    verificationToken = verificationToken,
+                    fromEmail = false,
+                )
+            },
+            onNavigateToCheckEmail = { emailAddress ->
+                navController.navigateToCheckEmail(emailAddress)
+            },
+            onNavigateToEnvironment = { navController.navigateToEnvironment() },
+        )
+        checkEmailDestination(
+            onNavigateBack = { navController.popBackStack() },
+        )
+        completeRegistrationDestination(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToLanding = {
+                navController.popBackStack(route = LANDING_ROUTE, inclusive = false)
+            },
+        )
         enterpriseSignOnDestination(
             onNavigateBack = { navController.popBackStack() },
             onNavigateToSetPassword = { navController.navigateToSetPassword() },
@@ -77,6 +109,7 @@ fun NavGraphBuilder.authGraph(
             onNavigateToEnvironment = {
                 navController.navigateToEnvironment()
             },
+            onNavigateToStartRegistration = { navController.navigateToStartRegistration() },
         )
         welcomeDestination(
             onNavigateToCreateAccount = { navController.navigateToCreateAccount() },
@@ -127,12 +160,14 @@ fun NavGraphBuilder.authGraph(
         )
         masterPasswordGuidanceDestination(
             onNavigateBack = { navController.popBackStack() },
-            onNavigateToGeneratePassword = {
-                // TODO [PM-10619](https://bitwarden.atlassian.net/browse/PM-10619)
-            },
+            onNavigateToGeneratePassword = { navController.navigateToMasterPasswordGenerator() },
         )
         preventAccountLockoutDestination(
             onNavigateBack = { navController.popBackStack() },
+        )
+        masterPasswordGeneratorDestination(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToPreventLockout = { navController.navigateToPreventAccountLockout() },
         )
     }
 }
