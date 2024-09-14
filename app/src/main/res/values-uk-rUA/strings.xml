@@ -41,6 +41,7 @@
   <string name="invalid_pin">Недійсний PIN. Спробуйте знову.</string>
   <string name="launch">Перейти</string>
   <string name="log_in">Увійти</string>
+  <string name="log_in_verb">Log in</string>
   <string name="log_in_noun">Вхід</string>
   <string name="log_out">Вийти</string>
   <string name="logout_confirmation">Ви дійсно хочете вийти?</string>
@@ -82,6 +83,7 @@
   <string name="yes">Так</string>
   <string name="account">Обліковий запис</string>
   <string name="account_created">Ваш обліковий запис створений! Тепер ви можете увійти.</string>
+  <string name="account_created_success">Your new account has been created!</string>
   <string name="add_an_item">Додати запис</string>
   <string name="app_extension">Розширення програми</string>
   <string name="autofill_accessibility_description">Використовуйте службу спеціальних можливостей Bitwarden, щоб автоматично вводити паролі в програмах та на вебсайтах.</string>
@@ -327,6 +329,7 @@
   <string name="no_items_folder">В цій теці немає записів.</string>
   <string name="no_items_trash">У смітнику немає записів.</string>
   <string name="autofill_accessibility_service">Служба спеціальних можливостей автозаповнення</string>
+  <string name="autofill_accessibility_summary">Assist with filling username and password fields in other apps and on the web.</string>
   <string name="autofill_service_description">Служба автозаповнення Bitwarden використовує Android Autofill Framework для введення облікових даних в інших програмах на вашому пристрої.</string>
   <string name="bitwarden_autofill_service_description">Використовуйте службу автозаповнення Bitwarden, щоб автоматично вводити облікові дані в інших програмах.</string>
   <string name="bitwarden_autofill_service_open_autofill_settings">Відкрити налаштування автозаповнення</string>
@@ -982,4 +985,20 @@
   <string name="email_address_required">Email address (required)</string>
   <string name="select_the_link_in_the_email_to_verify_your_email_address_and_continue_creating_your_account">"Select the link in the email to verify your email address and continue creating your account. "</string>
   <string name="change_email_address">Change email address</string>
+  <string name="next">Next</string>
+  <string name="bitwarden_cannot_recover_a_lost_or_forgotten_master_password">Bitwarden cannot recover a lost or forgotten master password.</string>
+  <string name="choose_your_master_password">Choose your master password</string>
+  <string name="choose_a_unique_and_strong_password_to_keep_your_information_safe">Choose a unique and strong password to keep your information safe.</string>
+  <string name="minimum_characters">%1$s characters</string>
+  <string name="expired_link">Expired link</string>
+  <string name="please_restart_registration_or_try_logging_in">Please restart registration or try logging in. You may already have an account.</string>
+  <string name="restart_registration">Restart registration</string>
+  <string name="authenticator_sync">Authenticator Sync</string>
+  <string name="allow_bitwarden_authenticator_syncing">Allow Bitwarden Authenticator Syncing</string>
+  <string name="there_was_an_issue_validating_the_registration_token">There was an issue validating the registration token.</string>
+  <string name="turn_on_autofill">Turn on autofill</string>
+  <string name="use_autofill_to_log_into_your_accounts">Use autofill to log into your accounts with a single tap.</string>
+  <string name="turn_on_later">Turn on later</string>
+  <string name="turn_on_autofill_later">Turn on autofill later?</string>
+  <string name="return_to_complete_this_step_anytime_in_settings">You can return to complete this step anytime in Settings.</string>
 </resources>
