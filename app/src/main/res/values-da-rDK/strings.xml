@@ -41,6 +41,7 @@
   <string name="invalid_pin">Ugyldig PIN-kode. Prøv igen.</string>
   <string name="launch">Start</string>
   <string name="log_in">Log ind</string>
+  <string name="log_in_verb">Log ind</string>
   <string name="log_in_noun">Login</string>
   <string name="log_out">Log ud</string>
   <string name="logout_confirmation">Log ud, sikker?</string>
@@ -82,6 +83,7 @@
   <string name="yes">Ja</string>
   <string name="account">Konto</string>
   <string name="account_created">Den nye konto er oprettet! Der kan nu logges ind.</string>
+  <string name="account_created_success">Din nye konto er oprettet!</string>
   <string name="add_an_item">Tilføj et emne</string>
   <string name="app_extension">App-udvidelse</string>
   <string name="autofill_accessibility_description">Brug Bitwardens hjælpefunktion til autoudfyldning af logins på tværs af apps og internet.</string>
@@ -615,6 +617,7 @@ Skanning vil ske automatisk.</string>
   <string name="updating_password">Opdaterer adgangskode</string>
   <string name="update_password_error">Kan p.t. ikke opdatere adgangskode</string>
   <string name="remove_master_password">Fjern hovedadgangskode</string>
+  <string name="organization_is_using_sso_with_a_self_hosted_key_server">%1$s benytter SSO med en selv-hostet nøgleserver. Organisationsmedlemmer behøver ikke længere en hovedadgangskode for at logge ind.</string>
   <string name="remove_master_password_warning">%1$s bruger SSO med kundehåndteret kryptering. Fortsættes, fjernes hovedadgangskoden fra kontoen, og SSO vil være krævet for indlogning.</string>
   <string name="remove_master_password_warning2">Ønsker man ikke at fjerne sin hovedadgangskode, kan man forlade denne organisation.</string>
   <string name="leave_organization">Forlad organisation</string>
@@ -927,8 +930,9 @@ Skift til denne konto?</string>
   <string name="self_hosted_server_url">URL til selv-hostet server</string>
   <string name="passkey_operation_failed_because_user_could_not_be_verified">Adgangsnøglehandling mislykkedes, da brugeren ikke kunne bekræftes.</string>
   <string name="user_verification_direction">Brugerbekræftelse</string>
-  <string name="creating_on">Creating on:</string>
+  <string name="creating_on">Opretter den:</string>
   <string name="follow_the_instructions_in_the_email_sent_to_x_to_continue_creating_your_account">Følg vejledningen i e-mailen sendt til %1$s for at fortsætte med kontooprettelsen.</string>
+  <string name="we_sent_an_email_to">Vi har sendt en e-mail til %1$s.</string>
   <string name="by_continuing_you_agree_to_the_terms_of_service_and_privacy_policy">Ved at fortsætte, accepterer du Vilkår for Tjeneste og Fortrolighedspolitik</string>
   <string name="set_password">Opsæt adgangskode</string>
   <string name="unsubscribe">Afmeld</string>
@@ -939,6 +943,7 @@ Skift til denne konto?</string>
   <string name="no_email_go_back_to_edit_your_email_address">Ingen e-mail? Gå tilbage for at redigere e-mailadressen.</string>
   <string name="or_log_in_you_may_already_have_an_account">Eller log ind, da en konto muligvis allerede eksisterer.</string>
   <string name="get_emails_from_bitwarden_for_announcements_advices_and_research_opportunities_unsubscribe_any_time">Få e-mails fra Bitwarden vedr. bekendtgørelser, råd og forskningsmuligheder. Afmeld når som helst.</string>
+  <string name="get_advice_announcements_and_research_opportunities_from_bitwarden_in_your_inbox_unsubscribe_any_time">Få råd, bekendtgørelser og forskningsmuligheder fra Bitwarden i indbakken. Afmeld til enhver tid.</string>
   <string name="privacy_prioritized">Fortrolighed, prioriteret</string>
   <string name="welcome_message_1">Gem logins, kort og identiteter i den sikre boks. Bitwarden bruger nul-viden, ende-til-ende kryptering til at beskytte brugerens vigtigt ting.</string>
   <string name="welcome_message_2">Opsæt biometrisk oplåsning og autofyld for at logge ind på konti uden at skrive ét enkelt bogstav.</string>
@@ -975,4 +980,18 @@ Skift til denne konto?</string>
   <string name="generate_button_label">Generér</string>
   <string name="write_this_password_down_and_keep_it_somewhere_safe">Nedskriv denne adgangskode og opbevar den et sikkert sted.</string>
   <string name="learn_about_other_ways_to_prevent_account_lockout">Læs om andre måder til forhindre at blive låst ude af kontoen</string>
+  <string name="help_with_server_geolocations">Hjælp med server-geolokationer.</string>
+  <string name="email_address_required">E-mailadresse (obligatorisk)</string>
+  <string name="select_the_link_in_the_email_to_verify_your_email_address_and_continue_creating_your_account">"Vælg linket i e-mailen for at bekræfte e-mailadressen og fortsætte med kontooprettelsen. "</string>
+  <string name="change_email_address">Skift e-mailadresse</string>
+  <string name="next">Næste</string>
+  <string name="bitwarden_cannot_recover_a_lost_or_forgotten_master_password">Bitwarden kan ikke gendanne en mistet eller glemt hovedadgangskode.</string>
+  <string name="choose_your_master_password">Vælg hovedadgangskode</string>
+  <string name="choose_a_unique_and_strong_password_to_keep_your_information_safe">Vælg en unik og stærk adgangskode for at holde brugeroplysningerne sikre.</string>
+  <string name="minimum_characters">%1$s tegn</string>
+  <string name="expired_link">Udløbet link</string>
+  <string name="please_restart_registration_or_try_logging_in">Genstart registreringen eller prøv at logge ind. En konto findes muligvis allerede.</string>
+  <string name="restart_registration">Genstart registrering</string>
+  <string name="authenticator_sync">Authenticator-synk</string>
+  <string name="allow_bitwarden_authenticator_syncing">Tillad Bitwarden Authenticator-synkning</string>
 </resources>

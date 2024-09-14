@@ -10,12 +10,14 @@ import com.x8bit.bitwarden.ui.auth.feature.checkemail.checkEmailDestination
 import com.x8bit.bitwarden.ui.auth.feature.checkemail.navigateToCheckEmail
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.completeRegistrationDestination
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.navigateToCompleteRegistration
+import com.x8bit.bitwarden.ui.auth.feature.completeregistration.popUpToCompleteRegistration
 import com.x8bit.bitwarden.ui.auth.feature.createaccount.createAccountDestination
 import com.x8bit.bitwarden.ui.auth.feature.createaccount.navigateToCreateAccount
 import com.x8bit.bitwarden.ui.auth.feature.enterprisesignon.enterpriseSignOnDestination
 import com.x8bit.bitwarden.ui.auth.feature.enterprisesignon.navigateToEnterpriseSignOn
 import com.x8bit.bitwarden.ui.auth.feature.environment.environmentDestination
 import com.x8bit.bitwarden.ui.auth.feature.environment.navigateToEnvironment
+import com.x8bit.bitwarden.ui.auth.feature.expiredregistrationlink.expiredRegistrationLinkDestination
 import com.x8bit.bitwarden.ui.auth.feature.landing.LANDING_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.landing.landingDestination
 import com.x8bit.bitwarden.ui.auth.feature.landing.navigateToLanding
@@ -27,6 +29,7 @@ import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.navigateToLoginWithDe
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordgenerator.masterPasswordGeneratorDestination
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordgenerator.navigateToMasterPasswordGenerator
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordguidance.masterPasswordGuidanceDestination
+import com.x8bit.bitwarden.ui.auth.feature.masterpasswordguidance.navigateToMasterPasswordGuidance
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordhint.masterPasswordHintDestination
 import com.x8bit.bitwarden.ui.auth.feature.masterpasswordhint.navigateToMasterPasswordHint
 import com.x8bit.bitwarden.ui.auth.feature.preventaccountlockout.navigateToPreventAccountLockout
@@ -80,11 +83,26 @@ fun NavGraphBuilder.authGraph(
         )
         checkEmailDestination(
             onNavigateBack = { navController.popBackStack() },
+            onNavigateBackToLanding = {
+                navController.popBackStack(route = LANDING_ROUTE, inclusive = false)
+            },
         )
         completeRegistrationDestination(
             onNavigateBack = { navController.popBackStack() },
-            onNavigateToLanding = {
-                navController.popBackStack(route = LANDING_ROUTE, inclusive = false)
+            onNavigateToPasswordGuidance = {
+                navController.navigateToMasterPasswordGuidance()
+            },
+            onNavigateToPreventAccountLockout = {
+                navController.navigateToPreventAccountLockout()
+            },
+            onNavigateToLogin = { emailAddress, captchaToken ->
+                navController.navigateToLogin(
+                    emailAddress = emailAddress,
+                    captchaToken = captchaToken,
+                    navOptions = navOptions {
+                        popUpTo(LANDING_ROUTE)
+                    },
+                )
             },
         )
         enterpriseSignOnDestination(
@@ -93,7 +111,7 @@ fun NavGraphBuilder.authGraph(
             onNavigateToTwoFactorLogin = { emailAddress ->
                 navController.navigateToTwoFactorLogin(
                     emailAddress = emailAddress,
-                    password = null,
+                    base64EncodedPassword = null,
                 )
             },
         )
@@ -136,7 +154,7 @@ fun NavGraphBuilder.authGraph(
             onNavigateToTwoFactorLogin = { emailAddress, password ->
                 navController.navigateToTwoFactorLogin(
                     emailAddress = emailAddress,
-                    password = password,
+                    base64EncodedPassword = password,
                 )
             },
         )
@@ -145,7 +163,7 @@ fun NavGraphBuilder.authGraph(
             onNavigateToTwoFactorLogin = {
                 navController.navigateToTwoFactorLogin(
                     emailAddress = it,
-                    password = null,
+                    base64EncodedPassword = null,
                 )
             },
         )
@@ -168,6 +186,26 @@ fun NavGraphBuilder.authGraph(
         masterPasswordGeneratorDestination(
             onNavigateBack = { navController.popBackStack() },
             onNavigateToPreventLockout = { navController.navigateToPreventAccountLockout() },
+            onNavigateBackWithPassword = {
+                navController.popUpToCompleteRegistration()
+            },
+        )
+        expiredRegistrationLinkDestination(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToStartRegistration = {
+                navController.navigateToStartRegistration(
+                    navOptions = navOptions {
+                        popUpTo(LANDING_ROUTE)
+                    },
+                )
+            },
+            onNavigateToLogin = {
+                navController.navigateToLanding(
+                    navOptions = navOptions {
+                        popUpTo(LANDING_ROUTE)
+                    },
+                )
+            },
         )
     }
 }

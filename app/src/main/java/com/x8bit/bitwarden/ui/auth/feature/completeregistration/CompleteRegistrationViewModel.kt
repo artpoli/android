@@ -6,15 +6,19 @@ import androidx.lifecycle.viewModelScope
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.sdk.model.PasswordStrength
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.model.PasswordStrengthResult
 import com.x8bit.bitwarden.data.auth.repository.model.RegisterResult
+import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
+import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
+import com.x8bit.bitwarden.data.tools.generator.repository.GeneratorRepository
+import com.x8bit.bitwarden.data.tools.generator.repository.model.GeneratorResult
+import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.BackClick
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.CheckDataBreachesToggle
-import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.CloseClick
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.ConfirmPasswordInputChange
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.ContinueWithBreachedPasswordClick
-import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.CreateAccountClick
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.ErrorDialogDismiss
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.Internal
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistrationAction.Internal.ReceivePasswordStrengthResult
@@ -23,48 +27,51 @@ import com.x8bit.bitwarden.ui.auth.feature.completeregistration.CompleteRegistra
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
 import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.asText
-import com.x8bit.bitwarden.ui.platform.base.util.concat
 import com.x8bit.bitwarden.ui.platform.base.util.isValidEmail
 import com.x8bit.bitwarden.ui.platform.components.dialog.BasicDialogState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
-import org.jetbrains.annotations.VisibleForTesting
 import javax.inject.Inject
 
 private const val KEY_STATE = "state"
 private const val MIN_PASSWORD_LENGTH = 12
 
 /**
- * Models logic for the create account screen.
+ * Models logic for the Complete Registration screen.
  */
 @Suppress("TooManyFunctions")
 @HiltViewModel
 class CompleteRegistrationViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    featureFlagManager: FeatureFlagManager,
+    generatorRepository: GeneratorRepository,
     private val authRepository: AuthRepository,
     private val environmentRepository: EnvironmentRepository,
     private val specialCircumstanceManager: SpecialCircumstanceManager,
 ) : BaseViewModel<CompleteRegistrationState, CompleteRegistrationEvent, CompleteRegistrationAction>(
-    initialState = savedStateHandle[KEY_STATE]
-        ?: run {
-            val args = CompleteRegistrationArgs(savedStateHandle)
-            CompleteRegistrationState(
-                userEmail = args.emailAddress,
-                emailVerificationToken = args.verificationToken,
-                fromEmail = args.fromEmail,
-                passwordInput = "",
-                confirmPasswordInput = "",
-                passwordHintInput = "",
-                isCheckDataBreachesToggled = true,
-                dialog = null,
-                passwordStrengthState = PasswordStrengthState.NONE,
-            )
-        },
+    initialState = savedStateHandle[KEY_STATE] ?: run {
+        val args = CompleteRegistrationArgs(savedStateHandle)
+        CompleteRegistrationState(
+            userEmail = args.emailAddress,
+            emailVerificationToken = args.verificationToken,
+            fromEmail = args.fromEmail,
+            passwordInput = "",
+            confirmPasswordInput = "",
+            passwordHintInput = "",
+            isCheckDataBreachesToggled = true,
+            dialog = null,
+            passwordStrengthState = PasswordStrengthState.NONE,
+            onboardingEnabled = featureFlagManager.getFeatureFlag(FlagKey.OnboardingFlow),
+            minimumPasswordLength = MIN_PASSWORD_LENGTH,
+        )
+    },
 ) {
 
     /**
@@ -79,31 +86,68 @@ class CompleteRegistrationViewModel @Inject constructor(
         stateFlow
             .onEach { savedStateHandle[KEY_STATE] = it }
             .launchIn(viewModelScope)
-    }
 
-    @VisibleForTesting
-    public override fun onCleared() {
-        // clean the specialCircumstance after being handled
-        specialCircumstanceManager.specialCircumstance = null
-        super.onCleared()
+        featureFlagManager
+            .getFeatureFlagFlow(FlagKey.OnboardingFlow)
+            .map {
+                Internal.UpdateOnboardingFeatureState(newValue = it)
+            }
+            .onEach(::sendAction)
+            .launchIn(viewModelScope)
+
+        generatorRepository
+            .generatorResultFlow
+            .filterIsInstance<GeneratorResult.Password>()
+            .map {
+                Internal.GeneratedPasswordResult(generatedPassword = it.password)
+            }
+            .onEach(::sendAction)
+            .launchIn(viewModelScope)
     }
 
     override fun handleAction(action: CompleteRegistrationAction) {
         when (action) {
-            is CreateAccountClick -> handleCreateAccountClick()
+            is Internal -> handleInternalAction(action)
             is ConfirmPasswordInputChange -> handleConfirmPasswordInputChanged(action)
             is PasswordHintChange -> handlePasswordHintChanged(action)
             is PasswordInputChange -> handlePasswordInputChanged(action)
-            is CloseClick -> handleCloseClick()
+            is BackClick -> handleBackClicked()
             is ErrorDialogDismiss -> handleDialogDismiss()
             is CheckDataBreachesToggle -> handleCheckDataBreachesToggle(action)
-            is Internal.ReceiveRegisterResult -> {
-                handleReceiveRegisterAccountResult(action)
+            ContinueWithBreachedPasswordClick -> handleContinueWithBreachedPasswordClick()
+            CompleteRegistrationAction.LearnToPreventLockoutClick -> {
+                handlePreventAccountLockoutClickAction()
             }
 
-            ContinueWithBreachedPasswordClick -> handleContinueWithBreachedPasswordClick()
-            is ReceivePasswordStrengthResult -> handlePasswordStrengthResult(action)
+            CompleteRegistrationAction.MakePasswordStrongClick -> {
+                handleMakePasswordStrongClickAction()
+            }
+
+            CompleteRegistrationAction.CallToActionClick -> handleCallToActionClick()
         }
+    }
+
+    private fun handleInternalAction(action: Internal) {
+        when (action) {
+            is Internal.GeneratedPasswordResult -> handleGeneratedPasswordResult(action)
+            is ReceivePasswordStrengthResult -> handlePasswordStrengthResult(action)
+            is Internal.ReceiveRegisterResult -> handleReceiveRegisterAccountResult(action)
+            is Internal.UpdateOnboardingFeatureState -> handleUpdateOnboardingFeatureState(action)
+            is Internal.ReceiveLoginResult -> handleLoginResult(action)
+        }
+    }
+
+    private fun handleGeneratedPasswordResult(
+        action: Internal.GeneratedPasswordResult,
+    ) {
+        val password = action.generatedPassword
+        mutableStateFlow.update {
+            it.copy(
+                passwordInput = password,
+                confirmPasswordInput = password,
+            )
+        }
+        checkPasswordStrength(input = password)
     }
 
     private fun verifyEmailAddress() {
@@ -117,6 +161,12 @@ class CompleteRegistrationViewModel @Inject constructor(
                     message = R.string.email_verified.asText(),
                 ),
             )
+        }
+    }
+
+    private fun handleUpdateOnboardingFeatureState(action: Internal.UpdateOnboardingFeatureState) {
+        mutableStateFlow.update {
+            it.copy(onboardingEnabled = action.newValue)
         }
     }
 
@@ -168,10 +218,19 @@ class CompleteRegistrationViewModel @Inject constructor(
             }
 
             is RegisterResult.Success -> {
-                mutableStateFlow.update { it.copy(dialog = null) }
-                sendEvent(
-                    CompleteRegistrationEvent.NavigateToLanding,
-                )
+                viewModelScope.launch {
+                    val loginResult = authRepository.login(
+                        email = state.userEmail,
+                        password = state.passwordInput,
+                        captchaToken = registerAccountResult.captchaToken,
+                    )
+                    sendAction(
+                        Internal.ReceiveLoginResult(
+                            loginResult = loginResult,
+                            captchaToken = registerAccountResult.captchaToken,
+                        ),
+                    )
+                }
             }
 
             RegisterResult.DataBreachFound -> {
@@ -209,6 +268,25 @@ class CompleteRegistrationViewModel @Inject constructor(
         }
     }
 
+    private fun handleLoginResult(action: Internal.ReceiveLoginResult) {
+        clearDialogState()
+        sendEvent(
+            CompleteRegistrationEvent.ShowToast(
+                message = R.string.account_created_success.asText(),
+            ),
+        )
+        // If the login result is Success the state based navigation will take care of it.
+        // otherwise we need to navigate to the login screen.
+        if (action.loginResult !is LoginResult.Success) {
+            sendEvent(
+                CompleteRegistrationEvent.NavigateToLogin(
+                    email = state.userEmail,
+                    captchaToken = action.captchaToken,
+                ),
+            )
+        }
+    }
+
     private fun handleCheckDataBreachesToggle(action: CheckDataBreachesToggle) {
         mutableStateFlow.update {
             it.copy(isCheckDataBreachesToggled = action.newState)
@@ -216,12 +294,12 @@ class CompleteRegistrationViewModel @Inject constructor(
     }
 
     private fun handleDialogDismiss() {
-        mutableStateFlow.update {
-            it.copy(dialog = null)
-        }
+        clearDialogState()
     }
 
-    private fun handleCloseClick() {
+    private fun handleBackClicked() {
+        // clear the special circumstance manager as user has elected not to proceed.
+        specialCircumstanceManager.specialCircumstance = null
         sendEvent(CompleteRegistrationEvent.NavigateBack)
     }
 
@@ -232,28 +310,14 @@ class CompleteRegistrationViewModel @Inject constructor(
     private fun handlePasswordInputChanged(action: PasswordInputChange) {
         // Update input:
         mutableStateFlow.update { it.copy(passwordInput = action.input) }
-        // Update password strength:
-        passwordStrengthJob.cancel()
-        if (action.input.isEmpty()) {
-            mutableStateFlow.update {
-                it.copy(passwordStrengthState = PasswordStrengthState.NONE)
-            }
-        } else {
-            passwordStrengthJob = viewModelScope.launch {
-                val result = authRepository.getPasswordStrength(
-                    email = state.userEmail,
-                    password = action.input,
-                )
-                trySendAction(ReceivePasswordStrengthResult(result))
-            }
-        }
+        checkPasswordStrength(action.input)
     }
 
     private fun handleConfirmPasswordInputChanged(action: ConfirmPasswordInputChange) {
         mutableStateFlow.update { it.copy(confirmPasswordInput = action.input) }
     }
 
-    private fun handleCreateAccountClick() = when {
+    private fun handleCallToActionClick() = when {
         state.userEmail.isBlank() -> {
             val dialog = BasicDialogState.Shown(
                 title = R.string.an_error_has_occurred.asText(),
@@ -295,6 +359,14 @@ class CompleteRegistrationViewModel @Inject constructor(
         }
     }
 
+    private fun handleMakePasswordStrongClickAction() {
+        sendEvent(CompleteRegistrationEvent.NavigateToMakePasswordStrong)
+    }
+
+    private fun handlePreventAccountLockoutClickAction() {
+        sendEvent(CompleteRegistrationEvent.NavigateToPreventAccountLockout)
+    }
+
     private fun handleContinueWithBreachedPasswordClick() {
         submitRegisterAccountRequest(
             shouldCheckForDataBreaches = false,
@@ -329,6 +401,30 @@ class CompleteRegistrationViewModel @Inject constructor(
             )
         }
     }
+
+    private fun checkPasswordStrength(input: String) {
+        // Update password strength:
+        passwordStrengthJob.cancel()
+        if (input.isEmpty()) {
+            mutableStateFlow.update {
+                it.copy(passwordStrengthState = PasswordStrengthState.NONE)
+            }
+        } else {
+            passwordStrengthJob = viewModelScope.launch {
+                val result = authRepository.getPasswordStrength(
+                    email = state.userEmail,
+                    password = input,
+                )
+                trySendAction(ReceivePasswordStrengthResult(result))
+            }
+        }
+    }
+
+    private fun clearDialogState() {
+        mutableStateFlow.update {
+            it.copy(dialog = null)
+        }
+    }
 }
 
 /**
@@ -345,19 +441,19 @@ data class CompleteRegistrationState(
     val isCheckDataBreachesToggled: Boolean,
     val dialog: CompleteRegistrationDialog?,
     val passwordStrengthState: PasswordStrengthState,
+    val onboardingEnabled: Boolean,
+    val minimumPasswordLength: Int,
 ) : Parcelable {
 
-    val passwordLengthLabel: Text
-        // Have to concat a few strings here, resulting string is:
-        // Important: Your master password cannot be recovered if you forget it! 12
-        // characters minimum
-        @Suppress("MaxLineLength")
-        get() = R.string.important.asText()
-            .concat(
-                ": ".asText(),
-                R.string.your_master_password_cannot_be_recovered_if_you_forget_it_x_characters_minimum
-                    .asText(MIN_PASSWORD_LENGTH),
-            )
+    /**
+     * The text to display on the call to action button.
+     */
+    val callToActionText: Text
+        get() = if (onboardingEnabled) {
+            R.string.next.asText()
+        } else {
+            R.string.create_account.asText()
+        }
 
     /**
      * Whether or not the provided master password is considered strong.
@@ -374,6 +470,14 @@ data class CompleteRegistrationState(
             PasswordStrengthState.STRONG,
             -> true
         }
+
+    /**
+     * Whether the form is valid.
+     */
+    val validSubmissionReady: Boolean
+        get() = passwordInput.isNotBlank() &&
+            confirmPasswordInput.isNotBlank() &&
+            passwordInput.length >= minimumPasswordLength
 }
 
 /**
@@ -423,24 +527,33 @@ sealed class CompleteRegistrationEvent {
     ) : CompleteRegistrationEvent()
 
     /**
-     * Navigates to the landing screen.
+     * Navigates to prevent account lockout info screen
      */
-    data object NavigateToLanding : CompleteRegistrationEvent()
+    data object NavigateToPreventAccountLockout : CompleteRegistrationEvent()
+
+    /**
+     * Navigates to make password strong screen
+     */
+    data object NavigateToMakePasswordStrong : CompleteRegistrationEvent()
+
+    /**
+     * Navigates to the captcha verification screen.
+     */
+    data class NavigateToLogin(
+        val email: String,
+        val captchaToken: String?,
+    ) : CompleteRegistrationEvent()
 }
 
 /**
  * Models actions for the complete registration screen.
  */
 sealed class CompleteRegistrationAction {
-    /**
-     * User clicked create account.
-     */
-    data object CreateAccountClick : CompleteRegistrationAction()
 
     /**
-     * User clicked close.
+     * User clicked back.
      */
-    data object CloseClick : CompleteRegistrationAction()
+    data object BackClick : CompleteRegistrationAction()
 
     /**
      * User clicked "Yes" when being asked if they are sure they want to use a breached password.
@@ -473,6 +586,21 @@ sealed class CompleteRegistrationAction {
     data class CheckDataBreachesToggle(val newState: Boolean) : CompleteRegistrationAction()
 
     /**
+     * User clicked on the make password strong card.
+     */
+    data object MakePasswordStrongClick : CompleteRegistrationAction()
+
+    /**
+     * User clicked on learn to prevent lockout text.
+     */
+    data object LearnToPreventLockoutClick : CompleteRegistrationAction()
+
+    /**
+     * User clicked on the "CTA" button.
+     */
+    data object CallToActionClick : CompleteRegistrationAction()
+
+    /**
      * Models actions that the [CompleteRegistrationViewModel] itself might send.
      */
     sealed class Internal : CompleteRegistrationAction() {
@@ -488,6 +616,28 @@ sealed class CompleteRegistrationAction {
          */
         data class ReceivePasswordStrengthResult(
             val result: PasswordStrengthResult,
+        ) : Internal()
+
+        /**
+         * Indicate on boarding feature state has been updated.
+         */
+        data class UpdateOnboardingFeatureState(val newValue: Boolean) : Internal()
+
+        /**
+         * Indicates a generated password has been received.
+         */
+        data class GeneratedPasswordResult(val generatedPassword: String) : Internal()
+
+        /**
+         * Indicates registration was successful and will now attempt to login and unlock the vault.
+         * @property captchaToken The captcha token to use for login. With the login function this
+         * is possible to be negative.
+         *
+         * @see [AuthRepository.login]
+         */
+        data class ReceiveLoginResult(
+            val loginResult: LoginResult,
+            val captchaToken: String?,
         ) : Internal()
     }
 }

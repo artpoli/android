@@ -17,6 +17,7 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockResult
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.model.UnlockType
+import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenInputLabel
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.model.AccountSummary
@@ -213,6 +214,7 @@ class VaultUnlockViewModelTest : BaseViewModelTest() {
                         needsMasterPassword = false,
                         trustedDevice = null,
                         hasMasterPassword = true,
+                        isUsingKeyConnector = false,
                     ),
                 ),
             )
@@ -250,6 +252,7 @@ class VaultUnlockViewModelTest : BaseViewModelTest() {
                         needsMasterPassword = false,
                         trustedDevice = null,
                         hasMasterPassword = true,
+                        isUsingKeyConnector = false,
                     ),
                 ),
             )
@@ -460,6 +463,28 @@ class VaultUnlockViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `on UnlockClick for empty password should display error dialog`() {
+        val password = ""
+        val initialState = DEFAULT_STATE.copy(
+            input = password,
+            vaultUnlockType = VaultUnlockType.MASTER_PASSWORD,
+        )
+        val viewModel = createViewModel(state = initialState)
+
+        viewModel.trySendAction(VaultUnlockAction.UnlockClick)
+        assertEquals(
+            initialState.copy(
+                dialog = VaultUnlockState.VaultUnlockDialog.Error(
+                    R.string.validation_field_required.asText(
+                        initialState.vaultUnlockType.unlockScreenInputLabel,
+                    ),
+                ),
+            ),
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Test
     fun `on UnlockClick for password unlock should display error dialog on AuthenticationError`() {
         val password = "abcd1234"
         val initialState = DEFAULT_STATE.copy(
@@ -594,6 +619,28 @@ class VaultUnlockViewModelTest : BaseViewModelTest() {
         coVerify {
             vaultRepository.unlockVaultWithMasterPassword(password)
         }
+    }
+
+    @Test
+    fun `on UnlockClick for empty PIN should display error dialog`() {
+        val password = ""
+        val initialState = DEFAULT_STATE.copy(
+            input = password,
+            vaultUnlockType = VaultUnlockType.PIN,
+        )
+        val viewModel = createViewModel(state = initialState)
+
+        viewModel.trySendAction(VaultUnlockAction.UnlockClick)
+        assertEquals(
+            initialState.copy(
+                dialog = VaultUnlockState.VaultUnlockDialog.Error(
+                    R.string.validation_field_required.asText(
+                        initialState.vaultUnlockType.unlockScreenInputLabel,
+                    ),
+                ),
+            ),
+            viewModel.stateFlow.value,
+        )
     }
 
     @Test
@@ -1008,6 +1055,7 @@ private val DEFAULT_ACCOUNT = UserState.Account(
     needsMasterPassword = false,
     trustedDevice = null,
     hasMasterPassword = true,
+    isUsingKeyConnector = false,
 )
 
 private val DEFAULT_USER_STATE = UserState(

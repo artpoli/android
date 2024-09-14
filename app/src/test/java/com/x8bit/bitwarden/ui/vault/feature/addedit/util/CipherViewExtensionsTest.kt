@@ -435,6 +435,7 @@ class CipherViewExtensionsTest {
                 Organization(
                     id = "mockOrganizationId-1",
                     name = "organizationName",
+                    shouldManageResetPassword = false,
                     shouldUseKeyConnector = false,
                     role = OrganizationType.ADMIN,
                 ),
@@ -444,6 +445,7 @@ class CipherViewExtensionsTest {
             needsMasterPassword = false,
             trustedDevice = null,
             hasMasterPassword = true,
+            isUsingKeyConnector = false,
         )
 }
 
@@ -468,7 +470,7 @@ private val DEFAULT_BASE_CIPHER_VIEW: CipherView = CipherView(
     favorite = false,
     reprompt = CipherRepromptType.PASSWORD,
     organizationUseTotp = false,
-    edit = false,
+    edit = true,
     viewPassword = false,
     localData = null,
     attachments = null,

@@ -51,15 +51,6 @@ sealed class SpecialCircumstance : Parcelable {
     ) : SpecialCircumstance()
 
     /**
-     * The app was launched via AppLink in order to allow the user complete an ongoing registration.
-     */
-    @Parcelize
-    data class CompleteRegistration(
-        val completeRegistrationData: CompleteRegistrationData,
-        val timestamp: Long,
-    ) : SpecialCircumstance()
-
-    /**
      * The app was launched via the credential manager framework in order to allow the user to
      * manually save a passkey to their vault.
      */
@@ -97,4 +88,28 @@ sealed class SpecialCircumstance : Parcelable {
      */
     @Parcelize
     data object VaultShortcut : SpecialCircumstance()
+
+    /**
+     * A subset of [SpecialCircumstance] that are only relevant in a pre-login state and should be
+     * cleared after a successful login.
+     */
+    @Parcelize
+    sealed class RegistrationEvent : SpecialCircumstance() {
+        /**
+         * The app was launched via AppLink in order to allow the user complete an ongoing
+         * registration.
+         */
+        @Parcelize
+        data class CompleteRegistration(
+            val completeRegistrationData: CompleteRegistrationData,
+            val timestamp: Long,
+        ) : RegistrationEvent()
+
+        /**
+         * The app was launched via AppLink in order to allow the user to complete registration but,
+         * the registration link has expired.
+         */
+        @Parcelize
+        data object ExpiredRegistrationLink : RegistrationEvent()
+    }
 }

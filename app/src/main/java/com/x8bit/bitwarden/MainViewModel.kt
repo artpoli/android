@@ -6,8 +6,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.bitwarden.vault.CipherView
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.EmailTokenResult
 import com.x8bit.bitwarden.data.auth.util.getCompleteRegistrationDataIntentOrNull
 import com.x8bit.bitwarden.data.auth.util.getPasswordlessRequestDataIntentOrNull
+import com.x8bit.bitwarden.data.autofill.accessibility.manager.AccessibilitySelectionManager
 import com.x8bit.bitwarden.data.autofill.fido2.manager.Fido2CredentialManager
 import com.x8bit.bitwarden.data.autofill.fido2.util.getFido2AssertionRequestOrNull
 import com.x8bit.bitwarden.data.autofill.fido2.util.getFido2CredentialRequestOrNull
@@ -17,11 +19,15 @@ import com.x8bit.bitwarden.data.autofill.util.getAutofillSaveItemOrNull
 import com.x8bit.bitwarden.data.autofill.util.getAutofillSelectionDataOrNull
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.garbage.GarbageCollectionManager
+import com.x8bit.bitwarden.data.platform.manager.model.CompleteRegistrationData
 import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
+import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.vault.manager.model.VaultStateEvent
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
+import com.x8bit.bitwarden.ui.platform.base.util.Text
+import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.platform.util.isMyVaultShortcut
@@ -30,10 +36,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import java.time.Clock
 import javax.inject.Inject
@@ -46,14 +54,16 @@ private const val SPECIAL_CIRCUMSTANCE_KEY = "special-circumstance"
 @Suppress("LongParameterList", "TooManyFunctions")
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    accessibilitySelectionManager: AccessibilitySelectionManager,
     autofillSelectionManager: AutofillSelectionManager,
     private val specialCircumstanceManager: SpecialCircumstanceManager,
     private val garbageCollectionManager: GarbageCollectionManager,
     private val fido2CredentialManager: Fido2CredentialManager,
     private val intentManager: IntentManager,
     settingsRepository: SettingsRepository,
-    private val vaultRepository: VaultRepository,
+    vaultRepository: VaultRepository,
     private val authRepository: AuthRepository,
+    private val environmentRepository: EnvironmentRepository,
     private val savedStateHandle: SavedStateHandle,
     private val clock: Clock,
 ) : BaseViewModel<MainState, MainEvent, MainAction>(
@@ -75,6 +85,12 @@ class MainViewModel @Inject constructor(
         specialCircumstanceManager
             .specialCircumstanceStateFlow
             .onEach { specialCircumstance = it }
+            .launchIn(viewModelScope)
+
+        accessibilitySelectionManager
+            .accessibilitySelectionFlow
+            .map { MainAction.Internal.AccessibilitySelectionReceive(it) }
+            .onEach(::sendAction)
             .launchIn(viewModelScope)
 
         autofillSelectionManager
@@ -126,10 +142,27 @@ class MainViewModel @Inject constructor(
                 }
             }
             .launchIn(viewModelScope)
+
+        // On app launch, mark all active users as having previously logged in.
+        // This covers any users who are active prior to this value being recorded.
+        viewModelScope.launch {
+            val userState = authRepository
+                .userStateFlow
+                .first()
+            userState
+                ?.accounts
+                ?.forEach {
+                    settingsRepository.storeUserHasLoggedInValue(it.userId)
+                }
+        }
     }
 
     override fun handleAction(action: MainAction) {
         when (action) {
+            is MainAction.Internal.AccessibilitySelectionReceive -> {
+                handleAccessibilitySelectionReceive(action)
+            }
+
             is MainAction.Internal.AutofillSelectionReceive -> {
                 handleAutofillSelectionReceive(action)
             }
@@ -140,7 +173,18 @@ class MainViewModel @Inject constructor(
             is MainAction.Internal.VaultUnlockStateChange -> handleVaultUnlockStateChange()
             is MainAction.ReceiveFirstIntent -> handleFirstIntentReceived(action)
             is MainAction.ReceiveNewIntent -> handleNewIntentReceived(action)
+            MainAction.OpenDebugMenu -> handleOpenDebugMenu()
         }
+    }
+
+    private fun handleOpenDebugMenu() {
+        sendEvent(MainEvent.NavigateToDebugMenu)
+    }
+
+    private fun handleAccessibilitySelectionReceive(
+        action: MainAction.Internal.AccessibilitySelectionReceive,
+    ) {
+        sendEvent(MainEvent.CompleteAccessibilityAutofill(cipherView = action.cipherView))
     }
 
     private fun handleAutofillSelectionReceive(
@@ -206,14 +250,7 @@ class MainViewModel @Inject constructor(
             }
 
             completeRegistrationData != null -> {
-                if (authRepository.activeUserId != null) {
-                    authRepository.hasPendingAccountAddition = true
-                }
-                specialCircumstanceManager.specialCircumstance =
-                    SpecialCircumstance.CompleteRegistration(
-                        completeRegistrationData = completeRegistrationData,
-                        timestamp = clock.millis(),
-                    )
+                handleCompleteRegistrationData(completeRegistrationData)
             }
 
             autofillSaveItem != null -> {
@@ -290,6 +327,49 @@ class MainViewModel @Inject constructor(
         sendEvent(MainEvent.Recreate)
         garbageCollectionManager.tryCollect()
     }
+
+    private fun handleCompleteRegistrationData(data: CompleteRegistrationData) {
+        viewModelScope.launch {
+            // Attempt to load the environment for the user if they have a pre-auth environment
+            // saved.
+            environmentRepository.loadEnvironmentForEmail(userEmail = data.email)
+            // Determine if the token is still valid.
+            val emailTokenResult = authRepository.validateEmailToken(
+                email = data.email,
+                token = data.verificationToken,
+            )
+            when (emailTokenResult) {
+                is EmailTokenResult.Error -> {
+                    sendEvent(
+                        MainEvent.ShowToast(
+                            message = emailTokenResult
+                                .message
+                                ?.asText()
+                                ?: R.string.there_was_an_issue_validating_the_registration_token
+                                    .asText(),
+                        ),
+                    )
+                }
+
+                EmailTokenResult.Expired -> {
+                    specialCircumstanceManager.specialCircumstance = SpecialCircumstance
+                        .RegistrationEvent
+                        .ExpiredRegistrationLink
+                }
+
+                EmailTokenResult.Success -> {
+                    if (authRepository.activeUserId != null) {
+                        authRepository.hasPendingAccountAddition = true
+                    }
+                    specialCircumstanceManager.specialCircumstance =
+                        SpecialCircumstance.RegistrationEvent.CompleteRegistration(
+                            completeRegistrationData = data,
+                            timestamp = clock.millis(),
+                        )
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -316,9 +396,22 @@ sealed class MainAction {
     data class ReceiveNewIntent(val intent: Intent) : MainAction()
 
     /**
+     * Receive event to open the debug menu.
+     */
+    data object OpenDebugMenu : MainAction()
+
+    /**
      * Actions for internal use by the ViewModel.
      */
     sealed class Internal : MainAction() {
+        /**
+         * Indicates the user has manually selected the given [cipherView] for accessibility
+         * autofill.
+         */
+        data class AccessibilitySelectionReceive(
+            val cipherView: CipherView,
+        ) : Internal()
+
         /**
          * Indicates the user has manually selected the given [cipherView] for autofill.
          */
@@ -357,6 +450,12 @@ sealed class MainAction {
  */
 sealed class MainEvent {
     /**
+     * Event indicating that the user has chosen the given [cipherView] for accessibility autofill
+     * and that the process is ready to complete.
+     */
+    data class CompleteAccessibilityAutofill(val cipherView: CipherView) : MainEvent()
+
+    /**
      * Event indicating that the user has chosen the given [cipherView] for autofill and that the
      * process is ready to complete.
      */
@@ -366,4 +465,14 @@ sealed class MainEvent {
      * Event indicating that the UI should recreate itself.
      */
     data object Recreate : MainEvent()
+
+    /**
+     * Navigate to the debug menu.
+     */
+    data object NavigateToDebugMenu : MainEvent()
+
+    /**
+     * Show a toast with the given [message].
+     */
+    data class ShowToast(val message: Text) : MainEvent()
 }

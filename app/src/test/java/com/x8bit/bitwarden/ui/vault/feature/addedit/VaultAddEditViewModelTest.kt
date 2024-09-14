@@ -24,6 +24,7 @@ import com.x8bit.bitwarden.data.autofill.fido2.model.UserVerificationRequirement
 import com.x8bit.bitwarden.data.autofill.fido2.model.createMockFido2CredentialRequest
 import com.x8bit.bitwarden.data.autofill.model.AutofillSaveItem
 import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
+import com.x8bit.bitwarden.data.platform.base.FakeDispatcherManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManagerImpl
@@ -137,8 +138,13 @@ class VaultAddEditViewModelTest : BaseViewModelTest() {
         every { vaultDataStateFlow } returns mutableVaultDataFlow
         every { totpCodeFlow } returns totpTestCodeFlow
     }
+
+    private val mockAuthRepository = mockk<AuthRepository>(relaxed = true)
     private val specialCircumstanceManager: SpecialCircumstanceManager =
-        SpecialCircumstanceManagerImpl()
+        SpecialCircumstanceManagerImpl(
+            authRepository = mockAuthRepository,
+            dispatcherManager = FakeDispatcherManager(),
+        )
 
     private val generatorRepository: GeneratorRepository = FakeGeneratorRepository()
     private val organizationEventManager = mockk<OrganizationEventManager> {
@@ -257,6 +263,7 @@ class VaultAddEditViewModelTest : BaseViewModelTest() {
     fun `initial add state should be correct when autofill selection`() = runTest {
         val autofillSelectionData = AutofillSelectionData(
             type = AutofillSelectionData.Type.LOGIN,
+            framework = AutofillSelectionData.Framework.AUTOFILL,
             uri = "https://www.test.com",
         )
         specialCircumstanceManager.specialCircumstance = SpecialCircumstance.AutofillSelection(
@@ -3879,6 +3886,7 @@ class VaultAddEditViewModelTest : BaseViewModelTest() {
                         Organization(
                             id = "organizationId",
                             name = "organizationName",
+                            shouldManageResetPassword = false,
                             shouldUseKeyConnector = false,
                             role = OrganizationType.ADMIN,
                         ),
@@ -3888,6 +3896,7 @@ class VaultAddEditViewModelTest : BaseViewModelTest() {
                     needsMasterPassword = false,
                     trustedDevice = null,
                     hasMasterPassword = true,
+                    isUsingKeyConnector = false,
                 ),
             ),
             hasPendingAccountAddition = false,

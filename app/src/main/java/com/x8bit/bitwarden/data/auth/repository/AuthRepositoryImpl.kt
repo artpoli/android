@@ -26,6 +26,8 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.SetPasswordRequest
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorAuthMethod
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorDataModel
+import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyEmailTokenRequestJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyEmailTokenResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.service.AccountsService
 import com.x8bit.bitwarden.data.auth.datasource.network.service.DevicesService
 import com.x8bit.bitwarden.data.auth.datasource.network.service.HaveIBeenPwnedService
@@ -35,11 +37,13 @@ import com.x8bit.bitwarden.data.auth.datasource.sdk.AuthSdkSource
 import com.x8bit.bitwarden.data.auth.datasource.sdk.util.toInt
 import com.x8bit.bitwarden.data.auth.datasource.sdk.util.toKdfTypeJson
 import com.x8bit.bitwarden.data.auth.manager.AuthRequestManager
+import com.x8bit.bitwarden.data.auth.manager.KeyConnectorManager
 import com.x8bit.bitwarden.data.auth.manager.TrustedDeviceManager
 import com.x8bit.bitwarden.data.auth.manager.UserLogoutManager
 import com.x8bit.bitwarden.data.auth.repository.model.AuthState
 import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
 import com.x8bit.bitwarden.data.auth.repository.model.DeleteAccountResult
+import com.x8bit.bitwarden.data.auth.repository.model.EmailTokenResult
 import com.x8bit.bitwarden.data.auth.repository.model.KnownDeviceResult
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.model.NewSsoUserResult
@@ -49,6 +53,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.PasswordStrengthResult
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.PrevalidateSsoResult
 import com.x8bit.bitwarden.data.auth.repository.model.RegisterResult
+import com.x8bit.bitwarden.data.auth.repository.model.RemovePasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.RequestOtpResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResendEmailResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResetPasswordResult
@@ -56,6 +61,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.SendVerificationEmailResul
 import com.x8bit.bitwarden.data.auth.repository.model.SetPasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.SwitchAccountResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserAccountTokens
+import com.x8bit.bitwarden.data.auth.repository.model.UserKeyConnectorState
 import com.x8bit.bitwarden.data.auth.repository.model.UserOrganizations
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
@@ -69,11 +75,14 @@ import com.x8bit.bitwarden.data.auth.repository.util.SsoCallbackResult
 import com.x8bit.bitwarden.data.auth.repository.util.WebAuthResult
 import com.x8bit.bitwarden.data.auth.repository.util.activeUserIdChangesFlow
 import com.x8bit.bitwarden.data.auth.repository.util.policyInformation
+import com.x8bit.bitwarden.data.auth.repository.util.toRemovedPasswordUserStateJson
 import com.x8bit.bitwarden.data.auth.repository.util.toSdkParams
 import com.x8bit.bitwarden.data.auth.repository.util.toUserState
 import com.x8bit.bitwarden.data.auth.repository.util.toUserStateJsonWithPassword
 import com.x8bit.bitwarden.data.auth.repository.util.userAccountTokens
 import com.x8bit.bitwarden.data.auth.repository.util.userAccountTokensFlow
+import com.x8bit.bitwarden.data.auth.repository.util.userKeyConnectorStateFlow
+import com.x8bit.bitwarden.data.auth.repository.util.userKeyConnectorStateList
 import com.x8bit.bitwarden.data.auth.repository.util.userOrganizationsList
 import com.x8bit.bitwarden.data.auth.repository.util.userOrganizationsListFlow
 import com.x8bit.bitwarden.data.auth.repository.util.userSwitchingChangesFlow
@@ -92,6 +101,7 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.data.platform.util.asFailure
 import com.x8bit.bitwarden.data.platform.util.asSuccess
 import com.x8bit.bitwarden.data.platform.util.flatMap
+import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
 import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
 import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
@@ -142,6 +152,7 @@ class AuthRepositoryImpl(
     private val settingsRepository: SettingsRepository,
     private val vaultRepository: VaultRepository,
     private val authRequestManager: AuthRequestManager,
+    private val keyConnectorManager: KeyConnectorManager,
     private val trustedDeviceManager: TrustedDeviceManager,
     private val userLogoutManager: UserLogoutManager,
     private val policyManager: PolicyManager,
@@ -238,6 +249,7 @@ class AuthRepositoryImpl(
         authDiskSource.userStateFlow,
         authDiskSource.userAccountTokensFlow,
         authDiskSource.userOrganizationsListFlow,
+        authDiskSource.userKeyConnectorStateFlow,
         vaultRepository.vaultUnlockDataStateFlow,
         mutableHasPendingAccountAdditionStateFlow,
         // Ignore the data in the merge, but trigger an update when they emit.
@@ -249,12 +261,14 @@ class AuthRepositoryImpl(
         val userStateJson = array[0] as UserStateJson?
         val userAccountTokens = array[1] as List<UserAccountTokens>
         val userOrganizationsList = array[2] as List<UserOrganizations>
-        val vaultState = array[3] as List<VaultUnlockData>
-        val hasPendingAccountAddition = array[4] as Boolean
+        val userIsUsingKeyConnectorList = array[3] as List<UserKeyConnectorState>
+        val vaultState = array[4] as List<VaultUnlockData>
+        val hasPendingAccountAddition = array[5] as Boolean
         userStateJson?.toUserState(
             vaultState = vaultState,
             userAccountTokens = userAccountTokens,
             userOrganizationsList = userOrganizationsList,
+            userIsUsingKeyConnectorList = userIsUsingKeyConnectorList,
             hasPendingAccountAddition = hasPendingAccountAddition,
             isBiometricsEnabledProvider = ::isBiometricsEnabled,
             vaultUnlockTypeProvider = ::getVaultUnlockType,
@@ -272,6 +286,7 @@ class AuthRepositoryImpl(
                     vaultState = vaultRepository.vaultUnlockDataStateFlow.value,
                     userAccountTokens = authDiskSource.userAccountTokens,
                     userOrganizationsList = authDiskSource.userOrganizationsList,
+                    userIsUsingKeyConnectorList = authDiskSource.userKeyConnectorStateList,
                     hasPendingAccountAddition = mutableHasPendingAccountAdditionStateFlow.value,
                     isBiometricsEnabledProvider = ::isBiometricsEnabled,
                     vaultUnlockTypeProvider = ::getVaultUnlockType,
@@ -299,6 +314,9 @@ class AuthRepositoryImpl(
     override var rememberedEmailAddress: String? by authDiskSource::rememberedEmailAddress
 
     override var rememberedOrgIdentifier: String? by authDiskSource::rememberedOrgIdentifier
+
+    override val tdeLoginComplete: Boolean?
+        get() = activeUserId?.let { authDiskSource.getIsTdeLoginComplete(userId = it) }
 
     override var shouldTrustDevice: Boolean
         get() = activeUserId?.let { authDiskSource.getShouldTrustDevice(userId = it) } ?: false
@@ -538,8 +556,7 @@ class AuthRepositoryImpl(
                 ),
             )
         }
-
-        authDiskSource.storeUserKey(userId = userId, userKey = asymmetricalKey)
+        settingsRepository.storeUserHasLoggedInValue(userId)
         vaultRepository.syncIfNecessary()
         return LoginResult.Success
     }
@@ -832,6 +849,46 @@ class AuthRepositoryImpl(
             },
             onFailure = { PasswordHintResult.Error(null) },
         )
+    }
+
+    override suspend fun removePassword(masterPassword: String): RemovePasswordResult {
+        val activeAccount = authDiskSource
+            .userState
+            ?.activeAccount
+            ?: return RemovePasswordResult.Error
+        val profile = activeAccount.profile
+        val userId = profile.userId
+        val userKey = authDiskSource
+            .getUserKey(userId = userId)
+            ?: return RemovePasswordResult.Error
+        val keyConnectorUrl = organizations
+            .find {
+                it.shouldUseKeyConnector &&
+                    it.type != OrganizationType.OWNER &&
+                    it.type != OrganizationType.ADMIN
+            }
+            ?.keyConnectorUrl
+            ?: return RemovePasswordResult.Error
+        return keyConnectorManager
+            .migrateExistingUserToKeyConnector(
+                userId = userId,
+                url = keyConnectorUrl,
+                userKeyEncrypted = userKey,
+                email = profile.email,
+                masterPassword = masterPassword,
+                kdf = profile.toSdkParams(),
+            )
+            .onSuccess {
+                authDiskSource.userState = authDiskSource
+                    .userState
+                    ?.toRemovedPasswordUserStateJson(userId = userId)
+                vaultRepository.sync()
+                settingsRepository.setDefaultsIfNecessary(userId = userId)
+            }
+            .fold(
+                onFailure = { RemovePasswordResult.Error },
+                onSuccess = { RemovePasswordResult.Success },
+            )
     }
 
     override suspend fun resetPassword(
@@ -1202,6 +1259,31 @@ class AuthRepositoryImpl(
                 },
             )
 
+    override suspend fun validateEmailToken(email: String, token: String): EmailTokenResult {
+        return identityService
+            .verifyEmailRegistrationToken(
+                body = VerifyEmailTokenRequestJson(
+                    email = email,
+                    token = token,
+                ),
+            )
+            .fold(
+                onSuccess = {
+                    when (val json = it) {
+                        VerifyEmailTokenResponseJson.Valid -> EmailTokenResult.Success
+                        is VerifyEmailTokenResponseJson.Invalid -> {
+                            EmailTokenResult.Error(json.message)
+                        }
+
+                        VerifyEmailTokenResponseJson.TokenExpired -> EmailTokenResult.Expired
+                    }
+                },
+                onFailure = {
+                    EmailTokenResult.Error(message = null)
+                },
+            )
+    }
+
     @Suppress("CyclomaticComplexMethod")
     private suspend fun validatePasswordAgainstPolicy(
         password: String,
@@ -1410,30 +1492,42 @@ class AuthRepositoryImpl(
             previousUserState = authDiskSource.userState,
             environmentUrlData = environmentRepository.environment.environmentUrlData,
         )
-        val userId = userStateJson.activeUserId
+        val profile = userStateJson.activeAccount.profile
+        val userId = profile.userId
 
         checkForVaultUnlockError(
             onVaultUnlockError = { vaultUnlockError ->
                 return@userStateTransaction vaultUnlockError.toLoginErrorResult()
             },
         ) {
+            val keyConnectorUrl = loginResponse
+                .keyConnectorUrl
+                ?: loginResponse
+                    .userDecryptionOptions
+                    ?.keyConnectorUserDecryptionOptions
+                    ?.keyConnectorUrl
             val isDeviceUnlockAvailable = deviceData != null ||
                 loginResponse.userDecryptionOptions?.trustedDeviceUserDecryptionOptions != null
             // if possible attempt to unlock the vault with trusted device data
             if (isDeviceUnlockAvailable) {
                 unlockVaultWithTdeOnLoginSuccess(
                     loginResponse = loginResponse,
-                    userStateJson = userStateJson,
+                    profile = profile,
                     deviceData = deviceData,
                 )
+            } else if (keyConnectorUrl != null && orgIdentifier != null) {
+                unlockVaultWithKeyConnectorOnLoginSuccess(
+                    profile = profile,
+                    keyConnectorUrl = keyConnectorUrl,
+                    orgIdentifier = orgIdentifier,
+                    loginResponse = loginResponse,
+                )
             } else {
-                password?.let {
-                    unlockVaultWithPasswordOnLoginSuccess(
-                        loginResponse = loginResponse,
-                        userStateJson = userStateJson,
-                        password = it,
-                    )
-                }
+                unlockVaultWithPasswordOnLoginSuccess(
+                    loginResponse = loginResponse,
+                    profile = profile,
+                    password = password,
+                )
             }
         }
 
@@ -1443,7 +1537,7 @@ class AuthRepositoryImpl(
                 .hashPassword(
                     email = email,
                     password = it,
-                    kdf = userStateJson.activeAccount.profile.toSdkParams(),
+                    kdf = profile.toSdkParams(),
                     purpose = HashPurpose.LOCAL_AUTHORIZATION,
                 )
                 .onSuccess { passwordHash ->
@@ -1471,8 +1565,11 @@ class AuthRepositoryImpl(
             // when we completed the pending admin auth request.
             authDiskSource.storeUserKey(userId = userId, userKey = it)
         }
-        authDiskSource.storePrivateKey(userId = userId, privateKey = loginResponse.privateKey)
-
+        loginResponse.privateKey?.let {
+            // Only set the value if it's present, since we may have set it already
+            // when we completed the key connector conversion.
+            authDiskSource.storePrivateKey(userId = userId, privateKey = it)
+        }
         // If the user just authenticated with a two-factor code and selected the option to
         // remember it, then the API response will return a token that will be used in place
         // of the two-factor code on the next login attempt.
@@ -1491,6 +1588,7 @@ class AuthRepositoryImpl(
         resendEmailRequestJson = null
         twoFactorDeviceData = null
         settingsRepository.setDefaultsIfNecessary(userId = userId)
+        settingsRepository.storeUserHasLoggedInValue(userId)
         vaultRepository.syncIfNecessary()
         hasPendingAccountAddition = false
         LoginResult.Success
@@ -1522,11 +1620,88 @@ class AuthRepositoryImpl(
     }
 
     /**
+     * Attempt to unlock the current user's vault with key connector data.
+     */
+    private suspend fun unlockVaultWithKeyConnectorOnLoginSuccess(
+        profile: AccountJson.Profile,
+        keyConnectorUrl: String,
+        orgIdentifier: String,
+        loginResponse: GetTokenResponseJson.Success,
+    ): VaultUnlockResult? =
+        if (loginResponse.userDecryptionOptions?.hasMasterPassword != false) {
+            // This user has a master password, so we skip the key-connector logic as it is not
+            // setup yet. The user can still unlock the vault with their master password.
+            null
+        } else if (loginResponse.key != null && loginResponse.privateKey != null) {
+            // This is a returning user who should already have the key connector setup
+            keyConnectorManager
+                .getMasterKeyFromKeyConnector(
+                    url = keyConnectorUrl,
+                    accessToken = loginResponse.accessToken,
+                )
+                .map {
+                    unlockVault(
+                        accountProfile = profile,
+                        privateKey = loginResponse.privateKey,
+                        initUserCryptoMethod = InitUserCryptoMethod.KeyConnector(
+                            masterKey = it.masterKey,
+                            userKey = loginResponse.key,
+                        ),
+                    )
+                }
+                .fold(
+                    // If the request failed, we want to abort the login process
+                    onFailure = { VaultUnlockResult.GenericError },
+                    onSuccess = { it },
+                )
+        } else {
+            // This is a new user who needs to setup the key connector
+            keyConnectorManager
+                .migrateNewUserToKeyConnector(
+                    url = keyConnectorUrl,
+                    accessToken = loginResponse.accessToken,
+                    kdfType = loginResponse.kdfType,
+                    kdfIterations = loginResponse.kdfIterations,
+                    kdfMemory = loginResponse.kdfMemory,
+                    kdfParallelism = loginResponse.kdfParallelism,
+                    organizationIdentifier = orgIdentifier,
+                )
+                .map { keyConnectorResponse ->
+                    val result = unlockVault(
+                        accountProfile = profile,
+                        privateKey = keyConnectorResponse.keys.private,
+                        initUserCryptoMethod = InitUserCryptoMethod.KeyConnector(
+                            masterKey = keyConnectorResponse.masterKey,
+                            userKey = keyConnectorResponse.encryptedUserKey,
+                        ),
+                    )
+                    if (result is VaultUnlockResult.Success) {
+                        // We now know that login/unlock was successful, so we store the userKey
+                        // and privateKey we now have since it didn't exist on the loginResponse
+                        authDiskSource.storeUserKey(
+                            userId = profile.userId,
+                            userKey = keyConnectorResponse.encryptedUserKey,
+                        )
+                        authDiskSource.storePrivateKey(
+                            userId = profile.userId,
+                            privateKey = keyConnectorResponse.keys.private,
+                        )
+                    }
+                    result
+                }
+                .fold(
+                    // If the request failed, we want to abort the login process
+                    onFailure = { VaultUnlockResult.GenericError },
+                    onSuccess = { it },
+                )
+        }
+
+    /**
      * Attempt to unlock the current user's vault with password data.
      */
     private suspend fun unlockVaultWithPasswordOnLoginSuccess(
         loginResponse: GetTokenResponseJson.Success,
-        userStateJson: UserStateJson,
+        profile: AccountJson.Profile,
         password: String?,
     ): VaultUnlockResult? {
         // Attempt to unlock the vault with password if possible.
@@ -1534,7 +1709,7 @@ class AuthRepositoryImpl(
         val privateKey = loginResponse.privateKey ?: return null
         val key = loginResponse.key ?: return null
         return unlockVault(
-            accountProfile = userStateJson.activeAccount.profile,
+            accountProfile = profile,
             privateKey = privateKey,
             initUserCryptoMethod = InitUserCryptoMethod.Password(
                 password = masterPassword,
@@ -1548,7 +1723,7 @@ class AuthRepositoryImpl(
      */
     private suspend fun unlockVaultWithTdeOnLoginSuccess(
         loginResponse: GetTokenResponseJson.Success,
-        userStateJson: UserStateJson,
+        profile: AccountJson.Profile,
         deviceData: DeviceDataModel?,
     ): VaultUnlockResult? {
         // Attempt to unlock the vault with auth request if possible.
@@ -1556,7 +1731,7 @@ class AuthRepositoryImpl(
         if (loginResponse.privateKey != null && loginResponse.key != null) {
             deviceData?.let { model ->
                 return unlockVault(
-                    accountProfile = userStateJson.activeAccount.profile,
+                    accountProfile = profile,
                     privateKey = loginResponse.privateKey,
                     initUserCryptoMethod = InitUserCryptoMethod.AuthRequest(
                         requestPrivateKey = model.privateKey,
@@ -1585,7 +1760,7 @@ class AuthRepositoryImpl(
                 loginResponse.privateKey?.let { privateKey ->
                     unlockVaultWithTrustedDeviceUserDecryptionOptionsAndStoreKeys(
                         options = options,
-                        userStateJson = userStateJson,
+                        profile = profile,
                         privateKey = privateKey,
                     )
                 }
@@ -1598,11 +1773,11 @@ class AuthRepositoryImpl(
      */
     private suspend fun unlockVaultWithTrustedDeviceUserDecryptionOptionsAndStoreKeys(
         options: TrustedDeviceUserDecryptionOptionsJson,
-        userStateJson: UserStateJson,
+        profile: AccountJson.Profile,
         privateKey: String,
     ): VaultUnlockResult? {
         var vaultUnlockResult: VaultUnlockResult? = null
-        val userId = userStateJson.activeUserId
+        val userId = profile.userId
         val deviceKey = authDiskSource.getDeviceKey(userId = userId)
         if (deviceKey == null) {
             // A null device key means this device is not trusted.
@@ -1616,7 +1791,7 @@ class AuthRepositoryImpl(
                     // For approved requests the key will always be present.
                     val userKey = requireNotNull(request.key)
                     vaultUnlockResult = unlockVault(
-                        accountProfile = userStateJson.activeAccount.profile,
+                        accountProfile = profile,
                         privateKey = privateKey,
                         initUserCryptoMethod = InitUserCryptoMethod.AuthRequest(
                             requestPrivateKey = pendingRequest.requestPrivateKey,
@@ -1643,7 +1818,7 @@ class AuthRepositoryImpl(
         }
 
         vaultUnlockResult = unlockVault(
-            accountProfile = userStateJson.activeAccount.profile,
+            accountProfile = profile,
             privateKey = privateKey,
             initUserCryptoMethod = InitUserCryptoMethod.DeviceKey(
                 deviceKey = deviceKey,

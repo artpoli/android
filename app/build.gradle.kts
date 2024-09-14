@@ -61,6 +61,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
             isMinifyEnabled = false
+
+            buildConfigField(type = "boolean", name = "HAS_DEBUG_MENU", value = "true")
         }
 
         // Beta and Release variants are identical except beta has a different package name
@@ -72,6 +74,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            buildConfigField(type = "boolean", name = "HAS_DEBUG_MENU", value = "false")
         }
         release {
             isDebuggable = false
@@ -80,6 +84,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            buildConfigField(type = "boolean", name = "HAS_DEBUG_MENU", value = "false")
         }
     }
 
@@ -128,6 +134,9 @@ dependencies {
     fun standardImplementation(dependencyNotation: Any) {
         add("standardImplementation", dependencyNotation)
     }
+
+    // TODO: this should use a versioned AAR instead of referencing a local AAR BITAU-94
+    implementation(files("libs/bridge-0.1.0-SNAPSHOT-release.aar"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
@@ -213,6 +222,7 @@ kover {
                 annotatedBy(
                     // Compose previews
                     "androidx.compose.ui.tooling.preview.Preview",
+                    "androidx.compose.ui.tooling.preview.PreviewScreenSizes",
                     // Manually excluded classes/files/etc.
                     "com.x8bit.bitwarden.data.platform.annotation.OmitFromCoverage",
                 )

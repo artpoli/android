@@ -2,6 +2,7 @@
 
 package com.x8bit.bitwarden.ui.tools.feature.generator
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -582,6 +584,7 @@ private fun ColumnScope.PasswordTypeContent(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Suppress("LongMethod")
 @Composable
 private fun PasswordLengthSliderItem(
@@ -646,6 +649,12 @@ private fun PasswordLengthSliderItem(
                 .width(16.dp + labelTextWidth + 16.dp),
         )
 
+        val colors = SliderDefaults.colors(
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent,
+            disabledActiveTickColor = Color.Transparent,
+            disabledInactiveTickColor = Color.Transparent,
+        )
         Slider(
             value = sliderValue.toFloat(),
             onValueChange = { newValue ->
@@ -656,16 +665,27 @@ private fun PasswordLengthSliderItem(
             },
             valueRange = sliderRange,
             steps = maxValue - 1,
-            colors = SliderDefaults.colors(
-                activeTickColor = Color.Transparent,
-                inactiveTickColor = Color.Transparent,
-                disabledActiveTickColor = Color.Transparent,
-                disabledInactiveTickColor = Color.Transparent,
-            ),
+            colors = colors,
+            thumb = {
+                SliderDefaults.Thumb(
+                    interactionSource = remember { MutableInteractionSource() },
+                    colors = colors,
+                    thumbSize = DpSize(width = 20.dp, height = 20.dp),
+                )
+            },
+            track = { sliderState ->
+                SliderDefaults.Track(
+                    modifier = Modifier.height(height = 4.dp),
+                    drawStopIndicator = null,
+                    colors = colors,
+                    sliderState = sliderState,
+                    thumbTrackGapSize = 0.dp,
+                )
+            },
             modifier = Modifier
                 .focusProperties { canFocus = false }
-                .testTag("PasswordLengthSlider")
-                .weight(1f),
+                .testTag(tag = "PasswordLengthSlider")
+                .weight(weight = 1f),
         )
     }
 }
@@ -1328,6 +1348,7 @@ private data class PasswordHandlers(
     val onPasswordMinSpecialCharactersChange: (Int) -> Unit,
     val onPasswordToggleAvoidAmbiguousCharsChange: (Boolean) -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         @Suppress("LongMethod")
         fun create(viewModel: GeneratorViewModel): PasswordHandlers {
@@ -1413,6 +1434,7 @@ private data class PassphraseHandlers(
     val onPassphraseCapitalizeToggleChange: (Boolean) -> Unit,
     val onPassphraseIncludeNumberToggleChange: (Boolean) -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         fun create(viewModel: GeneratorViewModel): PassphraseHandlers {
             return PassphraseHandlers(
@@ -1462,6 +1484,7 @@ private data class PassphraseHandlers(
 private data class UsernameTypeHandlers(
     val onUsernameTooltipClicked: () -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         fun create(viewModel: GeneratorViewModel): UsernameTypeHandlers {
             return UsernameTypeHandlers(
@@ -1493,6 +1516,7 @@ private data class ForwardedEmailAliasHandlers(
     val onForwardEmailDomainNameTextChange: (String) -> Unit,
     val onSimpleLoginApiKeyTextChange: (String) -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         @Suppress("LongMethod")
         fun create(viewModel: GeneratorViewModel): ForwardedEmailAliasHandlers {
@@ -1627,6 +1651,7 @@ private data class ForwardedEmailAliasHandlers(
 private data class PlusAddressedEmailHandlers(
     val onEmailChange: (String) -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         fun create(viewModel: GeneratorViewModel): PlusAddressedEmailHandlers {
             return PlusAddressedEmailHandlers(
@@ -1656,6 +1681,7 @@ private data class PlusAddressedEmailHandlers(
 private data class CatchAllEmailHandlers(
     val onDomainChange: (String) -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         fun create(viewModel: GeneratorViewModel): CatchAllEmailHandlers {
             return CatchAllEmailHandlers(
@@ -1686,6 +1712,7 @@ private data class RandomWordHandlers(
     val onCapitalizeChange: (Boolean) -> Unit,
     val onIncludeNumberChange: (Boolean) -> Unit,
 ) {
+    @Suppress("UndocumentedPublicClass")
     companion object {
         fun create(viewModel: GeneratorViewModel): RandomWordHandlers {
             return RandomWordHandlers(

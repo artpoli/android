@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import retrofit2.create
-import java.time.ZonedDateTime
 
 class OrganizationServiceTest : BaseServiceTest() {
     private val authenticatedOrganizationApi: AuthenticatedOrganizationApi = retrofit.create()
@@ -104,13 +103,6 @@ class OrganizationServiceTest : BaseServiceTest() {
         val result = organizationService.getOrganizationKeys("orgId")
         assertTrue(result.isFailure)
     }
-
-    @Test
-    fun `leaveOrganization when response is success should return success`() = runTest {
-        server.enqueue(MockResponse())
-        val result = organizationService.leaveOrganization(organizationId = "orgId")
-        assertTrue(result.isSuccess)
-    }
 }
 
 private const val ORGANIZATION_AUTO_ENROLL_STATUS_JSON = """
@@ -138,9 +130,6 @@ private const val ORGANIZATION_DOMAIN_SSO_DETAILS_JSON = """
 private val ORGANIZATION_DOMAIN_SSO_BODY = OrganizationDomainSsoDetailsResponseJson(
     isSsoAvailable = true,
     organizationIdentifier = "Test Org",
-    domainName = "bitwarden.com",
-    isSsoRequired = false,
-    verifiedDate = ZonedDateTime.parse("2024-09-13T00:00Z"),
 )
 
 private const val ORGANIZATION_KEYS_JSON = """

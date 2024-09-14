@@ -46,14 +46,41 @@ interface AuthDiskSource {
     fun clearData(userId: String)
 
     /**
+     * Get the authenticator sync unlock key. Null means there is no key, which means the user
+     * has not enabled authenticator syncing
+     */
+    fun getAuthenticatorSyncUnlockKey(userId: String): String?
+
+    /**
+     * Store the authenticator sync unlock key. Storing a null key effectively disables
+     * authenticator syncing.
+     */
+    fun storeAuthenticatorSyncUnlockKey(userId: String, authenticatorSyncUnlockKey: String?)
+
+    /**
      * Retrieves the state indicating that the user should use a key connector.
      */
     fun getShouldUseKeyConnector(userId: String): Boolean?
 
     /**
+     * Retrieves the state indicating that the user should use a key connector as a flow.
+     */
+    fun getShouldUseKeyConnectorFlow(userId: String): Flow<Boolean?>
+
+    /**
      * Stores the boolean indicating that the user should use a key connector.
      */
     fun storeShouldUseKeyConnector(userId: String, shouldUseKeyConnector: Boolean?)
+
+    /**
+     * Retrieves the state indicating that the user has completed login with TDE.
+     */
+    fun getIsTdeLoginComplete(userId: String): Boolean?
+
+    /**
+     * Stores the boolean indicating that the user has completed login with TDE.
+     */
+    fun storeIsTdeLoginComplete(userId: String, isTdeLoginComplete: Boolean?)
 
     /**
      * Retrieves the state indicating that the user has chosen to trust this device.

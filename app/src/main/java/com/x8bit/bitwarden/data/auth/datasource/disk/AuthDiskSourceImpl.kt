@@ -18,6 +18,7 @@ import java.util.UUID
 
 // These keys should be encrypted
 private const val ACCOUNT_TOKENS_KEY = "accountTokens"
+private const val AUTHENTICATOR_SYNC_UNLOCK_KEY = "authenticatorSyncUnlock"
 private const val BIOMETRICS_UNLOCK_KEY = "userKeyBiometricUnlock"
 private const val USER_AUTO_UNLOCK_KEY_KEY = "userKeyAutoUnlock"
 private const val DEVICE_KEY_KEY = "deviceKey"
@@ -39,6 +40,7 @@ private const val TWO_FACTOR_TOKEN_KEY = "twoFactorToken"
 private const val MASTER_PASSWORD_HASH_KEY = "keyHash"
 private const val POLICIES_KEY = "policies"
 private const val SHOULD_TRUST_DEVICE_KEY = "shouldTrustDevice"
+private const val TDE_LOGIN_COMPLETE = "tdeLoginComplete"
 private const val USES_KEY_CONNECTOR = "usesKeyConnector"
 
 /**
@@ -57,6 +59,8 @@ class AuthDiskSourceImpl(
     AuthDiskSource {
 
     private val inMemoryPinProtectedUserKeys = mutableMapOf<String, String?>()
+    private val mutableShouldUseKeyConnectorFlowMap =
+        mutableMapOf<String, MutableSharedFlow<Boolean?>>()
     private val mutableOrganizationsFlowMap =
         mutableMapOf<String, MutableSharedFlow<List<SyncResponseJson.Profile.Organization>?>>()
     private val mutablePoliciesFlowMap =
@@ -124,10 +128,29 @@ class AuthDiskSourceImpl(
         storePolicies(userId = userId, policies = null)
         storeAccountTokens(userId = userId, accountTokens = null)
         storeShouldUseKeyConnector(userId = userId, shouldUseKeyConnector = null)
+        storeIsTdeLoginComplete(userId = userId, isTdeLoginComplete = null)
+        storeAuthenticatorSyncUnlockKey(userId = userId, authenticatorSyncUnlockKey = null)
 
         // Do not remove the DeviceKey or PendingAuthRequest on logout, these are persisted
         // indefinitely unless the TDE flow explicitly removes them.
     }
+
+    override fun getAuthenticatorSyncUnlockKey(userId: String): String? =
+        getEncryptedString(AUTHENTICATOR_SYNC_UNLOCK_KEY.appendIdentifier(userId))
+
+    override fun storeAuthenticatorSyncUnlockKey(
+        userId: String,
+        authenticatorSyncUnlockKey: String?,
+    ) {
+        putEncryptedString(
+            key = AUTHENTICATOR_SYNC_UNLOCK_KEY.appendIdentifier(userId),
+            value = authenticatorSyncUnlockKey,
+        )
+    }
+
+    override fun getShouldUseKeyConnectorFlow(userId: String): Flow<Boolean?> =
+        getMutableShouldUseKeyConnectorFlowMap(userId = userId)
+            .onSubscription { emit(getShouldUseKeyConnector(userId = userId)) }
 
     override fun getShouldUseKeyConnector(
         userId: String,
@@ -138,6 +161,15 @@ class AuthDiskSourceImpl(
             key = USES_KEY_CONNECTOR.appendIdentifier(userId),
             value = shouldUseKeyConnector,
         )
+        getMutableShouldUseKeyConnectorFlowMap(userId = userId).tryEmit(shouldUseKeyConnector)
+    }
+
+    override fun getIsTdeLoginComplete(
+        userId: String,
+    ): Boolean? = getBoolean(key = TDE_LOGIN_COMPLETE.appendIdentifier(userId))
+
+    override fun storeIsTdeLoginComplete(userId: String, isTdeLoginComplete: Boolean?) {
+        putBoolean(TDE_LOGIN_COMPLETE.appendIdentifier(userId), isTdeLoginComplete)
     }
 
     override fun getShouldTrustDevice(
@@ -380,6 +412,13 @@ class AuthDiskSourceImpl(
             .also {
                 putString(key = UNIQUE_APP_ID_KEY, value = it)
             }
+
+    private fun getMutableShouldUseKeyConnectorFlowMap(
+        userId: String,
+    ): MutableSharedFlow<Boolean?> =
+        mutableShouldUseKeyConnectorFlowMap.getOrPut(userId) {
+            bufferedMutableSharedFlow(replay = 1)
+        }
 
     private fun getMutableOrganizationsFlow(
         userId: String,

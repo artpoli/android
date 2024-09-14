@@ -99,6 +99,38 @@ class SettingsRepositoryImpl(
             }
             ?: MutableStateFlow(value = null)
 
+    override var isAuthenticatorSyncEnabled: Boolean
+        // Authenticator sync is enabled if there is an authenticator sync unlock key for
+        // the current active user:
+        get() = activeUserId
+            ?.let { authDiskSource.getAuthenticatorSyncUnlockKey(userId = it) != null }
+            ?: false
+        set(value) {
+            val userId = activeUserId ?: return
+            // When turning off authenticator sync, set authenticator sync unlock key to
+            // null for the current active user:
+            if (!value) {
+                authDiskSource.storeAuthenticatorSyncUnlockKey(
+                    userId = userId,
+                    authenticatorSyncUnlockKey = null,
+                )
+                return
+            }
+            // When turning on authenticator sync, get a user encryption key from the vault SDK
+            // and store it as a authenticator sync unlock key:
+            unconfinedScope.launch {
+                vaultSdkSource
+                    .getUserEncryptionKey(userId = userId)
+                    .getOrNull()
+                    ?.let {
+                        authDiskSource.storeAuthenticatorSyncUnlockKey(
+                            userId = userId,
+                            authenticatorSyncUnlockKey = it,
+                        )
+                    }
+            }
+        }
+
     override var isIconLoadingDisabled: Boolean
         get() = settingsDiskSource.isIconLoadingDisabled ?: false
         set(value) {
@@ -325,14 +357,23 @@ class SettingsRepositoryImpl(
 
     override fun setDefaultsIfNecessary(userId: String) {
         // Set Vault Settings defaults
-        if (!isVaultTimeoutActionSet(userId = userId)) {
+        val hasMasterPassword = authDiskSource
+            .userState
+            ?.activeAccount
+            ?.profile
+            ?.userDecryptionOptions
+            ?.hasMasterPassword != false
+        val timeoutAction = settingsDiskSource.getVaultTimeoutAction(userId = userId)
+        val hasPin = authDiskSource.getPinProtectedUserKey(userId = userId) != null
+        val hasBiometrics = authDiskSource.getUserBiometricUnlockKey(userId = userId) != null
+        // The timeout action cannot be "lock" if you do not have master password, pin, or
+        // biometrics unlock enabled.
+        val hasInvalidTimeoutAction = timeoutAction == VaultTimeoutAction.LOCK &&
+            !hasPin &&
+            !hasBiometrics &&
+            !hasMasterPassword
+        if (!isVaultTimeoutActionSet(userId = userId) || hasInvalidTimeoutAction) {
             storeVaultTimeout(userId, VaultTimeout.FifteenMinutes)
-            val hasMasterPassword = authDiskSource
-                .userState
-                ?.activeAccount
-                ?.profile
-                ?.userDecryptionOptions
-                ?.hasMasterPassword != false
             storeVaultTimeoutAction(
                 userId = userId,
                 vaultTimeoutAction = if (!hasMasterPassword) {
@@ -480,6 +521,13 @@ class SettingsRepositoryImpl(
                 pinProtectedUserKey = null,
             )
         }
+    }
+
+    override fun getUserHasLoggedInValue(userId: String): Boolean =
+        settingsDiskSource.getUserHasSignedInPreviously(userId)
+
+    override fun storeUserHasLoggedInValue(userId: String) {
+        settingsDiskSource.storeUseHasLoggedInPreviously(userId)
     }
 
     /**

@@ -29,7 +29,7 @@ class VaultUnlockedNavBarViewModelTest : BaseViewModelTest() {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `on init with GeneratorShortcut special circumstance should navigate to the generator screen`() =
+    fun `on init with GeneratorShortcut special circumstance should navigate to the generator screen with shortcut event`() =
         runTest {
             every {
                 specialCircumstancesManager.specialCircumstance
@@ -38,7 +38,7 @@ class VaultUnlockedNavBarViewModelTest : BaseViewModelTest() {
             val viewModel = createViewModel()
 
             viewModel.eventFlow.test {
-                assertEquals(VaultUnlockedNavBarEvent.NavigateToGeneratorScreen, awaitItem())
+                assertEquals(VaultUnlockedNavBarEvent.Shortcut.NavigateToGeneratorScreen, awaitItem())
             }
             verify(exactly = 1) {
                 specialCircumstancesManager.specialCircumstance
@@ -48,7 +48,7 @@ class VaultUnlockedNavBarViewModelTest : BaseViewModelTest() {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `on init with VaultShortcut special circumstance should navigate to the generator screen`() =
+    fun `on init with VaultShortcut special circumstance should navigate to the vault screen with shortcut event`() =
         runTest {
             every {
                 specialCircumstancesManager.specialCircumstance
@@ -57,7 +57,13 @@ class VaultUnlockedNavBarViewModelTest : BaseViewModelTest() {
             val viewModel = createViewModel()
 
             viewModel.eventFlow.test {
-                assertEquals(VaultUnlockedNavBarEvent.NavigateToVaultScreen, awaitItem())
+                assertEquals(
+                    VaultUnlockedNavBarEvent.Shortcut.NavigateToVaultScreen(
+                        labelRes = R.string.my_vault,
+                        contentDescRes = R.string.my_vault,
+                    ),
+                    awaitItem(),
+                )
             }
             verify(exactly = 1) {
                 specialCircumstancesManager.specialCircumstance
@@ -139,7 +145,13 @@ class VaultUnlockedNavBarViewModelTest : BaseViewModelTest() {
         val viewModel = createViewModel()
         viewModel.eventFlow.test {
             viewModel.trySendAction(VaultUnlockedNavBarAction.VaultTabClick)
-            assertEquals(VaultUnlockedNavBarEvent.NavigateToVaultScreen, awaitItem())
+            assertEquals(
+                VaultUnlockedNavBarEvent.NavigateToVaultScreen(
+                    labelRes = R.string.my_vault,
+                    contentDescRes = R.string.my_vault,
+                ),
+                awaitItem(),
+            )
         }
     }
 

@@ -19,6 +19,30 @@ sealed class FlagKey<out T : Any> {
      */
     abstract val isRemotelyConfigured: Boolean
 
+    @Suppress("UndocumentedPublicClass")
+    companion object {
+        /**
+         * List of all flag keys to consider
+         */
+        val activeFlags: List<FlagKey<*>> by lazy {
+            listOf(
+                AuthenticatorSync,
+                EmailVerification,
+                OnboardingFlow,
+                OnboardingCarousel,
+            )
+        }
+    }
+
+    /**
+     *  Data object holding the key for syncing with the Bitwarden Authenticator app.
+     */
+    data object AuthenticatorSync : FlagKey<Boolean>() {
+        override val keyName: String = "enable-authenticator-sync-android"
+        override val defaultValue: Boolean = false
+        override val isRemotelyConfigured: Boolean = false
+    }
+
     /**
      * Data object holding the key for Email Verification feature.
      */

@@ -18,6 +18,8 @@ class FakeAuthDiskSource : AuthDiskSource {
     override var rememberedEmailAddress: String? = null
     override var rememberedOrgIdentifier: String? = null
 
+    private val mutableShouldUseKeyConnectorFlowMap =
+        mutableMapOf<String, MutableSharedFlow<Boolean?>>()
     private val mutableOrganizationsFlowMap =
         mutableMapOf<String, MutableSharedFlow<List<SyncResponseJson.Profile.Organization>?>>()
     private val mutablePoliciesFlowMap =
@@ -27,6 +29,7 @@ class FakeAuthDiskSource : AuthDiskSource {
     private val mutableUserStateFlow = bufferedMutableSharedFlow<UserStateJson?>(replay = 1)
 
     private val storedShouldUseKeyConnector = mutableMapOf<String, Boolean?>()
+    private val storedIsTdeLoginComplete = mutableMapOf<String, Boolean?>()
     private val storedShouldTrustDevice = mutableMapOf<String, Boolean?>()
     private val storedInvalidUnlockAttempts = mutableMapOf<String, Int?>()
     private val storedUserKeys = mutableMapOf<String, String?>()
@@ -43,6 +46,7 @@ class FakeAuthDiskSource : AuthDiskSource {
     private val storedPendingAuthRequests = mutableMapOf<String, PendingAuthRequestJson?>()
     private val storedBiometricKeys = mutableMapOf<String, String?>()
     private val storedMasterPasswordHashes = mutableMapOf<String, String?>()
+    private val storedAuthenticationSyncKeys = mutableMapOf<String, String?>()
     private val storedPolicies = mutableMapOf<String, List<SyncResponseJson.Policy>?>()
 
     override var userState: UserStateJson? = null
@@ -68,21 +72,34 @@ class FakeAuthDiskSource : AuthDiskSource {
         storedBiometricKeys.remove(userId)
         storedOrganizationKeys.remove(userId)
 
+        mutableShouldUseKeyConnectorFlowMap.remove(userId)
         mutableOrganizationsFlowMap.remove(userId)
         mutablePoliciesFlowMap.remove(userId)
         mutableAccountTokensFlowMap.remove(userId)
     }
 
+    override fun getShouldUseKeyConnectorFlow(
+        userId: String,
+    ): Flow<Boolean?> = getMutableShouldUseKeyConnectorFlow(userId = userId)
+        .onSubscription { emit(getShouldUseKeyConnector(userId = userId)) }
+
     override fun getShouldUseKeyConnector(
         userId: String,
-    ): Boolean = storedShouldUseKeyConnector[userId] ?: false
+    ): Boolean? = storedShouldUseKeyConnector[userId]
 
     override fun storeShouldUseKeyConnector(userId: String, shouldUseKeyConnector: Boolean?) {
         storedShouldUseKeyConnector[userId] = shouldUseKeyConnector
+        getMutableShouldUseKeyConnectorFlow(userId = userId).tryEmit(shouldUseKeyConnector)
     }
 
-    override fun getShouldTrustDevice(userId: String): Boolean =
-        storedShouldTrustDevice[userId] ?: false
+    override fun getIsTdeLoginComplete(userId: String): Boolean? = storedIsTdeLoginComplete[userId]
+
+    override fun storeIsTdeLoginComplete(userId: String, isTdeLoginComplete: Boolean?) {
+        storedIsTdeLoginComplete[userId] = isTdeLoginComplete
+    }
+
+    override fun getShouldTrustDevice(userId: String): Boolean? =
+        storedShouldTrustDevice[userId]
 
     override fun storeShouldTrustDevice(userId: String, shouldTrustDevice: Boolean?) {
         storedShouldTrustDevice[userId] = shouldTrustDevice
@@ -199,6 +216,16 @@ class FakeAuthDiskSource : AuthDiskSource {
         storedMasterPasswordHashes[userId] = passwordHash
     }
 
+    override fun getAuthenticatorSyncUnlockKey(userId: String): String? =
+        storedAuthenticationSyncKeys[userId]
+
+    override fun storeAuthenticatorSyncUnlockKey(
+        userId: String,
+        authenticatorSyncUnlockKey: String?,
+    ) {
+        storedAuthenticationSyncKeys[userId] = authenticatorSyncUnlockKey
+    }
+
     override fun getPolicies(
         userId: String,
     ): List<SyncResponseJson.Policy>? = storedPolicies[userId]
@@ -221,6 +248,20 @@ class FakeAuthDiskSource : AuthDiskSource {
     override fun storeAccountTokens(userId: String, accountTokens: AccountTokensJson?) {
         storedAccountTokens[userId] = accountTokens
         getMutableAccountTokensFlow(userId = userId).tryEmit(accountTokens)
+    }
+
+    /**
+     * Assert the the [isTdeLoginComplete] was stored successfully using the [userId].
+     */
+    fun assertIsTdeLoginComplete(userId: String, isTdeLoginComplete: Boolean?) {
+        assertEquals(isTdeLoginComplete, storedIsTdeLoginComplete[userId])
+    }
+
+    /**
+     * Assert the the [shouldTrustDevice] was stored successfully using the [userId].
+     */
+    fun assertShouldTrustDevice(userId: String, shouldTrustDevice: Boolean?) {
+        assertEquals(shouldTrustDevice, storedShouldTrustDevice[userId])
     }
 
     /**
@@ -353,6 +394,13 @@ class FakeAuthDiskSource : AuthDiskSource {
     }
 
     //region Private helper functions
+
+    private fun getMutableShouldUseKeyConnectorFlow(
+        userId: String,
+    ): MutableSharedFlow<Boolean?> =
+        mutableShouldUseKeyConnectorFlowMap.getOrPut(userId) {
+            bufferedMutableSharedFlow(replay = 1)
+        }
 
     private fun getMutableOrganizationsFlow(
         userId: String,

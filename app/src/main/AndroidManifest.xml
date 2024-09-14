@@ -62,17 +62,27 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="https" />
-                <data android:host="bitwarden.com" />
-                <data android:host="bitwarden.pw" />
-                <data android:host="bitwarden.eu" />
+
+                <data android:host="vault.bitwarden.com" />
+                <data android:host="vault.bitwarden.eu" />
+                <data android:host="*.bitwarden.pw" />
+                <data android:pathPattern="/redirect-connector.*" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.x8bit.bitwarden.fido2.ACTION_CREATE_PASSKEY" />
                 <action android:name="com.x8bit.bitwarden.fido2.ACTION_GET_PASSKEY" />
                 <action android:name="com.x8bit.bitwarden.fido2.ACTION_UNLOCK_ACCOUNT" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".AccessibilityActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
 
         <activity
             android:name=".AutofillTotpCopyActivity"
@@ -189,6 +199,42 @@
                 android:value="true" />
         </service>
 
+        <!--
+        The GeneratorTileService name below refers to the legacy Xamarin app's service name.
+        This must always match in order for the app to properly query if it is providing generator
+        tile services.
+        -->
+        <!--suppress AndroidDomInspection -->
+        <service
+            android:name="com.x8bit.bitwarden.GeneratorTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_generator"
+            android:label="@string/password_generator"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            tools:ignore="MissingClass">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!--
+        The MyVaultTileService name below refers to the legacy Xamarin app's service name.
+        This must always match in order for the app to properly query if it is providing vault
+        tile services.
+        -->
+        <!--suppress AndroidDomInspection -->
+        <service
+            android:name="com.x8bit.bitwarden.MyVaultTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_notification"
+            android:label="@string/my_vault"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            tools:ignore="MissingClass">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <meta-data
             android:name="android.content.APP_RESTRICTIONS"
             android:resource="@xml/app_restrictions" />
@@ -198,6 +244,10 @@
     <queries>
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
         </intent>
     </queries>
 

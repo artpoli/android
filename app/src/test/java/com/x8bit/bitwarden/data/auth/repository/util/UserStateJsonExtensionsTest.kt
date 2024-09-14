@@ -11,6 +11,7 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserD
 import com.x8bit.bitwarden.data.auth.datasource.network.model.UserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.UserAccountTokens
+import com.x8bit.bitwarden.data.auth.repository.model.UserKeyConnectorState
 import com.x8bit.bitwarden.data.auth.repository.model.UserOrganizations
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
@@ -23,6 +24,117 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class UserStateJsonExtensionsTest {
+    @Test
+    fun `toUpdatedUserStateJn should do nothing for a non-matching account`() {
+        val originalUserState = UserStateJson(
+            activeUserId = "activeUserId",
+            accounts = mapOf("activeUserId" to mockk()),
+        )
+        assertEquals(
+            originalUserState,
+            originalUserState.toRemovedPasswordUserStateJson(userId = "nonActiveUserId"),
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `toUpdatedUserStateJn should create user decryption options without a password if not present`() {
+        val originalProfile = AccountJson.Profile(
+            userId = "activeUserId",
+            email = "email",
+            isEmailVerified = true,
+            name = "name",
+            stamp = null,
+            organizationId = null,
+            avatarColorHex = null,
+            hasPremium = true,
+            forcePasswordResetReason = null,
+            kdfType = KdfTypeJson.ARGON2_ID,
+            kdfIterations = 600000,
+            kdfMemory = 16,
+            kdfParallelism = 4,
+            userDecryptionOptions = null,
+        )
+        val originalAccount = AccountJson(
+            profile = originalProfile,
+            tokens = null,
+            settings = AccountJson.Settings(environmentUrlData = null),
+        )
+        val originalUserState = UserStateJson(
+            activeUserId = "activeUserId",
+            accounts = mapOf("activeUserId" to originalAccount),
+        )
+
+        assertEquals(
+            UserStateJson(
+                activeUserId = "activeUserId",
+                accounts = mapOf(
+                    "activeUserId" to originalAccount.copy(
+                        profile = originalProfile.copy(
+                            userDecryptionOptions = UserDecryptionOptionsJson(
+                                hasMasterPassword = false,
+                                trustedDeviceUserDecryptionOptions = null,
+                                keyConnectorUserDecryptionOptions = null,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            originalUserState.toRemovedPasswordUserStateJson(userId = "activeUserId"),
+        )
+    }
+
+    @Test
+    fun `toUpdatedUserStateJn should update user decryption options to not have a password`() {
+        val originalProfile = AccountJson.Profile(
+            userId = "activeUserId",
+            email = "email",
+            isEmailVerified = true,
+            name = "name",
+            stamp = null,
+            organizationId = null,
+            avatarColorHex = null,
+            hasPremium = true,
+            forcePasswordResetReason = null,
+            kdfType = KdfTypeJson.ARGON2_ID,
+            kdfIterations = 600000,
+            kdfMemory = 16,
+            kdfParallelism = 4,
+            userDecryptionOptions = UserDecryptionOptionsJson(
+                hasMasterPassword = true,
+                trustedDeviceUserDecryptionOptions = null,
+                keyConnectorUserDecryptionOptions = null,
+            ),
+        )
+        val originalAccount = AccountJson(
+            profile = originalProfile,
+            tokens = null,
+            settings = AccountJson.Settings(environmentUrlData = null),
+        )
+        val originalUserState = UserStateJson(
+            activeUserId = "activeUserId",
+            accounts = mapOf("activeUserId" to originalAccount),
+        )
+
+        assertEquals(
+            UserStateJson(
+                activeUserId = "activeUserId",
+                accounts = mapOf(
+                    "activeUserId" to originalAccount.copy(
+                        profile = originalProfile.copy(
+                            userDecryptionOptions = UserDecryptionOptionsJson(
+                                hasMasterPassword = false,
+                                trustedDeviceUserDecryptionOptions = null,
+                                keyConnectorUserDecryptionOptions = null,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            originalUserState.toRemovedPasswordUserStateJson(userId = "activeUserId"),
+        )
+    }
+
     @Test
     fun `toUpdatedUserStateJson should do nothing for a non-matching account`() {
         val originalUserState = UserStateJson(
@@ -230,6 +342,7 @@ class UserStateJsonExtensionsTest {
                             Organization(
                                 id = "organizationId",
                                 name = "organizationName",
+                                shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
                             ),
@@ -239,6 +352,7 @@ class UserStateJsonExtensionsTest {
                         needsMasterPassword = false,
                         trustedDevice = null,
                         hasMasterPassword = true,
+                        isUsingKeyConnector = false,
                     ),
                 ),
             ),
@@ -290,10 +404,17 @@ class UserStateJsonExtensionsTest {
                                 Organization(
                                     id = "organizationId",
                                     name = "organizationName",
+                                    shouldManageResetPassword = false,
                                     shouldUseKeyConnector = false,
                                     role = OrganizationType.ADMIN,
                                 ),
                             ),
+                        ),
+                    ),
+                    userIsUsingKeyConnectorList = listOf(
+                        UserKeyConnectorState(
+                            userId = "activeUserId",
+                            isUsingKeyConnector = false,
                         ),
                     ),
                     hasPendingAccountAddition = false,
@@ -325,6 +446,7 @@ class UserStateJsonExtensionsTest {
                             Organization(
                                 id = "organizationId",
                                 name = "organizationName",
+                                shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
                             ),
@@ -334,6 +456,7 @@ class UserStateJsonExtensionsTest {
                         needsMasterPassword = true,
                         trustedDevice = null,
                         hasMasterPassword = false,
+                        isUsingKeyConnector = false,
                     ),
                 ),
                 hasPendingAccountAddition = true,
@@ -381,10 +504,17 @@ class UserStateJsonExtensionsTest {
                                 Organization(
                                     id = "organizationId",
                                     name = "organizationName",
+                                    shouldManageResetPassword = false,
                                     shouldUseKeyConnector = false,
                                     role = OrganizationType.ADMIN,
                                 ),
                             ),
+                        ),
+                    ),
+                    userIsUsingKeyConnectorList = listOf(
+                        UserKeyConnectorState(
+                            userId = "activeUserId",
+                            isUsingKeyConnector = null,
                         ),
                     ),
                     hasPendingAccountAddition = true,
@@ -417,13 +547,14 @@ class UserStateJsonExtensionsTest {
                             Organization(
                                 id = "organizationId",
                                 name = "organizationName",
+                                shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
                             ),
                         ),
                         isBiometricsEnabled = false,
                         vaultUnlockType = VaultUnlockType.MASTER_PASSWORD,
-                        needsMasterPassword = false,
+                        needsMasterPassword = true,
                         trustedDevice = UserState.TrustedDevice(
                             isDeviceTrusted = true,
                             hasAdminApproval = false,
@@ -431,6 +562,7 @@ class UserStateJsonExtensionsTest {
                             hasResetPasswordPermission = false,
                         ),
                         hasMasterPassword = false,
+                        isUsingKeyConnector = true,
                     ),
                 ),
                 hasPendingAccountAddition = true,
@@ -481,10 +613,17 @@ class UserStateJsonExtensionsTest {
                                 Organization(
                                     id = "organizationId",
                                     name = "organizationName",
+                                    shouldManageResetPassword = false,
                                     shouldUseKeyConnector = false,
                                     role = OrganizationType.ADMIN,
                                 ),
                             ),
+                        ),
+                    ),
+                    userIsUsingKeyConnectorList = listOf(
+                        UserKeyConnectorState(
+                            userId = "activeUserId",
+                            isUsingKeyConnector = true,
                         ),
                     ),
                     hasPendingAccountAddition = true,

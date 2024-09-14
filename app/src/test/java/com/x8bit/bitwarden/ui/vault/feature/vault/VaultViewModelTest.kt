@@ -188,12 +188,14 @@ class VaultViewModelTest : BaseViewModelTest() {
                             Organization(
                                 id = "organiationId",
                                 name = "Test Organization",
+                                shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
                             ),
                         ),
                         trustedDevice = null,
                         hasMasterPassword = true,
+                        isUsingKeyConnector = false,
                     ),
                 ),
             )
@@ -270,12 +272,14 @@ class VaultViewModelTest : BaseViewModelTest() {
                             Organization(
                                 id = "organizationId",
                                 name = "Test Organization",
+                                shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
                             ),
                         ),
                         trustedDevice = null,
                         hasMasterPassword = true,
+                        isUsingKeyConnector = false,
                     ),
                 ),
             )
@@ -476,6 +480,7 @@ class VaultViewModelTest : BaseViewModelTest() {
                             Organization(
                                 id = "testOrganizationId",
                                 name = "Test Organization",
+                                shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
                             ),
@@ -607,7 +612,6 @@ class VaultViewModelTest : BaseViewModelTest() {
                     VaultEvent.ShowToast(R.string.syncing_complete.asText()),
                     awaitItem(),
                 )
-                assertEquals(VaultEvent.DismissPullToRefresh, awaitItem())
             }
         }
 
@@ -655,7 +659,6 @@ class VaultViewModelTest : BaseViewModelTest() {
                     VaultEvent.ShowToast(R.string.syncing_complete.asText()),
                     awaitItem(),
                 )
-                assertEquals(VaultEvent.DismissPullToRefresh, awaitItem())
             }
         }
 
@@ -1525,6 +1528,7 @@ private val DEFAULT_USER_STATE = UserState(
             needsMasterPassword = false,
             trustedDevice = null,
             hasMasterPassword = true,
+            isUsingKeyConnector = false,
         ),
         UserState.Account(
             userId = "lockedUserId",
@@ -1541,6 +1545,7 @@ private val DEFAULT_USER_STATE = UserState(
             needsMasterPassword = false,
             trustedDevice = null,
             hasMasterPassword = true,
+            isUsingKeyConnector = false,
         ),
     ),
 )
@@ -1584,4 +1589,5 @@ private fun createMockVaultState(
         isIconLoadingDisabled = false,
         hasMasterPassword = true,
         hideNotificationsDialog = true,
+        isRefreshing = false,
     )

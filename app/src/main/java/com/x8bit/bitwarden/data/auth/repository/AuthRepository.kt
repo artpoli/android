@@ -7,6 +7,7 @@ import com.x8bit.bitwarden.data.auth.manager.AuthRequestManager
 import com.x8bit.bitwarden.data.auth.repository.model.AuthState
 import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
 import com.x8bit.bitwarden.data.auth.repository.model.DeleteAccountResult
+import com.x8bit.bitwarden.data.auth.repository.model.EmailTokenResult
 import com.x8bit.bitwarden.data.auth.repository.model.KnownDeviceResult
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.model.NewSsoUserResult
@@ -16,6 +17,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.PasswordStrengthResult
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.PrevalidateSsoResult
 import com.x8bit.bitwarden.data.auth.repository.model.RegisterResult
+import com.x8bit.bitwarden.data.auth.repository.model.RemovePasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.RequestOtpResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResendEmailResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResetPasswordResult
@@ -101,6 +103,11 @@ interface AuthRepository : AuthenticatorProvider, AuthRequestManager {
      * The currently persisted organization identifier (or `null` if not set).
      */
     var rememberedOrgIdentifier: String?
+
+    /**
+     * The currently persisted state indicating whether the user has completed login via TDE.
+     */
+    val tdeLoginComplete: Boolean?
 
     /**
      * The currently persisted state indicating whether the user has trusted this device.
@@ -268,6 +275,12 @@ interface AuthRepository : AuthenticatorProvider, AuthRequestManager {
     ): PasswordHintResult
 
     /**
+     * Removes the users password from the account. This used used when migrating from master
+     * password login to key connector login.
+     */
+    suspend fun removePassword(masterPassword: String): RemovePasswordResult
+
+    /**
      * Resets the users password from the [currentPassword] (or null for account recovery resets),
      * to the [newPassword] and optional [passwordHint].
      */
@@ -365,4 +378,12 @@ interface AuthRepository : AuthenticatorProvider, AuthRequestManager {
         name: String,
         receiveMarketingEmails: Boolean,
     ): SendVerificationEmailResult
+
+    /**
+     * Validates the given [token] for the given [email]. Part of th new account registration flow.
+     */
+    suspend fun validateEmailToken(
+        email: String,
+        token: String,
+    ): EmailTokenResult
 }
