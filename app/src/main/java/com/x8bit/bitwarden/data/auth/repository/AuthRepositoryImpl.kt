@@ -9,6 +9,7 @@ import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.DeleteAccountResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.DeviceDataModel
@@ -74,6 +75,8 @@ import com.x8bit.bitwarden.data.auth.repository.util.DuoCallbackTokenResult
 import com.x8bit.bitwarden.data.auth.repository.util.SsoCallbackResult
 import com.x8bit.bitwarden.data.auth.repository.util.WebAuthResult
 import com.x8bit.bitwarden.data.auth.repository.util.activeUserIdChangesFlow
+import com.x8bit.bitwarden.data.auth.repository.util.currentOnboardingStatus
+import com.x8bit.bitwarden.data.auth.repository.util.onboardingStatusChangesFlow
 import com.x8bit.bitwarden.data.auth.repository.util.policyInformation
 import com.x8bit.bitwarden.data.auth.repository.util.toRemovedPasswordUserStateJson
 import com.x8bit.bitwarden.data.auth.repository.util.toSdkParams
@@ -89,15 +92,20 @@ import com.x8bit.bitwarden.data.auth.repository.util.userSwitchingChangesFlow
 import com.x8bit.bitwarden.data.auth.util.KdfParamsConstants.DEFAULT_PBKDF2_ITERATIONS
 import com.x8bit.bitwarden.data.auth.util.YubiKeyResult
 import com.x8bit.bitwarden.data.auth.util.toSdkParams
+import com.x8bit.bitwarden.data.platform.datasource.disk.ConfigDiskSource
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
+import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
+import com.x8bit.bitwarden.data.platform.manager.LogsManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.PushManager
 import com.x8bit.bitwarden.data.platform.manager.dispatcher.DispatcherManager
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.manager.util.getActivePolicies
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
+import com.x8bit.bitwarden.data.platform.repository.util.toEnvironmentUrls
 import com.x8bit.bitwarden.data.platform.util.asFailure
 import com.x8bit.bitwarden.data.platform.util.asSuccess
 import com.x8bit.bitwarden.data.platform.util.flatMap
@@ -148,6 +156,7 @@ class AuthRepositoryImpl(
     private val authSdkSource: AuthSdkSource,
     private val vaultSdkSource: VaultSdkSource,
     private val authDiskSource: AuthDiskSource,
+    private val configDiskSource: ConfigDiskSource,
     private val environmentRepository: EnvironmentRepository,
     private val settingsRepository: SettingsRepository,
     private val vaultRepository: VaultRepository,
@@ -157,6 +166,8 @@ class AuthRepositoryImpl(
     private val userLogoutManager: UserLogoutManager,
     private val policyManager: PolicyManager,
     private val featureFlagManager: FeatureFlagManager,
+    firstTimeActionManager: FirstTimeActionManager,
+    logsManager: LogsManager,
     pushManager: PushManager,
     dispatcherManager: DispatcherManager,
 ) : AuthRepository,
@@ -250,6 +261,8 @@ class AuthRepositoryImpl(
         authDiskSource.userAccountTokensFlow,
         authDiskSource.userOrganizationsListFlow,
         authDiskSource.userKeyConnectorStateFlow,
+        authDiskSource.onboardingStatusChangesFlow,
+        firstTimeActionManager.firstTimeStateFlow,
         vaultRepository.vaultUnlockDataStateFlow,
         mutableHasPendingAccountAdditionStateFlow,
         // Ignore the data in the merge, but trigger an update when they emit.
@@ -262,17 +275,21 @@ class AuthRepositoryImpl(
         val userAccountTokens = array[1] as List<UserAccountTokens>
         val userOrganizationsList = array[2] as List<UserOrganizations>
         val userIsUsingKeyConnectorList = array[3] as List<UserKeyConnectorState>
-        val vaultState = array[4] as List<VaultUnlockData>
-        val hasPendingAccountAddition = array[5] as Boolean
+        val onboardingStatus = array[4] as OnboardingStatus?
+        val firstTimeState = array[5] as FirstTimeState
+        val vaultState = array[6] as List<VaultUnlockData>
+        val hasPendingAccountAddition = array[7] as Boolean
         userStateJson?.toUserState(
             vaultState = vaultState,
             userAccountTokens = userAccountTokens,
             userOrganizationsList = userOrganizationsList,
             userIsUsingKeyConnectorList = userIsUsingKeyConnectorList,
             hasPendingAccountAddition = hasPendingAccountAddition,
+            onboardingStatus = onboardingStatus,
             isBiometricsEnabledProvider = ::isBiometricsEnabled,
             vaultUnlockTypeProvider = ::getVaultUnlockType,
             isDeviceTrustedProvider = ::isDeviceTrusted,
+            firstTimeState = firstTimeState,
         )
     }
         .filterNot { mutableHasPendingAccountDeletionStateFlow.value }
@@ -288,9 +305,11 @@ class AuthRepositoryImpl(
                     userOrganizationsList = authDiskSource.userOrganizationsList,
                     userIsUsingKeyConnectorList = authDiskSource.userKeyConnectorStateList,
                     hasPendingAccountAddition = mutableHasPendingAccountAdditionStateFlow.value,
+                    onboardingStatus = authDiskSource.currentOnboardingStatus,
                     isBiometricsEnabledProvider = ::isBiometricsEnabled,
                     vaultUnlockTypeProvider = ::getVaultUnlockType,
                     isDeviceTrustedProvider = ::isDeviceTrusted,
+                    firstTimeState = firstTimeActionManager.currentOrDefaultUserFirstTimeState,
                 ),
         )
 
@@ -347,6 +366,24 @@ class AuthRepositoryImpl(
             featureFlagManager.getFeatureFlag(FlagKey.OnboardingCarousel)
 
     init {
+        combine(
+            mutableHasPendingAccountAdditionStateFlow,
+            authDiskSource.userStateFlow,
+            environmentRepository.environmentStateFlow,
+        ) { hasPendingAddition, userState, environment ->
+            logsManager.setUserData(
+                userId = userState?.activeUserId.takeUnless { hasPendingAddition },
+                environmentType = userState
+                    ?.activeAccount
+                    ?.settings
+                    ?.environmentUrlData
+                    ?.toEnvironmentUrls()
+                    ?.type
+                    .takeUnless { hasPendingAddition }
+                    ?: environment.type,
+            )
+        }
+            .launchIn(unconfinedScope)
         pushManager
             .syncOrgKeysFlow
             .onEach {
@@ -621,6 +658,7 @@ class AuthRepositoryImpl(
         password: String?,
         twoFactorData: TwoFactorDataModel,
         captchaToken: String?,
+        orgIdentifier: String?,
     ): LoginResult = identityTokenAuthModel
         ?.let {
             loginCommon(
@@ -630,6 +668,7 @@ class AuthRepositoryImpl(
                 twoFactorData = twoFactorData,
                 captchaToken = captchaToken ?: twoFactorResponse?.captchaToken,
                 deviceData = twoFactorDeviceData,
+                orgIdentifier = orgIdentifier,
             )
         }
         ?: LoginResult.Error(errorMessage = null)
@@ -991,7 +1030,7 @@ class AuthRepositoryImpl(
             ForcePasswordResetReason.ADMIN_FORCE_PASSWORD_RESET,
             ForcePasswordResetReason.WEAK_MASTER_PASSWORD_ON_LOGIN,
             null,
-            -> {
+                -> {
                 authSdkSource
                     .makeRegisterKeys(
                         email = activeAccount.profile.email,
@@ -1041,7 +1080,7 @@ class AuthRepositoryImpl(
                     is VaultUnlockResult.AuthenticationError,
                     VaultUnlockResult.InvalidStateError,
                     VaultUnlockResult.GenericError,
-                    -> {
+                        -> {
                         IllegalStateException("Failed to unlock vault").asFailure()
                     }
                 }
@@ -1284,6 +1323,15 @@ class AuthRepositoryImpl(
             )
     }
 
+    override fun setOnboardingStatus(userId: String, status: OnboardingStatus?) {
+        authDiskSource.storeOnboardingStatus(userId = userId, onboardingStatus = status)
+    }
+
+    override fun setShowImportLogins(showImportLogins: Boolean) {
+        val userId: String = activeUserId ?: return
+        authDiskSource.storeShowImportLogins(userId = userId, showImportLogins = showImportLogins)
+    }
+
     @Suppress("CyclomaticComplexMethod")
     private suspend fun validatePasswordAgainstPolicy(
         password: String,
@@ -1448,7 +1496,12 @@ class AuthRepositoryImpl(
             captchaToken = captchaToken,
         )
         .fold(
-            onFailure = { LoginResult.Error(errorMessage = null) },
+            onFailure = {
+                when (configDiskSource.serverConfig?.isOfficialBitwardenServer) {
+                    false -> LoginResult.UnofficialServerError
+                    else -> LoginResult.Error(errorMessage = null)
+                }
+            },
             onSuccess = { loginResponse ->
                 when (loginResponse) {
                     is GetTokenResponseJson.CaptchaRequired -> LoginResult.CaptchaRequired(
@@ -1471,7 +1524,7 @@ class AuthRepositoryImpl(
                     )
 
                     is GetTokenResponseJson.Invalid -> LoginResult.Error(
-                        errorMessage = loginResponse.errorModel.errorMessage,
+                        errorMessage = loginResponse.errorMessage,
                     )
                 }
             },
@@ -1559,6 +1612,16 @@ class AuthRepositoryImpl(
             ),
         )
         settingsRepository.hasUserLoggedInOrCreatedAccount = true
+
+        val shouldSetOnboardingStatus = featureFlagManager.getFeatureFlag(FlagKey.OnboardingFlow) &&
+            !settingsRepository.getUserHasLoggedInValue(userId = userId)
+        if (shouldSetOnboardingStatus) {
+            setOnboardingStatus(
+                userId = userId,
+                status = OnboardingStatus.NOT_STARTED,
+            )
+        }
+
         authDiskSource.userState = userStateJson
         loginResponse.key?.let {
             // Only set the value if it's present, since we may have set it already

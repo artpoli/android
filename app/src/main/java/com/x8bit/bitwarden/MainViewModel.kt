@@ -30,8 +30,10 @@ import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
+import com.x8bit.bitwarden.ui.platform.util.isAccountSecurityShortcut
 import com.x8bit.bitwarden.ui.platform.util.isMyVaultShortcut
 import com.x8bit.bitwarden.ui.platform.util.isPasswordGeneratorShortcut
+import com.x8bit.bitwarden.ui.vault.util.getTotpDataOrNull
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -61,7 +63,7 @@ class MainViewModel @Inject constructor(
     private val fido2CredentialManager: Fido2CredentialManager,
     private val intentManager: IntentManager,
     settingsRepository: SettingsRepository,
-    vaultRepository: VaultRepository,
+    private val vaultRepository: VaultRepository,
     private val authRepository: AuthRepository,
     private val environmentRepository: EnvironmentRepository,
     private val savedStateHandle: SavedStateHandle,
@@ -223,7 +225,7 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    @Suppress("LongMethod")
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private fun handleIntent(
         intent: Intent,
         isFirstIntent: Boolean,
@@ -232,14 +234,26 @@ class MainViewModel @Inject constructor(
         val autofillSaveItem = intent.getAutofillSaveItemOrNull()
         val autofillSelectionData = intent.getAutofillSelectionDataOrNull()
         val shareData = intentManager.getShareDataFromIntent(intent)
+        val totpData = intent.getTotpDataOrNull()
         val hasGeneratorShortcut = intent.isPasswordGeneratorShortcut
         val hasVaultShortcut = intent.isMyVaultShortcut
+        val hasAccountSecurityShortcut = intent.isAccountSecurityShortcut
         val fido2CredentialRequestData = intent.getFido2CredentialRequestOrNull()
         val completeRegistrationData = intent.getCompleteRegistrationDataIntentOrNull()
         val fido2CredentialAssertionRequest = intent.getFido2AssertionRequestOrNull()
         val fido2GetCredentialsRequest = intent.getFido2GetCredentialsRequestOrNull()
         when {
             passwordlessRequestData != null -> {
+                authRepository.activeUserId?.let {
+                    if (it != passwordlessRequestData.userId &&
+                        !vaultRepository.isVaultUnlocked(it)
+                    ) {
+                        // We only switch the account here if the current user's vault is not
+                        // unlocked, otherwise prompt the user to allow us to change the account
+                        // in the LoginApprovalScreen
+                        authRepository.switchAccount(passwordlessRequestData.userId)
+                    }
+                }
                 specialCircumstanceManager.specialCircumstance =
                     SpecialCircumstance.PasswordlessRequest(
                         passwordlessRequestData = passwordlessRequestData,
@@ -268,6 +282,11 @@ class MainViewModel @Inject constructor(
                         // autofill task when this is not the first intent.
                         shouldFinishWhenComplete = isFirstIntent,
                     )
+            }
+
+            totpData != null -> {
+                specialCircumstanceManager.specialCircumstance =
+                    SpecialCircumstance.AddTotpLoginItem(data = totpData)
             }
 
             shareData != null -> {
@@ -319,6 +338,11 @@ class MainViewModel @Inject constructor(
 
             hasVaultShortcut -> {
                 specialCircumstanceManager.specialCircumstance = SpecialCircumstance.VaultShortcut
+            }
+
+            hasAccountSecurityShortcut -> {
+                specialCircumstanceManager.specialCircumstance =
+                    SpecialCircumstance.AccountSecurityShortcut
             }
         }
     }

@@ -12,10 +12,14 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.isPopup
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.core.net.toUri
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
@@ -36,6 +40,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+@Suppress("LargeClass")
 class SendScreenTest : BaseComposeTest() {
 
     private var onNavigateToNewSendCalled = false
@@ -246,7 +251,8 @@ class SendScreenTest : BaseComposeTest() {
             it.copy(viewState = SendState.ViewState.Empty)
         }
         composeTestRule
-            .onNodeWithText("Add a Send")
+            .onNodeWithText("New send")
+            .performScrollTo()
             .performClick()
         verify { viewModel.trySendAction(SendAction.AddSendClick) }
     }
@@ -436,14 +442,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -460,14 +472,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -490,14 +508,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -520,14 +544,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -550,14 +580,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -580,14 +616,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -609,14 +651,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 
@@ -644,14 +692,20 @@ class SendScreenTest : BaseComposeTest() {
                 viewState = SendState.ViewState.Content(
                     textTypeCount = 0,
                     fileTypeCount = 1,
-                    sendItems = listOf(DEFAULT_SEND_ITEM),
+                    sendItems = listOf(
+                        DEFAULT_SEND_ITEM,
+                        DEFAULT_SEND_ITEM.copy(id = "mockId-2"),
+                    ),
                 ),
             )
         }
         composeTestRule.assertNoDialogExists()
 
+        // We scroll to the last item but click the first one to avoid clicking the FAB by mistake
         composeTestRule
-            .onNodeWithContentDescription("Options")
+            .onAllNodesWithContentDescription("Options")
+            .apply { onLast().performScrollTo() }
+            .onFirst()
             .assertIsDisplayed()
             .performClick()
 

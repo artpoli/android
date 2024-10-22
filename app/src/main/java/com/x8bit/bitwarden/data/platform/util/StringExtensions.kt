@@ -27,6 +27,12 @@ fun String.isAndroidApp(): Boolean =
     this.startsWith(ANDROID_APP_PROTOCOL)
 
 /**
+ * Whether this [String] starts with an http or https protocol.
+ */
+fun String.hasHttpProtocol(): Boolean =
+    this.startsWith(prefix = "http://") || this.startsWith(prefix = "https://")
+
+/**
  * Try and extract the web host from this [String] if it represents an Android app.
  */
 fun String.getWebHostFromAndroidUriOrNull(): String? =
@@ -51,6 +57,21 @@ fun String.getDomainOrNull(resourceCacheManager: ResourceCacheManager): String? 
     this
         .toUriOrNull()
         ?.parseDomainOrNull(resourceCacheManager = resourceCacheManager)
+
+/**
+ * Returns `true` if the [String] uri has a port, `false` otherwise.
+ */
+@OmitFromCoverage
+fun String.hasPort(): Boolean {
+    val uri = this.toUriOrNull() ?: return false
+    return uri.port != -1
+}
+
+/**
+ * Extract the host from this [String] if possible, otherwise return null.
+ */
+@OmitFromCoverage
+fun String.getHostOrNull(): String? = this.toUriOrNull()?.host
 
 /**
  * Extract the host with optional port from this [String] if possible, otherwise return null.

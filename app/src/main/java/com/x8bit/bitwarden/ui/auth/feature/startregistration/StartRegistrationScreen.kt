@@ -18,13 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.ripple
@@ -44,9 +41,6 @@ import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -62,18 +56,21 @@ import com.x8bit.bitwarden.ui.auth.feature.startregistration.StartRegistrationEv
 import com.x8bit.bitwarden.ui.auth.feature.startregistration.StartRegistrationEvent.NavigateToTerms
 import com.x8bit.bitwarden.ui.auth.feature.startregistration.handlers.StartRegistrationHandler
 import com.x8bit.bitwarden.ui.auth.feature.startregistration.handlers.rememberStartRegistrationHandler
+import com.x8bit.bitwarden.ui.platform.base.util.ClickableTextHighlight
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.base.util.asText
-import com.x8bit.bitwarden.ui.platform.base.util.createAnnotatedString
+import com.x8bit.bitwarden.ui.platform.base.util.createClickableAnnotatedString
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenFilledButton
+import com.x8bit.bitwarden.ui.platform.components.button.BitwardenStandardIconButton
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenBasicDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenLoadingDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.LoadingDialogState
 import com.x8bit.bitwarden.ui.platform.components.dropdown.EnvironmentSelector
 import com.x8bit.bitwarden.ui.platform.components.field.BitwardenTextField
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
+import com.x8bit.bitwarden.ui.platform.components.toggle.color.bitwardenSwitchColors
 import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.composition.LocalIntentManager
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
@@ -264,18 +261,14 @@ private fun StartRegistrationContent(
                     .testTag("RegionSelectorDropdown"),
             )
             if (isNewOnboardingUiEnabled) {
-                IconButton(
+                BitwardenStandardIconButton(
+                    vectorIconRes = R.drawable.ic_question_circle_small,
+                    contentDescription = stringResource(R.string.help_with_server_geolocations),
                     onClick = handler.onServerGeologyHelpClick,
+                    contentColor = BitwardenTheme.colorScheme.icon.secondary,
                     // Align with design but keep accessible touch target of IconButton.
                     modifier = Modifier.offset(y = (-8f).dp, x = 16.dp),
-                ) {
-                    Icon(
-                        painter = rememberVectorPainter(id = R.drawable.ic_tooltip_small),
-                        contentDescription = stringResource(R.string.help_with_server_geolocations),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                )
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
@@ -318,54 +311,22 @@ private fun TermsAndPrivacyText(
 ) {
     val strTerms = stringResource(id = R.string.terms_of_service)
     val strPrivacy = stringResource(id = R.string.privacy_policy)
-    val annotatedLinkString: AnnotatedString = buildAnnotatedString {
-        val strTermsAndPrivacy = stringResource(
-            id = R.string.by_continuing_you_agree_to_the_terms_of_service_and_privacy_policy,
-        )
-        val startIndexTerms = strTermsAndPrivacy.indexOf(strTerms)
-        val endIndexTerms = startIndexTerms + strTerms.length
-        val startIndexPrivacy = strTermsAndPrivacy.indexOf(strPrivacy)
-        val endIndexPrivacy = startIndexPrivacy + strPrivacy.length
-        append(strTermsAndPrivacy)
-        addStyle(
-            style = SpanStyle(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+    val strTermsAndPrivacy = stringResource(
+        id = R.string.by_continuing_you_agree_to_the_terms_of_service_and_privacy_policy,
+    )
+    val annotatedLinkString: AnnotatedString = createClickableAnnotatedString(
+        mainString = strTermsAndPrivacy,
+        highlights = listOf(
+            ClickableTextHighlight(
+                textToHighlight = strTerms,
+                onTextClick = onTermsClick,
             ),
-            start = 0,
-            end = strTermsAndPrivacy.length,
-        )
-        addStyle(
-            style = SpanStyle(
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
-                fontWeight = FontWeight.Bold,
+            ClickableTextHighlight(
+                textToHighlight = strPrivacy,
+                onTextClick = onPrivacyPolicyClick,
             ),
-            start = startIndexTerms,
-            end = endIndexTerms,
-        )
-        addStyle(
-            style = SpanStyle(
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
-                fontWeight = FontWeight.Bold,
-            ),
-            start = startIndexPrivacy,
-            end = endIndexPrivacy,
-        )
-        addStringAnnotation(
-            tag = TAG_URL,
-            annotation = strTerms,
-            start = startIndexTerms,
-            end = endIndexTerms,
-        )
-        addStringAnnotation(
-            tag = TAG_URL,
-            annotation = strPrivacy,
-            start = startIndexPrivacy,
-            end = endIndexPrivacy,
-        )
-    }
+        ),
+    )
     Row(
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
@@ -392,23 +353,11 @@ private fun TermsAndPrivacyText(
             .padding(horizontal = 16.dp)
             .fillMaxWidth(),
     ) {
-        val termsUrl = stringResource(id = R.string.terms_of_service)
-        ClickableText(
+        Text(
             text = annotatedLinkString,
-            style = MaterialTheme.typography.bodyMedium.copy(
+            style = BitwardenTheme.typography.bodyMedium.copy(
                 textAlign = TextAlign.Center,
             ),
-            onClick = {
-                annotatedLinkString
-                    .getStringAnnotations(TAG_URL, it, it)
-                    .firstOrNull()?.let { stringAnnotation ->
-                        if (stringAnnotation.item == termsUrl) {
-                            onTermsClick()
-                        } else {
-                            onPrivacyPolicyClick()
-                        }
-                    }
-            },
         )
     }
 }
@@ -424,10 +373,14 @@ private fun ReceiveMarketingEmailsSwitch(
     val unsubscribeString = stringResource(id = R.string.unsubscribe)
 
     @Suppress("MaxLineLength")
-    val annotatedLinkString = createAnnotatedString(
-        mainString = stringResource(id = R.string.get_advice_announcements_and_research_opportunities_from_bitwarden_in_your_inbox_unsubscribe_any_time),
-        highlights = listOf(unsubscribeString),
-        tag = TAG_URL,
+    val annotatedLinkString = createClickableAnnotatedString(
+        mainString = stringResource(id = R.string.get_emails_from_bitwarden_for_announcements_advices_and_research_opportunities_unsubscribe_any_time),
+        highlights = listOf(
+            ClickableTextHighlight(
+                textToHighlight = unsubscribeString,
+                onTextClick = onUnsubscribeClick,
+            ),
+        ),
     )
     Row(
         horizontalArrangement = Arrangement.Start,
@@ -448,7 +401,9 @@ private fun ReceiveMarketingEmailsSwitch(
             }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = MaterialTheme.colorScheme.primary),
+                indication = ripple(
+                    color = BitwardenTheme.colorScheme.background.pressed,
+                ),
                 onClick = { onCheckedChange.invoke(!isChecked) },
             )
             .fillMaxWidth(),
@@ -459,18 +414,12 @@ private fun ReceiveMarketingEmailsSwitch(
                 .width(52.dp),
             checked = isChecked,
             onCheckedChange = null,
+            colors = bitwardenSwitchColors(),
         )
         Spacer(modifier = Modifier.width(16.dp))
-        ClickableText(
+        Text(
             text = annotatedLinkString,
-            style = MaterialTheme.typography.bodyMedium,
-            onClick = {
-                annotatedLinkString
-                    .getStringAnnotations(TAG_URL, it, it)
-                    .firstOrNull()?.let {
-                        onUnsubscribeClick()
-                    }
-            },
+            style = BitwardenTheme.typography.bodyMedium,
         )
     }
 }

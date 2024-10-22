@@ -16,6 +16,7 @@ import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.EnvironmentUrlDataJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.PendingAuthRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.util.FakeAuthDiskSource
@@ -96,10 +97,16 @@ import com.x8bit.bitwarden.data.auth.repository.util.toUserState
 import com.x8bit.bitwarden.data.auth.util.YubiKeyResult
 import com.x8bit.bitwarden.data.auth.util.toSdkParams
 import com.x8bit.bitwarden.data.platform.base.FakeDispatcherManager
+import com.x8bit.bitwarden.data.platform.datasource.disk.model.ServerConfig
+import com.x8bit.bitwarden.data.platform.datasource.disk.util.FakeConfigDiskSource
+import com.x8bit.bitwarden.data.platform.datasource.network.model.ConfigResponseJson
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
+import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
+import com.x8bit.bitwarden.data.platform.manager.LogsManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.PushManager
 import com.x8bit.bitwarden.data.platform.manager.dispatcher.DispatcherManager
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.manager.model.NotificationLogoutData
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
@@ -206,6 +213,7 @@ class AuthRepositoryTest {
         )
             .asSuccess()
     }
+    private val configDiskSource = FakeConfigDiskSource()
     private val vaultSdkSource = mockk<VaultSdkSource> {
         coEvery {
             getAuthRequestKey(
@@ -233,7 +241,18 @@ class AuthRepositoryTest {
             getActivePoliciesFlow(type = PolicyTypeJson.MASTER_PASSWORD)
         } returns mutableActivePolicyFlow
     }
-    private val featureFlagManager: FeatureFlagManager = mockk()
+
+    private val featureFlagManager: FeatureFlagManager = mockk(relaxed = true) {
+        every { getFeatureFlag(FlagKey.OnboardingFlow) } returns false
+    }
+
+    private val firstTimeActionManager = mockk<FirstTimeActionManager> {
+        every { currentOrDefaultUserFirstTimeState } returns FIRST_TIME_STATE
+        every { firstTimeStateFlow } returns MutableStateFlow(FIRST_TIME_STATE)
+    }
+    private val logsManager: LogsManager = mockk {
+        every { setUserData(userId = any(), environmentType = any()) } just runs
+    }
 
     private val repository = AuthRepositoryImpl(
         accountsService = accountsService,
@@ -244,6 +263,7 @@ class AuthRepositoryTest {
         authSdkSource = authSdkSource,
         vaultSdkSource = vaultSdkSource,
         authDiskSource = fakeAuthDiskSource,
+        configDiskSource = configDiskSource,
         environmentRepository = fakeEnvironmentRepository,
         settingsRepository = settingsRepository,
         vaultRepository = vaultRepository,
@@ -255,6 +275,8 @@ class AuthRepositoryTest {
         pushManager = pushManager,
         policyManager = policyManager,
         featureFlagManager = featureFlagManager,
+        firstTimeActionManager = firstTimeActionManager,
+        logsManager = logsManager,
     )
 
     @BeforeEach
@@ -336,9 +358,11 @@ class AuthRepositoryTest {
                 userOrganizationsList = emptyList(),
                 userIsUsingKeyConnectorList = emptyList(),
                 hasPendingAccountAddition = false,
+                onboardingStatus = null,
                 isBiometricsEnabledProvider = { false },
                 vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
                 isDeviceTrustedProvider = { false },
+                firstTimeState = FIRST_TIME_STATE,
             ),
             repository.userStateFlow.value,
         )
@@ -364,6 +388,8 @@ class AuthRepositoryTest {
                 isBiometricsEnabledProvider = { false },
                 vaultUnlockTypeProvider = { VaultUnlockType.PIN },
                 isDeviceTrustedProvider = { false },
+                onboardingStatus = null,
+                firstTimeState = FIRST_TIME_STATE,
             ),
             repository.userStateFlow.value,
         )
@@ -380,6 +406,8 @@ class AuthRepositoryTest {
                 isBiometricsEnabledProvider = { false },
                 vaultUnlockTypeProvider = { VaultUnlockType.PIN },
                 isDeviceTrustedProvider = { false },
+                onboardingStatus = null,
+                firstTimeState = FIRST_TIME_STATE,
             ),
             repository.userStateFlow.value,
         )
@@ -408,6 +436,8 @@ class AuthRepositoryTest {
                 isBiometricsEnabledProvider = { false },
                 vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
                 isDeviceTrustedProvider = { false },
+                onboardingStatus = null,
+                firstTimeState = FIRST_TIME_STATE,
             ),
             repository.userStateFlow.value,
         )
@@ -636,6 +666,8 @@ class AuthRepositoryTest {
             isBiometricsEnabledProvider = { false },
             vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
             isDeviceTrustedProvider = { false },
+            onboardingStatus = null,
+            firstTimeState = FIRST_TIME_STATE,
         )
         val finalUserState = SINGLE_USER_STATE_2.toUserState(
             vaultState = VAULT_UNLOCK_DATA,
@@ -646,6 +678,8 @@ class AuthRepositoryTest {
             isBiometricsEnabledProvider = { false },
             vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
             isDeviceTrustedProvider = { false },
+            onboardingStatus = null,
+            firstTimeState = FIRST_TIME_STATE,
         )
         val kdf = SINGLE_USER_STATE_1.activeAccount.profile.toSdkParams()
         coEvery {
@@ -1413,38 +1447,65 @@ class AuthRepositoryTest {
         coVerify { identityService.preLogin(email = EMAIL) }
     }
 
+    @Suppress("MaxLineLength")
     @Test
-    fun `login get token fails should return Error with no message`() = runTest {
-        coEvery {
-            identityService.preLogin(email = EMAIL)
-        } returns PRE_LOGIN_SUCCESS.asSuccess()
-        coEvery {
-            identityService.getToken(
-                email = EMAIL,
-                authModel = IdentityTokenAuthModel.MasterPassword(
-                    username = EMAIL,
-                    password = PASSWORD_HASH,
-                ),
-                captchaToken = null,
-                uniqueAppId = UNIQUE_APP_ID,
-            )
-        } returns RuntimeException().asFailure()
-        val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
-        assertEquals(LoginResult.Error(errorMessage = null), result)
-        assertEquals(AuthState.Unauthenticated, repository.authStateFlow.value)
-        coVerify { identityService.preLogin(email = EMAIL) }
-        coVerify {
-            identityService.getToken(
-                email = EMAIL,
-                authModel = IdentityTokenAuthModel.MasterPassword(
-                    username = EMAIL,
-                    password = PASSWORD_HASH,
-                ),
-                captchaToken = null,
-                uniqueAppId = UNIQUE_APP_ID,
-            )
+    fun `login get token fails should return Error with no message when server is an official Bitwarden server`() =
+        runTest {
+            coEvery {
+                identityService.preLogin(email = EMAIL)
+            } returns PRE_LOGIN_SUCCESS.asSuccess()
+            coEvery {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            } returns RuntimeException().asFailure()
+            val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
+            assertEquals(LoginResult.Error(errorMessage = null), result)
+            assertEquals(AuthState.Unauthenticated, repository.authStateFlow.value)
+            coVerify { identityService.preLogin(email = EMAIL) }
+            coVerify {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            }
         }
-    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `login get token fails should return UnofficialServerError when server is an unofficial Bitwarden server`() =
+        runTest {
+            configDiskSource.serverConfig = SERVER_CONFIG_UNOFFICIAL
+            coEvery {
+                identityService.preLogin(email = EMAIL)
+            } returns PRE_LOGIN_SUCCESS.asSuccess()
+            coEvery {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            } returns RuntimeException().asFailure()
+            val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
+            assertEquals(LoginResult.UnofficialServerError, result)
+            assertEquals(AuthState.Unauthenticated, repository.authStateFlow.value)
+            coVerify { identityService.preLogin(email = EMAIL) }
+        }
 
     @Test
     fun `login get token returns Invalid should return Error with correct message`() = runTest {
@@ -1466,6 +1527,7 @@ class AuthRepositoryTest {
                 errorModel = GetTokenResponseJson.Invalid.ErrorModel(
                     errorMessage = "mock_error_message",
                 ),
+                legacyErrorModel = null,
             )
             .asSuccess()
 
@@ -1988,6 +2050,7 @@ class AuthRepositoryTest {
             password = PASSWORD,
             twoFactorData = TWO_FACTOR_DATA,
             captchaToken = null,
+            orgIdentifier = null,
         )
         assertEquals(LoginResult.Success, finalResult)
         assertNull(repository.twoFactorResponse)
@@ -2082,6 +2145,7 @@ class AuthRepositoryTest {
                 password = PASSWORD,
                 twoFactorData = TWO_FACTOR_DATA,
                 captchaToken = null,
+                orgIdentifier = null,
             )
             assertEquals(LoginResult.Error(errorMessage = null), finalResult)
             assertEquals(twoFactorResponse, repository.twoFactorResponse)
@@ -2193,6 +2257,7 @@ class AuthRepositoryTest {
             password = PASSWORD,
             twoFactorData = TWO_FACTOR_DATA,
             captchaToken = null,
+            orgIdentifier = null,
         )
         assertEquals(LoginResult.Error(errorMessage = null), result)
     }
@@ -2255,6 +2320,7 @@ class AuthRepositoryTest {
                     errorModel = GetTokenResponseJson.Invalid.ErrorModel(
                         errorMessage = "mock_error_message",
                     ),
+                    legacyErrorModel = null,
                 )
                 .asSuccess()
 
@@ -2657,6 +2723,7 @@ class AuthRepositoryTest {
             password = null,
             twoFactorData = TWO_FACTOR_DATA,
             captchaToken = null,
+            orgIdentifier = null,
         )
         assertEquals(LoginResult.Success, finalResult)
         assertNull(repository.twoFactorResponse)
@@ -2722,6 +2789,7 @@ class AuthRepositoryTest {
                 errorModel = GetTokenResponseJson.Invalid.ErrorModel(
                     errorMessage = "mock_error_message",
                 ),
+                legacyErrorModel = null,
             )
             .asSuccess()
 
@@ -3822,6 +3890,7 @@ class AuthRepositoryTest {
             password = null,
             twoFactorData = TWO_FACTOR_DATA,
             captchaToken = null,
+            orgIdentifier = null,
         )
         assertEquals(LoginResult.Success, finalResult)
         assertNull(repository.twoFactorResponse)
@@ -5347,6 +5416,8 @@ class AuthRepositoryTest {
             isBiometricsEnabledProvider = { false },
             vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
             isDeviceTrustedProvider = { false },
+            onboardingStatus = null,
+            firstTimeState = FIRST_TIME_STATE,
         )
         fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
         assertEquals(
@@ -5380,6 +5451,8 @@ class AuthRepositoryTest {
             isBiometricsEnabledProvider = { false },
             vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
             isDeviceTrustedProvider = { false },
+            onboardingStatus = null,
+            firstTimeState = FIRST_TIME_STATE,
         )
         fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
         assertEquals(
@@ -5411,6 +5484,8 @@ class AuthRepositoryTest {
             isBiometricsEnabledProvider = { false },
             vaultUnlockTypeProvider = { VaultUnlockType.MASTER_PASSWORD },
             isDeviceTrustedProvider = { false },
+            onboardingStatus = null,
+            firstTimeState = FIRST_TIME_STATE,
         )
         fakeAuthDiskSource.userState = MULTI_USER_STATE
         assertEquals(
@@ -6095,6 +6170,204 @@ class AuthRepositoryTest {
         )
     }
 
+    @Test
+    fun `setOnboardingStatus should save the onboarding status to disk`() {
+        val userId = "userId"
+        repository.setOnboardingStatus(userId = userId, status = OnboardingStatus.NOT_STARTED)
+        assertEquals(OnboardingStatus.NOT_STARTED, fakeAuthDiskSource.getOnboardingStatus(userId))
+    }
+
+    @Test
+    @Suppress("MaxLineLength")
+    fun `on successful login a new user should have onboarding status set if feature flag is on and has not previously logged in`() =
+        runTest {
+            val successResponse = GET_TOKEN_RESPONSE_SUCCESS
+            coEvery {
+                identityService.preLogin(email = EMAIL)
+            } returns PRE_LOGIN_SUCCESS.asSuccess()
+            every { featureFlagManager.getFeatureFlag(FlagKey.OnboardingFlow) } returns true
+            coEvery {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            } returns successResponse.asSuccess()
+            coEvery {
+                vaultRepository.unlockVault(
+                    userId = USER_ID_1,
+                    email = EMAIL,
+                    kdf = ACCOUNT_1.profile.toSdkParams(),
+                    initUserCryptoMethod = InitUserCryptoMethod.Password(
+                        password = PASSWORD,
+                        userKey = successResponse.key!!,
+                    ),
+                    privateKey = successResponse.privateKey!!,
+                    organizationKeys = null,
+                )
+            } returns VaultUnlockResult.Success
+            coEvery { vaultRepository.syncIfNecessary() } just runs
+            every {
+                GET_TOKEN_RESPONSE_SUCCESS.toUserState(
+                    previousUserState = null,
+                    environmentUrlData = EnvironmentUrlDataJson.DEFAULT_US,
+                )
+            } returns SINGLE_USER_STATE_1
+            every { settingsRepository.getUserHasLoggedInValue(USER_ID_1) } returns false
+            val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
+            assertEquals(LoginResult.Success, result)
+            assertEquals(AuthState.Authenticated(ACCESS_TOKEN), repository.authStateFlow.value)
+            coVerify { identityService.preLogin(email = EMAIL) }
+            fakeAuthDiskSource.assertPrivateKey(
+                userId = USER_ID_1,
+                privateKey = "privateKey",
+            )
+            fakeAuthDiskSource.assertUserKey(
+                userId = USER_ID_1,
+                userKey = "key",
+            )
+            fakeAuthDiskSource.assertMasterPasswordHash(
+                userId = USER_ID_1,
+                passwordHash = PASSWORD_HASH,
+            )
+            assertEquals(
+                OnboardingStatus.NOT_STARTED,
+                fakeAuthDiskSource.getOnboardingStatus(USER_ID_1),
+            )
+        }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `on successful login does not set onboarding status if feature flag is off`() =
+        runTest {
+            val successResponse = GET_TOKEN_RESPONSE_SUCCESS
+            coEvery {
+                identityService.preLogin(email = EMAIL)
+            } returns PRE_LOGIN_SUCCESS.asSuccess()
+            every { featureFlagManager.getFeatureFlag(FlagKey.OnboardingFlow) } returns false
+            coEvery {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            } returns successResponse.asSuccess()
+            coEvery {
+                vaultRepository.unlockVault(
+                    userId = USER_ID_1,
+                    email = EMAIL,
+                    kdf = ACCOUNT_1.profile.toSdkParams(),
+                    initUserCryptoMethod = InitUserCryptoMethod.Password(
+                        password = PASSWORD,
+                        userKey = successResponse.key!!,
+                    ),
+                    privateKey = successResponse.privateKey!!,
+                    organizationKeys = null,
+                )
+            } returns VaultUnlockResult.Success
+            coEvery { vaultRepository.syncIfNecessary() } just runs
+            every {
+                GET_TOKEN_RESPONSE_SUCCESS.toUserState(
+                    previousUserState = null,
+                    environmentUrlData = EnvironmentUrlDataJson.DEFAULT_US,
+                )
+            } returns SINGLE_USER_STATE_1
+            val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
+            assertEquals(LoginResult.Success, result)
+            assertEquals(AuthState.Authenticated(ACCESS_TOKEN), repository.authStateFlow.value)
+            coVerify { identityService.preLogin(email = EMAIL) }
+            fakeAuthDiskSource.assertPrivateKey(
+                userId = USER_ID_1,
+                privateKey = "privateKey",
+            )
+            fakeAuthDiskSource.assertUserKey(
+                userId = USER_ID_1,
+                userKey = "key",
+            )
+            fakeAuthDiskSource.assertMasterPasswordHash(
+                userId = USER_ID_1,
+                passwordHash = PASSWORD_HASH,
+            )
+            verify { settingsRepository.setDefaultsIfNecessary(userId = USER_ID_1) }
+            assertNull(fakeAuthDiskSource.getOnboardingStatus(USER_ID_1))
+        }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `on successful login does not set onboarding status if feature flag is on but user has previously logged in`() =
+        runTest {
+            val successResponse = GET_TOKEN_RESPONSE_SUCCESS
+            coEvery {
+                identityService.preLogin(email = EMAIL)
+            } returns PRE_LOGIN_SUCCESS.asSuccess()
+            every { featureFlagManager.getFeatureFlag(FlagKey.OnboardingFlow) } returns true
+            coEvery {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            } returns successResponse.asSuccess()
+            coEvery {
+                vaultRepository.unlockVault(
+                    userId = USER_ID_1,
+                    email = EMAIL,
+                    kdf = ACCOUNT_1.profile.toSdkParams(),
+                    initUserCryptoMethod = InitUserCryptoMethod.Password(
+                        password = PASSWORD,
+                        userKey = successResponse.key!!,
+                    ),
+                    privateKey = successResponse.privateKey!!,
+                    organizationKeys = null,
+                )
+            } returns VaultUnlockResult.Success
+            coEvery { vaultRepository.syncIfNecessary() } just runs
+            every {
+                GET_TOKEN_RESPONSE_SUCCESS.toUserState(
+                    previousUserState = null,
+                    environmentUrlData = EnvironmentUrlDataJson.DEFAULT_US,
+                )
+            } returns SINGLE_USER_STATE_1
+            every { settingsRepository.getUserHasLoggedInValue(USER_ID_1) } returns true
+            val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
+            assertEquals(LoginResult.Success, result)
+            assertEquals(AuthState.Authenticated(ACCESS_TOKEN), repository.authStateFlow.value)
+            coVerify { identityService.preLogin(email = EMAIL) }
+            fakeAuthDiskSource.assertPrivateKey(
+                userId = USER_ID_1,
+                privateKey = "privateKey",
+            )
+            fakeAuthDiskSource.assertUserKey(
+                userId = USER_ID_1,
+                userKey = "key",
+            )
+            fakeAuthDiskSource.assertMasterPasswordHash(
+                userId = USER_ID_1,
+                passwordHash = PASSWORD_HASH,
+            )
+            verify { settingsRepository.setDefaultsIfNecessary(userId = USER_ID_1) }
+            assertNull(fakeAuthDiskSource.getOnboardingStatus(USER_ID_1))
+        }
+
+    @Test
+    fun `setShowImportLogins should save the showImportLogins to disk`() {
+        fakeAuthDiskSource.userState = MULTI_USER_STATE
+        repository.setShowImportLogins(showImportLogins = true)
+        assertEquals(true, fakeAuthDiskSource.getShowImportLogins(USER_ID_1))
+    }
+
     companion object {
         private const val UNIQUE_APP_ID = "testUniqueAppId"
         private const val NAME = "Example Name"
@@ -6285,5 +6558,38 @@ class AuthRepositoryTest {
                 status = VaultUnlockData.Status.UNLOCKED,
             ),
         )
+
+        private val FIRST_TIME_STATE = FirstTimeState(
+            showImportLoginsCard = true,
+        )
+
+        private val SERVER_CONFIG_DEFAULT = ServerConfig(
+            lastSync = 0L,
+            serverData = ConfigResponseJson(
+                type = "mockType",
+                version = "mockVersion",
+                gitHash = "mockGitHash",
+                server = null,
+                environment = ConfigResponseJson.EnvironmentJson(
+                    cloudRegion = "mockCloudRegion",
+                    vaultUrl = "mockVaultUrl",
+                    apiUrl = "mockApiUrl",
+                    identityUrl = "mockIdentityUrl",
+                    notificationsUrl = "mockNotificationsUrl",
+                    ssoUrl = "mockSsoUrl",
+                ),
+                featureStates = emptyMap(),
+            ),
+        )
+
+        private val SERVER_CONFIG_UNOFFICIAL = SERVER_CONFIG_DEFAULT
+            .copy(
+                serverData = SERVER_CONFIG_DEFAULT.serverData.copy(
+                    server = ConfigResponseJson.ServerJson(
+                        name = "mockUnofficialServerName",
+                        url = "mockUnofficialServerUrl",
+                    ),
+                ),
+            )
     }
 }

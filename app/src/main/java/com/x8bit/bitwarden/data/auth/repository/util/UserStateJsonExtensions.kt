@@ -1,5 +1,6 @@
 package com.x8bit.bitwarden.data.auth.repository.util
 
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.UserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.repository.model.UserAccountTokens
@@ -7,6 +8,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.UserKeyConnectorState
 import com.x8bit.bitwarden.data.auth.repository.model.UserOrganizations
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.repository.util.toEnvironmentUrlsOrDefault
 import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
 import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
@@ -109,6 +111,8 @@ fun UserStateJson.toUserState(
     userOrganizationsList: List<UserOrganizations>,
     userIsUsingKeyConnectorList: List<UserKeyConnectorState>,
     hasPendingAccountAddition: Boolean,
+    onboardingStatus: OnboardingStatus?,
+    firstTimeState: FirstTimeState,
     isBiometricsEnabledProvider: (userId: String) -> Boolean,
     vaultUnlockTypeProvider: (userId: String) -> VaultUnlockType,
     isDeviceTrustedProvider: (userId: String) -> Boolean,
@@ -135,9 +139,6 @@ fun UserStateJson.toUserState(
                         it.role == OrganizationType.ADMIN ||
                         it.shouldManageResetPassword
                 }
-                val needsMasterPassword = decryptionOptions?.hasMasterPassword == false &&
-                    hasManageResetPasswordPermission &&
-                    keyConnectorOptions == null
                 val trustedDevice = trustedDeviceOptions?.let {
                     UserState.TrustedDevice(
                         isDeviceTrusted = isDeviceTrustedProvider(userId),
@@ -146,7 +147,14 @@ fun UserStateJson.toUserState(
                         hasResetPasswordPermission = it.hasManageResetPasswordPermission,
                     )
                 }
-
+                // If a user does not have a Master Password we want to check if they have another
+                // method for unlocking the vault. In the case of a TDE user we check if they
+                // have the reset password permission via their organization(S). If the user does
+                // not belong to a TDE or we check to see if they user key connector.
+                val tdeUserNeedsMasterPassword =
+                    hasManageResetPasswordPermission.takeIf { trustedDevice != null }
+                val needsMasterPassword = decryptionOptions?.hasMasterPassword == false &&
+                    (tdeUserNeedsMasterPassword ?: (keyConnectorOptions == null))
                 UserState.Account(
                     userId = userId,
                     name = profile.name,
@@ -171,6 +179,10 @@ fun UserStateJson.toUserState(
                     isUsingKeyConnector = userIsUsingKeyConnectorList
                         .find { it.userId == userId }
                         ?.isUsingKeyConnector == true,
+                    // If the user exists with no onboarding status we can assume they have been
+                    // using the app prior to the release of the onboarding flow.
+                    onboardingStatus = onboardingStatus ?: OnboardingStatus.COMPLETE,
+                    firstTimeState = firstTimeState,
                 )
             },
         hasPendingAccountAddition = hasPendingAccountAddition,

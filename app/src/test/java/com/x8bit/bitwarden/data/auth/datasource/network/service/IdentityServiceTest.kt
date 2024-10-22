@@ -274,6 +274,22 @@ class IdentityServiceTest : BaseServiceTest() {
     }
 
     @Test
+    fun `getToken when response is a 400 with a legacy error body should return Invalid`() =
+        runTest {
+            server.enqueue(MockResponse().setResponseCode(400).setBody(LEGACY_INVALID_LOGIN_JSON))
+            val result = identityService.getToken(
+                email = EMAIL,
+                authModel = IdentityTokenAuthModel.MasterPassword(
+                    username = EMAIL,
+                    password = PASSWORD_HASH,
+                ),
+                captchaToken = null,
+                uniqueAppId = UNIQUE_APP_ID,
+            )
+            assertEquals(LEGACY_INVALID_LOGIN.asSuccess(), result)
+        }
+
+    @Test
     fun `prevalidateSso when response is success should return PrevalidateSsoResponseJson`() =
         runTest {
             val organizationId = "organizationId"
@@ -408,27 +424,24 @@ class IdentityServiceTest : BaseServiceTest() {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `verifyEmailToken should return Invalid when response message is non expired error`() = runTest {
-        val messageWithOutExpired = "message without expir... whoops"
-        val json = """
-            {
-              "message": "$messageWithOutExpired"
-            }
-        """.trimIndent()
-        val response = MockResponse().setResponseCode(400).setBody(json)
-        server.enqueue(response)
-        val result = identityService.verifyEmailRegistrationToken(
-            body = VerifyEmailTokenRequestJson(
-                token = EMAIL_TOKEN,
-                email = EMAIL,
-            ),
-        )
-        assertTrue(result.isSuccess)
-        assertEquals(
-            VerifyEmailTokenResponseJson.Invalid(messageWithOutExpired),
-            result.getOrThrow(),
-        )
-    }
+    fun `verifyEmailToken should return Invalid when response message is non expired error`() =
+        runTest {
+            val messageWithOutExpired = "message without expir... whoops"
+            val json = """{ "message": "$messageWithOutExpired" }""".trimIndent()
+            val response = MockResponse().setResponseCode(400).setBody(json)
+            server.enqueue(response)
+            val result = identityService.verifyEmailRegistrationToken(
+                body = VerifyEmailTokenRequestJson(
+                    token = EMAIL_TOKEN,
+                    email = EMAIL,
+                ),
+            )
+            assertTrue(result.isSuccess)
+            assertEquals(
+                VerifyEmailTokenResponseJson.Invalid(messageWithOutExpired),
+                result.getOrThrow(),
+            )
+        }
 
     @Test
     fun `verifyEmailToken should return an error when response is an un-handled error`() = runTest {
@@ -566,7 +579,7 @@ private const val LOGIN_SUCCESS_JSON = """
     }
   },
   "KeyConnectorUrl": "keyConnectorUrl"
-}    
+}
 """
 
 private val LOGIN_SUCCESS = GetTokenResponseJson.Success(
@@ -616,6 +629,14 @@ private const val INVALID_LOGIN_JSON = """
 }
 """
 
+private const val LEGACY_INVALID_LOGIN_JSON = """
+{
+  "errorModel": {
+    "message": "Legacy-123"
+  }
+}
+"""
+
 private const val TOO_MANY_REQUEST_ERROR_JSON = """
 {
   "Object": "error",
@@ -647,6 +668,14 @@ private const val CAPTCHA_BYPASS_TOKEN_RESPONSE_JSON = """
 private val INVALID_LOGIN = GetTokenResponseJson.Invalid(
     errorModel = GetTokenResponseJson.Invalid.ErrorModel(
         errorMessage = "123",
+    ),
+    legacyErrorModel = null,
+)
+
+private val LEGACY_INVALID_LOGIN = GetTokenResponseJson.Invalid(
+    errorModel = null,
+    legacyErrorModel = GetTokenResponseJson.Invalid.LegacyErrorModel(
+        errorMessage = "Legacy-123",
     ),
 )
 

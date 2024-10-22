@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
@@ -28,10 +26,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,8 +35,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.ui.auth.feature.checkemail.handlers.rememberCheckEmailHandler
+import com.x8bit.bitwarden.ui.platform.base.util.ClickableTextHighlight
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.base.util.createAnnotatedString
+import com.x8bit.bitwarden.ui.platform.base.util.createClickableAnnotatedString
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenFilledButton
@@ -52,8 +48,6 @@ import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.composition.LocalIntentManager
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
-
-private const val TAG_URL = "URL"
 
 /**
  * Top level composable for the check email screen.
@@ -150,8 +144,8 @@ private fun CheckEmailContent(
         Text(
             text = stringResource(id = R.string.check_your_email),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = BitwardenTheme.typography.titleMedium,
+            color = BitwardenTheme.colorScheme.text.primary,
             modifier = Modifier
                 .padding(horizontal = 8.dp)
                 .wrapContentHeight()
@@ -166,8 +160,8 @@ private fun CheckEmailContent(
             ),
             highlights = listOf(email),
             highlightStyle = SpanStyle(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                color = BitwardenTheme.colorScheme.text.primary,
+                fontSize = BitwardenTheme.typography.bodyMedium.fontSize,
                 fontWeight = FontWeight.Bold,
             ),
             tag = "EMAIL",
@@ -175,7 +169,7 @@ private fun CheckEmailContent(
         Text(
             text = descriptionAnnotatedString,
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyMedium,
+            style = BitwardenTheme.typography.bodyMedium,
             modifier = Modifier
                 .padding(horizontal = 8.dp)
                 .fillMaxWidth()
@@ -185,8 +179,8 @@ private fun CheckEmailContent(
         @Suppress("MaxLineLength")
         Text(
             text = stringResource(R.string.select_the_link_in_the_email_to_verify_your_email_address_and_continue_creating_your_account),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = BitwardenTheme.typography.bodyMedium,
+            color = BitwardenTheme.colorScheme.text.primary,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .padding(horizontal = 8.dp)
@@ -226,7 +220,7 @@ private fun CheckEmailLegacyContent(
         Spacer(modifier = Modifier.height(32.dp))
         Image(
             painter = rememberVectorPainter(id = R.drawable.email_check),
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+            colorFilter = ColorFilter.tint(BitwardenTheme.colorScheme.icon.secondary),
             contentDescription = null,
             contentScale = ContentScale.FillHeight,
             modifier = Modifier
@@ -238,8 +232,8 @@ private fun CheckEmailLegacyContent(
         Text(
             text = stringResource(id = R.string.check_your_email),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = BitwardenTheme.typography.headlineSmall,
+            color = BitwardenTheme.colorScheme.text.primary,
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .wrapContentHeight()
@@ -255,8 +249,8 @@ private fun CheckEmailLegacyContent(
             ),
             highlights = listOf(email),
             highlightStyle = SpanStyle(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                color = BitwardenTheme.colorScheme.text.primary,
+                fontSize = BitwardenTheme.typography.bodyMedium.fontSize,
                 fontWeight = FontWeight.Bold,
             ),
             tag = "EMAIL",
@@ -283,54 +277,34 @@ private fun CheckEmailLegacyContent(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val goBackAnnotatedString = createAnnotatedString(
+            val goBackAnnotatedString = createClickableAnnotatedString(
                 mainString = stringResource(
                     id = R.string.no_email_go_back_to_edit_your_email_address,
                 ),
-                highlights = listOf(stringResource(id = R.string.go_back)),
-                tag = TAG_URL,
+                highlights = listOf(
+                    ClickableTextHighlight(
+                        textToHighlight = stringResource(id = R.string.go_back),
+                        onTextClick = onChangeEmailClick,
+                    ),
+                ),
             )
-            ClickableText(
+            Text(
                 text = goBackAnnotatedString,
-                onClick = {
-                    goBackAnnotatedString
-                        .getStringAnnotations(TAG_URL, it, it)
-                        .firstOrNull()?.let {
-                            onChangeEmailClick()
-                        }
-                },
-                modifier = Modifier.semantics {
-                    role = Role.Button
-                    onClick {
-                        onChangeEmailClick()
-                        true
-                    }
-                },
             )
             Spacer(modifier = Modifier.height(32.dp))
-            val logInAnnotatedString = createAnnotatedString(
+            val logInAnnotatedString = createClickableAnnotatedString(
                 mainString = stringResource(
                     id = R.string.or_log_in_you_may_already_have_an_account,
                 ),
-                highlights = listOf(stringResource(id = R.string.log_in)),
-                tag = TAG_URL,
+                highlights = listOf(
+                    ClickableTextHighlight(
+                        textToHighlight = stringResource(id = R.string.log_in),
+                        onTextClick = onLoginClick,
+                    ),
+                ),
             )
-            ClickableText(
+            Text(
                 text = logInAnnotatedString,
-                onClick = {
-                    logInAnnotatedString
-                        .getStringAnnotations(TAG_URL, it, it)
-                        .firstOrNull()?.let {
-                            onLoginClick()
-                        }
-                },
-                modifier = Modifier.semantics {
-                    role = Role.Button
-                    onClick {
-                        onLoginClick()
-                        true
-                    }
-                },
             )
         }
     }

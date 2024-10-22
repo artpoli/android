@@ -2,6 +2,7 @@ package com.x8bit.bitwarden.data.auth.datasource.disk.util
 
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.PendingAuthRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
@@ -12,6 +13,8 @@ import kotlinx.coroutines.flow.onSubscription
 import org.junit.Assert.assertEquals
 
 class FakeAuthDiskSource : AuthDiskSource {
+
+    override var authenticatorSyncSymmetricKey: ByteArray? = null
 
     override val uniqueAppId: String = "testUniqueAppId"
 
@@ -26,6 +29,10 @@ class FakeAuthDiskSource : AuthDiskSource {
         mutableMapOf<String, MutableSharedFlow<List<SyncResponseJson.Policy>?>>()
     private val mutableAccountTokensFlowMap =
         mutableMapOf<String, MutableSharedFlow<AccountTokensJson?>>()
+    private val mutableShowImportLoginsFlowMap = mutableMapOf<String, MutableSharedFlow<Boolean?>>()
+
+    private val mutableOnboardingStatusFlowMap =
+        mutableMapOf<String, MutableSharedFlow<OnboardingStatus?>>()
     private val mutableUserStateFlow = bufferedMutableSharedFlow<UserStateJson?>(replay = 1)
 
     private val storedShouldUseKeyConnector = mutableMapOf<String, Boolean?>()
@@ -48,6 +55,8 @@ class FakeAuthDiskSource : AuthDiskSource {
     private val storedMasterPasswordHashes = mutableMapOf<String, String?>()
     private val storedAuthenticationSyncKeys = mutableMapOf<String, String?>()
     private val storedPolicies = mutableMapOf<String, List<SyncResponseJson.Policy>?>()
+    private val storedOnboardingStatus = mutableMapOf<String, OnboardingStatus?>()
+    private val storedShowImportLogins = mutableMapOf<String, Boolean?>()
 
     override var userState: UserStateJson? = null
         set(value) {
@@ -250,6 +259,30 @@ class FakeAuthDiskSource : AuthDiskSource {
         getMutableAccountTokensFlow(userId = userId).tryEmit(accountTokens)
     }
 
+    override fun getOnboardingStatus(userId: String): OnboardingStatus? =
+        storedOnboardingStatus[userId]
+
+    override fun storeOnboardingStatus(userId: String, onboardingStatus: OnboardingStatus?) {
+        storedOnboardingStatus[userId] = onboardingStatus
+        getMutableOnboardingStatusFlow(userId = userId).tryEmit(onboardingStatus)
+    }
+
+    override fun getOnboardingStatusFlow(userId: String): Flow<OnboardingStatus?> =
+        getMutableOnboardingStatusFlow(userId = userId)
+            .onSubscription { emit(getOnboardingStatus(userId)) }
+
+    override fun getShowImportLogins(userId: String): Boolean? =
+        storedShowImportLogins[userId]
+
+    override fun storeShowImportLogins(userId: String, showImportLogins: Boolean?) {
+        storedShowImportLogins[userId] = showImportLogins
+        getMutableShowImportLoginsFlow(userId = userId).tryEmit(showImportLogins)
+    }
+
+    override fun getShowImportLoginsFlow(userId: String): Flow<Boolean?> =
+        getMutableShowImportLoginsFlow(userId)
+            .onSubscription { emit(getShowImportLogins(userId)) }
+
     /**
      * Assert the the [isTdeLoginComplete] was stored successfully using the [userId].
      */
@@ -422,6 +455,19 @@ class FakeAuthDiskSource : AuthDiskSource {
         mutableAccountTokensFlowMap.getOrPut(userId) {
             bufferedMutableSharedFlow(replay = 1)
         }
+
+    private fun getMutableOnboardingStatusFlow(
+        userId: String,
+    ): MutableSharedFlow<OnboardingStatus?> =
+        mutableOnboardingStatusFlowMap.getOrPut(userId) {
+            bufferedMutableSharedFlow(replay = 1)
+        }
+
+    private fun getMutableShowImportLoginsFlow(
+        userId: String,
+    ): MutableSharedFlow<Boolean?> = mutableShowImportLoginsFlowMap.getOrPut(userId) {
+        bufferedMutableSharedFlow(replay = 1)
+    }
 
     //endregion Private helper functions
 }

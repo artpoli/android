@@ -12,7 +12,6 @@ import com.x8bit.bitwarden.data.auth.repository.model.KnownDeviceResult
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.util.CaptchaCallbackTokenResult
 import com.x8bit.bitwarden.data.auth.repository.util.generateUriForCaptcha
-import com.x8bit.bitwarden.data.platform.datasource.network.util.base64UrlEncode
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
@@ -144,6 +143,7 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    @Suppress("MaxLineLength")
     private fun handleReceiveLoginResult(action: LoginAction.Internal.ReceiveLoginResult) {
         when (val loginResult = action.loginResult) {
             is LoginResult.CaptchaRequired -> {
@@ -160,9 +160,7 @@ class LoginViewModel @Inject constructor(
                 sendEvent(
                     LoginEvent.NavigateToTwoFactorLogin(
                         emailAddress = state.emailAddress,
-                        // Base64 URL encode the password to prevent corruption of escapable chars
-                        // when sending via navArgs.
-                        base64EncodedPassword = state.passwordInput.base64UrlEncode(),
+                        password = state.passwordInput,
                     ),
                 )
             }
@@ -174,6 +172,17 @@ class LoginViewModel @Inject constructor(
                             title = R.string.an_error_has_occurred.asText(),
                             message = loginResult.errorMessage?.asText()
                                 ?: R.string.generic_error_message.asText(),
+                        ),
+                    )
+                }
+            }
+
+            LoginResult.UnofficialServerError -> {
+                mutableStateFlow.update {
+                    it.copy(
+                        dialogState = LoginState.DialogState.Error(
+                            title = R.string.an_error_has_occurred.asText(),
+                            message = R.string.this_is_not_a_recognized_bitwarden_server_you_may_need_to_check_with_your_provider_or_update_your_server.asText(),
                         ),
                     )
                 }
@@ -345,7 +354,7 @@ sealed class LoginEvent {
      */
     data class NavigateToTwoFactorLogin(
         val emailAddress: String,
-        val base64EncodedPassword: String?,
+        val password: String?,
     ) : LoginEvent()
 
     /**

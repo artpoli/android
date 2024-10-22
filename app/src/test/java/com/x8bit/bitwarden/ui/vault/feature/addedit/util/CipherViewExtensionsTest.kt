@@ -13,9 +13,11 @@ import com.bitwarden.vault.PasswordHistoryView
 import com.bitwarden.vault.SecureNoteType
 import com.bitwarden.vault.SecureNoteView
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
 import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
@@ -69,6 +71,7 @@ class CipherViewExtensionsTest {
         val result = cipherView.toViewState(
             isClone = false,
             isIndividualVaultDisabled = false,
+            totpData = null,
             resourceManager = resourceManager,
             clock = FIXED_CLOCK,
         )
@@ -114,6 +117,7 @@ class CipherViewExtensionsTest {
         val result = cipherView.toViewState(
             isClone = false,
             isIndividualVaultDisabled = true,
+            totpData = null,
             resourceManager = resourceManager,
             clock = FIXED_CLOCK,
         )
@@ -164,6 +168,7 @@ class CipherViewExtensionsTest {
         val result = cipherView.toViewState(
             isClone = false,
             isIndividualVaultDisabled = false,
+            totpData = null,
             resourceManager = resourceManager,
             clock = FIXED_CLOCK,
         )
@@ -214,12 +219,73 @@ class CipherViewExtensionsTest {
     }
 
     @Test
+    fun `toViewState should create a Login ViewState with a predefined totp`() {
+        val totp = "otpauth://totp/alice@google.com?secret=JBSWY3DPEHPK3PXP"
+        val cipherView = DEFAULT_LOGIN_CIPHER_VIEW.copy(
+            login = DEFAULT_LOGIN_CIPHER_VIEW.login?.copy(totp = null),
+        )
+
+        val result = cipherView.toViewState(
+            isClone = false,
+            isIndividualVaultDisabled = false,
+            totpData = mockk { every { uri } returns totp },
+            resourceManager = resourceManager,
+            clock = FIXED_CLOCK,
+        )
+
+        assertEquals(
+            VaultAddEditState.ViewState.Content(
+                common = VaultAddEditState.ViewState.Content.Common(
+                    originalCipher = cipherView,
+                    name = "cipher",
+                    favorite = false,
+                    masterPasswordReprompt = true,
+                    notes = "Lots of notes",
+                    availableFolders = emptyList(),
+                    availableOwners = emptyList(),
+                    customFieldData = listOf(
+                        VaultAddEditState.Custom.BooleanField(TEST_ID, "TestBoolean", false),
+                        VaultAddEditState.Custom.TextField(TEST_ID, "TestText", "TestText"),
+                        VaultAddEditState.Custom.HiddenField(TEST_ID, "TestHidden", "TestHidden"),
+                        VaultAddEditState.Custom.LinkedField(
+                            TEST_ID,
+                            "TestLinked",
+                            VaultLinkedFieldType.USERNAME,
+                        ),
+                    ),
+                ),
+                isIndividualVaultDisabled = false,
+                type = VaultAddEditState.ViewState.Content.ItemType.Login(
+                    username = "username",
+                    password = "password",
+                    uriList = listOf(
+                        UriItem(
+                            id = TEST_ID,
+                            uri = "www.example.com",
+                            match = null,
+                            checksum = null,
+                        ),
+                    ),
+                    totp = totp,
+                    canViewPassword = false,
+                    fido2CredentialCreationDateTime = R.string.created_xy.asText(
+                        "10/27/23",
+                        "12:00 PM",
+                    ),
+                ),
+            ),
+            result,
+        )
+    }
+
+    @Test
     fun `toViewState should create a Secure Notes ViewState`() {
         val cipherView = DEFAULT_SECURE_NOTES_CIPHER_VIEW
 
         val result = cipherView.toViewState(
             isClone = false,
             isIndividualVaultDisabled = true,
+            totpData = null,
             resourceManager = resourceManager,
             clock = FIXED_CLOCK,
         )
@@ -254,6 +320,7 @@ class CipherViewExtensionsTest {
         val result = cipherView.toViewState(
             isClone = true,
             isIndividualVaultDisabled = false,
+            totpData = null,
             resourceManager = resourceManager,
             clock = FIXED_CLOCK,
         )
@@ -446,6 +513,8 @@ class CipherViewExtensionsTest {
             trustedDevice = null,
             hasMasterPassword = true,
             isUsingKeyConnector = false,
+            onboardingStatus = OnboardingStatus.COMPLETE,
+            firstTimeState = FirstTimeState(showImportLoginsCard = true),
         )
 }
 

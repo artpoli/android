@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.core.net.toUri
 import com.x8bit.bitwarden.R
@@ -59,7 +60,7 @@ import org.junit.Test
 
 @Suppress("LargeClass")
 class VaultScreenTest : BaseComposeTest() {
-
+    private var onNavigateToImportLoginsCalled = false
     private var onNavigateToVaultAddItemScreenCalled = false
     private var onNavigateToVaultItemId: String? = null
     private var onNavigateToVaultEditItemId: String? = null
@@ -90,6 +91,7 @@ class VaultScreenTest : BaseComposeTest() {
                 onDimBottomNavBarRequest = { onDimBottomNavBarRequestCalled = true },
                 onNavigateToVerificationCodeScreen = { onNavigateToVerificationCodeScreen = true },
                 onNavigateToSearchVault = { onNavigateToSearchScreen = true },
+                onNavigateToImportLogins = { onNavigateToImportLoginsCalled = true },
                 exitManager = exitManager,
                 intentManager = intentManager,
                 permissionsManager = permissionsManager,
@@ -636,7 +638,10 @@ class VaultScreenTest : BaseComposeTest() {
     @Test
     fun `add an item button click should send AddItemClick action`() {
         mutableStateFlow.update { it.copy(viewState = VaultState.ViewState.NoItems) }
-        composeTestRule.onNodeWithText("Add an Item").performClick()
+        composeTestRule
+            .onNodeWithText("New login")
+            .performScrollTo()
+            .performClick()
         verify { viewModel.trySendAction(VaultAction.AddItemClick) }
     }
 
@@ -1137,6 +1142,65 @@ class VaultScreenTest : BaseComposeTest() {
         composeTestRule.waitForIdle()
         assertTrue(permissionsManager.hasGetLauncherBeenCalled)
     }
+
+    @Test
+    fun `action card for importing logins should show based on state`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = VaultState.ViewState.NoItems,
+            )
+        }
+        val importSavedLogins = "Import saved logins"
+        composeTestRule
+            .onNodeWithText(importSavedLogins)
+            .assertDoesNotExist()
+
+        mutableStateFlow.update {
+            it.copy(
+                viewState = VaultState.ViewState.NoItems,
+                showImportActionCard = true,
+            )
+        }
+        composeTestRule
+            .onNodeWithText(importSavedLogins)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `when import action card is showing, clicking it should send ImportLoginsClick action`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = VaultState.ViewState.NoItems,
+                showImportActionCard = true,
+            )
+        }
+        composeTestRule
+            .onNodeWithText("Get started")
+            .performClick()
+
+        verify { viewModel.trySendAction(VaultAction.ImportActionCardClick) }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when import action card is showing, dismissing it should send DismissImportActionCard action`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = VaultState.ViewState.NoItems,
+                showImportActionCard = true,
+            )
+        }
+        composeTestRule
+            .onNodeWithContentDescription("Close")
+            .performClick()
+        verify { viewModel.trySendAction(VaultAction.DismissImportActionCard) }
+    }
+
+    @Test
+    fun `when NavigateToImportLogins is sent, it should call onNavigateToImportLogins`() {
+        mutableEventFlow.tryEmit(VaultEvent.NavigateToImportLogins)
+        assertTrue(onNavigateToImportLoginsCalled)
+    }
 }
 
 private val ACTIVE_ACCOUNT_SUMMARY = AccountSummary(
@@ -1191,6 +1255,7 @@ private val DEFAULT_STATE: VaultState = VaultState(
     hasMasterPassword = true,
     hideNotificationsDialog = true,
     isRefreshing = false,
+    showImportActionCard = false,
 )
 
 private val DEFAULT_CONTENT_VIEW_STATE: VaultState.ViewState.Content = VaultState.ViewState.Content(

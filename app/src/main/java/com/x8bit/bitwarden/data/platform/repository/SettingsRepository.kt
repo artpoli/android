@@ -134,6 +134,15 @@ interface SettingsRepository {
     var blockedAutofillUris: List<String>
 
     /**
+     * Emits updates whenever there is a change in the app's status for accessibility-based
+     * autofill.
+     *
+     * Note that the correct value is only populated upon subscription so calling [StateFlow.value]
+     * may result in an out-of-date value.
+     */
+    val isAccessibilityEnabledStateFlow: StateFlow<Boolean>
+
+    /**
      * Emits updates whenever there is a change in the app's status for supporting autofill.
      *
      * Note that the correct value is only populated upon subscription so calling [StateFlow.value]
@@ -245,4 +254,38 @@ interface SettingsRepository {
      * Record that a user has logged in on this device.
      */
     fun storeUserHasLoggedInValue(userId: String)
+
+    /**
+     * Gets whether or not the given [userId] has signalled they want to enable autofill
+     * later, during onboarding.
+     */
+    fun getShowAutoFillSettingBadge(userId: String): Boolean
+
+    /**
+     * Stores the given value for whether or not the given [userId] has signalled they want to
+     * enable autofill later, during onboarding.
+     */
+    fun storeShowAutoFillSettingBadge(userId: String, showBadge: Boolean)
+
+    /**
+     * Gets whether or not the given [userId] has signalled they want to enable unlock options
+     * later, during onboarding.
+     */
+    fun getShowUnlockSettingBadge(userId: String): Boolean
+
+    /**
+     * Stores the given value for whether or not the given [userId] has signalled they want to
+     * set up unlock options later, during onboarding.
+     */
+    fun storeShowUnlockSettingBadge(userId: String, showBadge: Boolean)
+
+    /**
+     * Gets whether or not the given [userId] has signalled they want to enable autofill
+     */
+    fun getShowAutofillBadgeFlow(userId: String): Flow<Boolean>
+
+    /**
+     * Gets whether or not the given [userId] has signalled they want to enable unlock options
+     */
+    fun getShowUnlockBadgeFlow(userId: String): Flow<Boolean>
 }

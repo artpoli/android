@@ -5,13 +5,14 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.EnvironmentUrlDataJson
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.KnownDeviceResult
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.util.CaptchaCallbackTokenResult
 import com.x8bit.bitwarden.data.auth.repository.util.generateUriForCaptcha
-import com.x8bit.bitwarden.data.platform.datasource.network.util.base64UrlEncode
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
 import com.x8bit.bitwarden.data.platform.repository.util.FakeEnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
@@ -61,7 +62,7 @@ class LoginViewModelTest : BaseViewModelTest() {
 
     @AfterEach
     fun tearDown() {
-        unmockkStatic(::generateUriForCaptcha, String::base64UrlEncode)
+        unmockkStatic(::generateUriForCaptcha)
     }
 
     @Test
@@ -130,6 +131,8 @@ class LoginViewModelTest : BaseViewModelTest() {
                     trustedDevice = null,
                     hasMasterPassword = true,
                     isUsingKeyConnector = false,
+                    onboardingStatus = OnboardingStatus.COMPLETE,
+                    firstTimeState = FirstTimeState(showImportLoginsCard = true),
                 ),
             ),
         )
@@ -278,6 +281,44 @@ class LoginViewModelTest : BaseViewModelTest() {
         }
     }
 
+    @Suppress("MaxLineLength")
+    @Test
+    fun `LoginButtonClick login returns UnofficialServerError should update errorDialogState`() =
+        runTest {
+            coEvery {
+                authRepository.login(
+                    email = EMAIL,
+                    password = "",
+                    captchaToken = null,
+                )
+            } returns LoginResult.UnofficialServerError
+            val viewModel = createViewModel()
+            viewModel.stateFlow.test {
+                assertEquals(DEFAULT_STATE, awaitItem())
+                viewModel.trySendAction(LoginAction.LoginButtonClick)
+                assertEquals(
+                    DEFAULT_STATE.copy(
+                        dialogState = LoginState.DialogState.Loading(
+                            message = R.string.logging_in.asText(),
+                        ),
+                    ),
+                    awaitItem(),
+                )
+                assertEquals(
+                    DEFAULT_STATE.copy(
+                        dialogState = LoginState.DialogState.Error(
+                            title = R.string.an_error_has_occurred.asText(),
+                            message = R.string.this_is_not_a_recognized_bitwarden_server_you_may_need_to_check_with_your_provider_or_update_your_server.asText(),
+                        ),
+                    ),
+                    awaitItem(),
+                )
+            }
+            coVerify {
+                authRepository.login(email = EMAIL, password = "", captchaToken = null)
+            }
+        }
+
     @Test
     fun `LoginButtonClick login returns success should update loadingDialogState`() = runTest {
         coEvery {
@@ -338,34 +379,30 @@ class LoginViewModelTest : BaseViewModelTest() {
     @Test
     fun `LoginButtonClick login returns TwoFactorRequired should base64 URL encode password and emit NavigateToTwoFactorLogin`() =
         runTest {
-            mockkStatic(String::base64UrlEncode)
-            val decodedPassword = "password"
-            val encodedPassword = "base64EncodedPassword"
-            every { decodedPassword.base64UrlEncode() } returns encodedPassword
+            val password = "password"
             coEvery {
                 authRepository.login(
                     email = EMAIL,
-                    password = decodedPassword,
+                    password = password,
                     captchaToken = null,
                 )
             } returns LoginResult.TwoFactorRequired
 
             val viewModel = createViewModel(
                 state = DEFAULT_STATE.copy(
-                    passwordInput = decodedPassword,
+                    passwordInput = password,
                 ),
             )
             viewModel.eventFlow.test {
                 viewModel.trySendAction(LoginAction.LoginButtonClick)
-                verify { decodedPassword.base64UrlEncode() }
                 assertEquals(
-                    DEFAULT_STATE.copy(passwordInput = decodedPassword),
+                    DEFAULT_STATE.copy(passwordInput = password),
                     viewModel.stateFlow.value,
                 )
                 assertEquals(
                     LoginEvent.NavigateToTwoFactorLogin(
-                        EMAIL,
-                        encodedPassword,
+                        emailAddress = EMAIL,
+                        password = password,
                     ),
                     awaitItem(),
                 )
@@ -373,7 +410,7 @@ class LoginViewModelTest : BaseViewModelTest() {
             coVerify {
                 authRepository.login(
                     email = EMAIL,
-                    password = decodedPassword,
+                    password = password,
                     captchaToken = null,
                 )
             }

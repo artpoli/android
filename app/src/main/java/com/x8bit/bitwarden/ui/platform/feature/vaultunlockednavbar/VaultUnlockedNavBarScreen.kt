@@ -11,12 +11,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.ScaffoldDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -26,8 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
@@ -44,13 +37,14 @@ import androidx.navigation.navOptions
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.base.util.max
 import com.x8bit.bitwarden.ui.platform.base.util.toDp
+import com.x8bit.bitwarden.ui.platform.components.navigation.BitwardenNavigationBarItem
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
 import com.x8bit.bitwarden.ui.platform.components.scrim.BitwardenAnimatedScrim
-import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.feature.search.model.SearchType
 import com.x8bit.bitwarden.ui.platform.feature.settings.navigateToSettingsGraph
 import com.x8bit.bitwarden.ui.platform.feature.settings.settingsGraph
 import com.x8bit.bitwarden.ui.platform.feature.vaultunlockednavbar.model.VaultUnlockedNavBarTab
+import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
 import com.x8bit.bitwarden.ui.platform.theme.RootTransitionProviders
 import com.x8bit.bitwarden.ui.tools.feature.generator.generatorGraph
 import com.x8bit.bitwarden.ui.tools.feature.generator.navigateToGeneratorGraph
@@ -64,7 +58,7 @@ import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
 /**
  * Top level composable for the Vault Unlocked Screen.
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LongMethod")
 @Composable
 fun VaultUnlockedNavBarScreen(
     viewModel: VaultUnlockedNavBarViewModel = hiltViewModel(),
@@ -81,6 +75,9 @@ fun VaultUnlockedNavBarScreen(
     onNavigateToFolders: () -> Unit,
     onNavigateToPendingRequests: () -> Unit,
     onNavigateToPasswordHistory: () -> Unit,
+    onNavigateToSetupUnlockScreen: () -> Unit,
+    onNavigateToSetupAutoFillScreen: () -> Unit,
+    onNavigateToImportLogins: () -> Unit,
 ) {
     val state by viewModel.stateFlow.collectAsStateWithLifecycle()
 
@@ -90,7 +87,7 @@ fun VaultUnlockedNavBarScreen(
             when (event) {
                 is VaultUnlockedNavBarEvent.Shortcut.NavigateToVaultScreen,
                 is VaultUnlockedNavBarEvent.NavigateToVaultScreen,
-                -> {
+                    -> {
                     navigateToVaultGraph(navOptions)
                 }
 
@@ -100,11 +97,15 @@ fun VaultUnlockedNavBarScreen(
 
                 VaultUnlockedNavBarEvent.Shortcut.NavigateToGeneratorScreen,
                 VaultUnlockedNavBarEvent.NavigateToGeneratorScreen,
-                -> {
+                    -> {
                     navigateToGeneratorGraph(navOptions)
                 }
 
                 VaultUnlockedNavBarEvent.NavigateToSettingsScreen -> {
+                    navigateToSettingsGraph(navOptions)
+                }
+
+                VaultUnlockedNavBarEvent.Shortcut.NavigateToSettingsScreen -> {
                     navigateToSettingsGraph(navOptions)
                 }
             }
@@ -138,6 +139,9 @@ fun VaultUnlockedNavBarScreen(
         settingsTabClickedAction = remember(viewModel) {
             { viewModel.trySendAction(VaultUnlockedNavBarAction.SettingsTabClick) }
         },
+        onNavigateToSetupUnlockScreen = onNavigateToSetupUnlockScreen,
+        onNavigateToSetupAutoFillScreen = onNavigateToSetupAutoFillScreen,
+        onNavigateToImportLogins = onNavigateToImportLogins,
     )
 }
 
@@ -165,6 +169,9 @@ private fun VaultUnlockedNavBarScaffold(
     navigateToFolders: () -> Unit,
     navigateToPendingRequests: () -> Unit,
     navigateToPasswordHistory: () -> Unit,
+    onNavigateToSetupUnlockScreen: () -> Unit,
+    onNavigateToSetupAutoFillScreen: () -> Unit,
+    onNavigateToImportLogins: () -> Unit,
 ) {
     var shouldDimNavBar by remember { mutableStateOf(false) }
 
@@ -224,6 +231,7 @@ private fun VaultUnlockedNavBarScaffold(
                 onDimBottomNavBarRequest = { shouldDim ->
                     shouldDimNavBar = shouldDim
                 },
+                onNavigateToImportLogins = onNavigateToImportLogins,
             )
             sendGraph(
                 navController = navController,
@@ -240,12 +248,14 @@ private fun VaultUnlockedNavBarScaffold(
                 onNavigateToExportVault = navigateToExportVault,
                 onNavigateToFolders = navigateToFolders,
                 onNavigateToPendingRequests = navigateToPendingRequests,
+                onNavigateToSetupUnlockScreen = onNavigateToSetupUnlockScreen,
+                onNavigateToSetupAutoFillScreen = onNavigateToSetupAutoFillScreen,
+                onNavigateToImportLogins = onNavigateToImportLogins,
             )
         }
     }
 }
 
-@Suppress("LongMethod")
 @Composable
 private fun VaultBottomAppBar(
     state: VaultUnlockedNavBarState,
@@ -257,7 +267,7 @@ private fun VaultBottomAppBar(
     modifier: Modifier = Modifier,
 ) {
     BottomAppBar(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = BitwardenTheme.colorScheme.background.secondary,
         modifier = modifier,
     ) {
         val destinations = listOf(
@@ -267,53 +277,26 @@ private fun VaultBottomAppBar(
             ),
             VaultUnlockedNavBarTab.Send,
             VaultUnlockedNavBarTab.Generator,
-            VaultUnlockedNavBarTab.Settings,
+            VaultUnlockedNavBarTab.Settings(state.notificationState.settingsTabNotificationCount),
         )
         // Collecting the back stack entry here as state is crucial to ensuring that the items
         // below recompose when the navigation state changes to update the selected tab.
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         destinations.forEach { destination ->
-            val isSelected = navBackStackEntry.isCurrentTab(destination)
-
-            NavigationBarItem(
-                icon = {
-                    Icon(
-                        painter = rememberVectorPainter(
-                            id = if (isSelected) {
-                                destination.iconResSelected
-                            } else {
-                                destination.iconRes
-                            },
-                        ),
-                        contentDescription = stringResource(
-                            id = destination.contentDescriptionRes,
-                        ),
-                    )
+            BitwardenNavigationBarItem(
+                labelRes = destination.labelRes,
+                contentDescriptionRes = destination.contentDescriptionRes,
+                selectedIconRes = destination.iconResSelected,
+                unselectedIconRes = destination.iconRes,
+                notificationCount = destination.notificationCount,
+                isSelected = navBackStackEntry.isCurrentTab(tab = destination),
+                onClick = when (destination) {
+                    is VaultUnlockedNavBarTab.Vault -> vaultTabClickedAction
+                    VaultUnlockedNavBarTab.Send -> sendTabClickedAction
+                    VaultUnlockedNavBarTab.Generator -> generatorTabClickedAction
+                    is VaultUnlockedNavBarTab.Settings -> settingsTabClickedAction
                 },
-                label = {
-                    Text(
-                        text = stringResource(id = destination.labelRes),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                selected = isSelected,
-                onClick = {
-                    when (destination) {
-                        is VaultUnlockedNavBarTab.Vault -> vaultTabClickedAction()
-                        VaultUnlockedNavBarTab.Send -> sendTabClickedAction()
-                        VaultUnlockedNavBarTab.Generator -> generatorTabClickedAction()
-                        VaultUnlockedNavBarTab.Settings -> settingsTabClickedAction()
-                    }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurface,
-                    selectedTextColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurface,
-                ),
-                modifier = Modifier.testTag(destination.testTag),
+                modifier = Modifier.testTag(tag = destination.testTag),
             )
         }
     }

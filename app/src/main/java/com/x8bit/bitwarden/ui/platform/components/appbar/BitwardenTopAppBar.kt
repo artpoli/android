@@ -2,9 +2,6 @@ package com.x8bit.bitwarden.ui.platform.components.appbar
 
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -22,8 +19,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.ui.platform.base.util.bottomDivider
 import com.x8bit.bitwarden.ui.platform.base.util.mirrorIfRtl
+import com.x8bit.bitwarden.ui.platform.base.util.scrolledContainerBottomDivider
+import com.x8bit.bitwarden.ui.platform.components.appbar.color.bitwardenTopAppBarColors
+import com.x8bit.bitwarden.ui.platform.components.button.BitwardenStandardIconButton
+import com.x8bit.bitwarden.ui.platform.components.model.TopAppBarDividerStyle
 import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
 
@@ -46,6 +49,7 @@ fun BitwardenTopAppBar(
     navigationIconContentDescription: String,
     onNavigationIconClick: () -> Unit,
     modifier: Modifier = Modifier,
+    dividerStyle: TopAppBarDividerStyle = TopAppBarDividerStyle.ON_SCROLL,
     actions: @Composable RowScope.() -> Unit = { },
 ) {
     BitwardenTopAppBar(
@@ -57,6 +61,7 @@ fun BitwardenTopAppBar(
             onNavigationIconClick = onNavigationIconClick,
         ),
         modifier = modifier,
+        dividerStyle = dividerStyle,
         actions = actions,
     )
 }
@@ -81,6 +86,7 @@ fun BitwardenTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior,
     navigationIcon: NavigationIcon?,
     modifier: Modifier = Modifier,
+    dividerStyle: TopAppBarDividerStyle = TopAppBarDividerStyle.ON_SCROLL,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     var titleTextHasOverflow by remember {
@@ -90,65 +96,76 @@ fun BitwardenTopAppBar(
     val navigationIconContent: @Composable () -> Unit = remember(navigationIcon) {
         {
             navigationIcon?.let {
-                IconButton(
+                BitwardenStandardIconButton(
+                    painter = it.navigationIcon,
+                    contentDescription = it.navigationIconContentDescription,
                     onClick = it.onNavigationIconClick,
-                    modifier = Modifier.testTag("CloseButton"),
-                ) {
-                    Icon(
-                        modifier = Modifier.mirrorIfRtl(),
-                        painter = it.navigationIcon,
-                        contentDescription = it.navigationIconContentDescription,
-                    )
-                }
+                    modifier = Modifier
+                        .testTag(tag = "CloseButton")
+                        .mirrorIfRtl(),
+                )
             }
         }
     }
-
-    val topAppBarColors = TopAppBarDefaults.largeTopAppBarColors(
-        containerColor = MaterialTheme.colorScheme.surface,
-        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val customModifier = modifier
+        .testTag(tag = "HeaderBarComponent")
+        .scrolledContainerBottomDivider(
+            topAppBarScrollBehavior = scrollBehavior,
+            enabled = when (dividerStyle) {
+                TopAppBarDividerStyle.NONE -> false
+                TopAppBarDividerStyle.STATIC -> false
+                TopAppBarDividerStyle.ON_SCROLL -> true
+            },
+        )
+        .bottomDivider(
+            enabled = when (dividerStyle) {
+                TopAppBarDividerStyle.NONE -> false
+                TopAppBarDividerStyle.STATIC -> true
+                TopAppBarDividerStyle.ON_SCROLL -> false
+            },
+            thickness = (0.5).dp,
+        )
 
     if (titleTextHasOverflow) {
         MediumTopAppBar(
-            colors = topAppBarColors,
+            colors = bitwardenTopAppBarColors(),
             scrollBehavior = scrollBehavior,
             navigationIcon = navigationIconContent,
+            collapsedHeight = 48.dp,
+            expandedHeight = 96.dp,
             title = {
                 // The height of the component is controlled and will only allow for 1 extra row,
                 // making adding any arguments for softWrap and minLines superfluous.
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = BitwardenTheme.typography.titleLarge,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("PageTitleLabel"),
+                    modifier = Modifier.testTag(tag = "PageTitleLabel"),
                 )
             },
-            modifier = modifier.testTag("HeaderBarComponent"),
+            modifier = customModifier,
             actions = actions,
         )
     } else {
         TopAppBar(
-            colors = topAppBarColors,
+            colors = bitwardenTopAppBarColors(),
             scrollBehavior = scrollBehavior,
             navigationIcon = navigationIconContent,
+            expandedHeight = 48.dp,
             title = {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = BitwardenTheme.typography.titleLarge,
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("PageTitleLabel"),
+                    modifier = Modifier.testTag(tag = "PageTitleLabel"),
                     onTextLayout = {
                         titleTextHasOverflow = it.hasVisualOverflow
                     },
                 )
             },
-            modifier = modifier.testTag("HeaderBarComponent"),
+            modifier = customModifier,
             actions = actions,
         )
     }

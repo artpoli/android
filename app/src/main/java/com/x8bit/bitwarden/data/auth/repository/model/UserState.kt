@@ -1,6 +1,8 @@
 package com.x8bit.bitwarden.data.auth.repository.model
 
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.model.UserState.Account
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
 
 /**
@@ -27,6 +29,9 @@ data class UserState(
      */
     val activeAccount: Account
         get() = accounts.first { it.userId == activeUserId }
+
+    val activeUserFirstTimeState: FirstTimeState
+        get() = activeAccount.firstTimeState
 
     /**
      * Basic account information about a given user.
@@ -69,6 +74,8 @@ data class UserState(
         val isBiometricsEnabled: Boolean,
         val vaultUnlockType: VaultUnlockType = VaultUnlockType.MASTER_PASSWORD,
         val isUsingKeyConnector: Boolean,
+        val onboardingStatus: OnboardingStatus,
+        val firstTimeState: FirstTimeState,
     ) {
         /**
          * Indicates that the user does or does not have a means to manually unlock the vault.

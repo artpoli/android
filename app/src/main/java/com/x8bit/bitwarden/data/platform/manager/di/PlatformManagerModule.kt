@@ -10,7 +10,6 @@ import com.x8bit.bitwarden.data.platform.datasource.disk.PushDiskSource
 import com.x8bit.bitwarden.data.platform.datasource.disk.SettingsDiskSource
 import com.x8bit.bitwarden.data.platform.datasource.disk.legacy.LegacyAppCenterMigrator
 import com.x8bit.bitwarden.data.platform.datasource.network.authenticator.RefreshAuthenticator
-import com.x8bit.bitwarden.data.platform.datasource.network.interceptor.AuthTokenInterceptor
 import com.x8bit.bitwarden.data.platform.datasource.network.interceptor.BaseUrlInterceptors
 import com.x8bit.bitwarden.data.platform.datasource.network.service.EventService
 import com.x8bit.bitwarden.data.platform.datasource.network.service.PushService
@@ -20,13 +19,13 @@ import com.x8bit.bitwarden.data.platform.manager.AssetManager
 import com.x8bit.bitwarden.data.platform.manager.AssetManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.BiometricsEncryptionManager
 import com.x8bit.bitwarden.data.platform.manager.BiometricsEncryptionManagerImpl
-import com.x8bit.bitwarden.data.platform.processor.BridgeServiceProcessor
-import com.x8bit.bitwarden.data.platform.processor.BridgeServiceProcessorImpl
-import com.x8bit.bitwarden.data.platform.manager.CrashLogsManager
-import com.x8bit.bitwarden.data.platform.manager.CrashLogsManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.DebugMenuFeatureFlagManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManagerImpl
+import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
+import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManagerImpl
+import com.x8bit.bitwarden.data.platform.manager.LogsManager
+import com.x8bit.bitwarden.data.platform.manager.LogsManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.NetworkConfigManager
 import com.x8bit.bitwarden.data.platform.manager.NetworkConfigManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.NetworkConnectionManager
@@ -51,10 +50,14 @@ import com.x8bit.bitwarden.data.platform.manager.garbage.GarbageCollectionManage
 import com.x8bit.bitwarden.data.platform.manager.garbage.GarbageCollectionManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.restriction.RestrictionManager
 import com.x8bit.bitwarden.data.platform.manager.restriction.RestrictionManagerImpl
+import com.x8bit.bitwarden.data.platform.processor.AuthenticatorBridgeProcessor
+import com.x8bit.bitwarden.data.platform.processor.AuthenticatorBridgeProcessorImpl
+import com.x8bit.bitwarden.data.platform.repository.AuthenticatorBridgeRepository
 import com.x8bit.bitwarden.data.platform.repository.DebugMenuRepository
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.ServerConfigRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
+import com.x8bit.bitwarden.data.vault.datasource.disk.VaultDiskSource
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import dagger.Module
 import dagger.Provides
@@ -79,9 +82,13 @@ object PlatformManagerModule {
 
     @Provides
     @Singleton
-    fun provideBridgeServiceProcessor(
+    fun provideAuthenticatorBridgeProcessor(
+        authenticatorBridgeRepository: AuthenticatorBridgeRepository,
+        dispatcherManager: DispatcherManager,
         featureFlagManager: FeatureFlagManager,
-    ): BridgeServiceProcessor = BridgeServiceProcessorImpl(
+    ): AuthenticatorBridgeProcessor = AuthenticatorBridgeProcessorImpl(
+        authenticatorBridgeRepository = authenticatorBridgeRepository,
+        dispatcherManager = dispatcherManager,
         featureFlagManager = featureFlagManager,
     )
 
@@ -180,7 +187,6 @@ object PlatformManagerModule {
     @Singleton
     fun provideNetworkConfigManager(
         authRepository: AuthRepository,
-        authTokenInterceptor: AuthTokenInterceptor,
         environmentRepository: EnvironmentRepository,
         serverConfigRepository: ServerConfigRepository,
         baseUrlInterceptors: BaseUrlInterceptors,
@@ -189,7 +195,6 @@ object PlatformManagerModule {
     ): NetworkConfigManager =
         NetworkConfigManagerImpl(
             authRepository = authRepository,
-            authTokenInterceptor = authTokenInterceptor,
             environmentRepository = environmentRepository,
             serverConfigRepository = serverConfigRepository,
             baseUrlInterceptors = baseUrlInterceptors,
@@ -233,10 +238,10 @@ object PlatformManagerModule {
 
     @Provides
     @Singleton
-    fun provideCrashLogsManager(
+    fun provideLogsManager(
         legacyAppCenterMigrator: LegacyAppCenterMigrator,
         settingsRepository: SettingsRepository,
-    ): CrashLogsManager = CrashLogsManagerImpl(
+    ): LogsManager = LogsManagerImpl(
         settingsRepository = settingsRepository,
         legacyAppCenterMigrator = legacyAppCenterMigrator,
     )
@@ -271,4 +276,20 @@ object PlatformManagerModule {
     fun provideResourceCacheManager(
         @ApplicationContext context: Context,
     ): ResourceCacheManager = ResourceCacheManagerImpl(context = context)
+
+    @Provides
+    @Singleton
+    fun provideFirstTimeActionManager(
+        authDiskSource: AuthDiskSource,
+        settingsDiskSource: SettingsDiskSource,
+        vaultDiskSource: VaultDiskSource,
+        dispatcherManager: DispatcherManager,
+        featureFlagManager: FeatureFlagManager,
+    ): FirstTimeActionManager = FirstTimeActionManagerImpl(
+        authDiskSource = authDiskSource,
+        settingsDiskSource = settingsDiskSource,
+        vaultDiskSource = vaultDiskSource,
+        dispatcherManager = dispatcherManager,
+        featureFlagManager = featureFlagManager,
+    )
 }

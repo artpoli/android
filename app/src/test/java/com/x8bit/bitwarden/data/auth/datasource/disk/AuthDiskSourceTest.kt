@@ -2,10 +2,12 @@ package com.x8bit.bitwarden.data.auth.datasource.disk
 
 import androidx.core.content.edit
 import app.cash.turbine.test
+import com.bitwarden.authenticatorbridge.util.generateSecretKey
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.EnvironmentUrlDataJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.PendingAuthRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.KdfTypeJson
@@ -300,12 +302,21 @@ class AuthDiskSourceTest {
             authenticatorSyncUnlockKey = "authenticatorSyncUnlockKey",
         )
 
+        authDiskSource.storeOnboardingStatus(
+            userId = userId,
+            onboardingStatus = OnboardingStatus.AUTOFILL_SETUP,
+        )
+
         authDiskSource.clearData(userId = userId)
 
         // We do not clear these even when you call clear storage
         assertEquals(pendingAuthRequestJson, authDiskSource.getPendingAuthRequest(userId = userId))
         assertEquals(deviceKey, authDiskSource.getDeviceKey(userId = userId))
         assertEquals(shouldTrustDevice, authDiskSource.getShouldTrustDevice(userId = userId))
+        assertEquals(
+            OnboardingStatus.AUTOFILL_SETUP,
+            authDiskSource.getOnboardingStatus(userId = userId),
+        )
 
         // These should be cleared
         assertNull(authDiskSource.getUserBiometricUnlockKey(userId = userId))
@@ -323,6 +334,7 @@ class AuthDiskSourceTest {
         assertNull(authDiskSource.getShouldUseKeyConnector(userId = userId))
         assertNull(authDiskSource.getIsTdeLoginComplete(userId = userId))
         assertNull(authDiskSource.getAuthenticatorSyncUnlockKey(userId = userId))
+        assertNull(authDiskSource.getShowImportLogins(userId = userId))
     }
 
     @Test
@@ -1083,6 +1095,111 @@ class AuthDiskSourceTest {
             mockAuthenticatorSyncUnlockKey,
             actual,
         )
+    }
+
+    @Test
+    fun `getOnboardingStatus should pull from SharedPreferences`() {
+        val onboardingStatusBaseKey = "bwPreferencesStorage:onboardingStatus"
+        val mockUserId = "mockUserId"
+        val expectedStatus = OnboardingStatus.AUTOFILL_SETUP
+        fakeSharedPreferences.edit {
+            putString(
+                "${onboardingStatusBaseKey}_$mockUserId",
+                json.encodeToString(expectedStatus),
+            )
+        }
+        val actual = authDiskSource.getOnboardingStatus(userId = mockUserId)
+        assertEquals(
+            expectedStatus,
+            actual,
+        )
+    }
+
+    @Test
+    fun `storeOnboardingStatus should update SharedPreferences`() {
+        val onboardingStatusBaseKey = "bwPreferencesStorage:onboardingStatus"
+        val mockUserId = "mockUserId"
+        val mockOnboardingStatus = OnboardingStatus.AUTOFILL_SETUP
+        authDiskSource.storeOnboardingStatus(mockUserId, mockOnboardingStatus)
+
+        val actual = fakeSharedPreferences.getString(
+            "${onboardingStatusBaseKey}_$mockUserId",
+            null,
+        )
+        assertEquals(
+            json.encodeToString(mockOnboardingStatus),
+            actual,
+        )
+    }
+
+    @Test
+    fun `getOnboardingStatusFlow should react to changes from storeOnboardingStatus`() = runTest {
+        val userId = "userId"
+        authDiskSource.getOnboardingStatusFlow(userId).test {
+            // The initial values of the Flow and the property are in sync
+            assertNull(awaitItem())
+
+            // Updating the repository updates shared preferences
+            authDiskSource.storeOnboardingStatus(userId, OnboardingStatus.AUTOFILL_SETUP)
+            assertEquals(OnboardingStatus.AUTOFILL_SETUP, awaitItem())
+        }
+    }
+
+    @Test
+    fun `authenticatorSyncSymmetricKey should store and update from EncryptedSharedPreferences`() {
+        val sharedPrefsKey = "bwSecureStorage:authenticatorSyncSymmetric"
+
+        // Shared preferences and the repository start with the same value:
+        assertNull(authDiskSource.authenticatorSyncSymmetricKey)
+        assertNull(fakeEncryptedSharedPreferences.getString(sharedPrefsKey, null))
+
+        // Updating the repository updates shared preferences:
+        val symmetricKey = generateSecretKey().getOrThrow().encoded
+        authDiskSource.authenticatorSyncSymmetricKey = symmetricKey
+        assertEquals(
+            symmetricKey.toString(Charsets.ISO_8859_1),
+            fakeEncryptedSharedPreferences.getString(sharedPrefsKey, null),
+        )
+
+        // Retrieving the key from repository should give same byte array despite String conversion:
+        assertTrue(authDiskSource.authenticatorSyncSymmetricKey.contentEquals(symmetricKey))
+    }
+
+    @Test
+    fun `getShowImportLogins should pull from SharedPreferences`() {
+        val showImportLoginsBaseKey = "bwPreferencesStorage:showImportLogins"
+        val mockUserId = "mockUserId"
+        fakeSharedPreferences.edit {
+            putBoolean("${showImportLoginsBaseKey}_$mockUserId", true)
+        }
+        val actual = authDiskSource.getShowImportLogins(userId = mockUserId) ?: false
+        assertTrue(actual)
+    }
+
+    @Test
+    fun `storeShowImportLogins should update SharedPreferences`() {
+        val showImportLoginsBaseKey = "bwPreferencesStorage:showImportLogins"
+        val mockUserId = "mockUserId"
+        authDiskSource.storeShowImportLogins(
+            userId = mockUserId,
+            showImportLogins = true,
+        )
+        val actual = fakeSharedPreferences.getBoolean(
+            "${showImportLoginsBaseKey}_$mockUserId",
+            false,
+        )
+        assertTrue(actual)
+    }
+
+    @Test
+    fun `getShowImportLoginsFlow should react to changes from storeShowImportLogins`() = runTest {
+        val mockUserId = "mockUserId"
+        authDiskSource.getShowImportLoginsFlow(userId = mockUserId).test {
+            // The initial values of the Flow and the property are in sync
+            assertNull(awaitItem())
+            authDiskSource.storeShowImportLogins(userId = mockUserId, true)
+            assertTrue(awaitItem() ?: false)
+        }
     }
 }
 

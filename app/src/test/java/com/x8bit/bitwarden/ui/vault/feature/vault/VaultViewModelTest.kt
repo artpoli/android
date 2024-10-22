@@ -2,14 +2,18 @@ package com.x8bit.bitwarden.ui.vault.feature.vault
 
 import app.cash.turbine.test
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.SwitchAccountResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
+import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
 import com.x8bit.bitwarden.data.platform.manager.event.OrganizationEventManager
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
+import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.model.DataState
@@ -40,6 +44,7 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -83,6 +88,7 @@ class VaultViewModelTest : BaseViewModelTest() {
             every { hasPendingAccountAddition = any() } just runs
             every { logout(any()) } just runs
             every { switchAccount(any()) } answers { switchAccountResult }
+            every { setShowImportLogins(any()) } just runs
         }
 
     private val settingsRepository: SettingsRepository = mockk {
@@ -103,6 +109,13 @@ class VaultViewModelTest : BaseViewModelTest() {
 
     private val organizationEventManager = mockk<OrganizationEventManager> {
         every { trackEvent(event = any()) } just runs
+    }
+
+    private val mutableImportLoginsFeatureFlow = MutableStateFlow(true)
+    private val featureFlagManager: FeatureFlagManager = mockk {
+        every {
+            getFeatureFlagFlow(FlagKey.ImportLoginsFlow)
+        } returns mutableImportLoginsFeatureFlow
     }
 
     @Test
@@ -196,6 +209,8 @@ class VaultViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = DEFAULT_FIRST_TIME_STATE,
                     ),
                 ),
             )
@@ -280,6 +295,8 @@ class VaultViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = DEFAULT_FIRST_TIME_STATE,
                     ),
                 ),
             )
@@ -1481,6 +1498,118 @@ class VaultViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @Test
+    fun `when user first time state updates, vault state is updated`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.stateFlow.test {
+            assertEquals(
+                DEFAULT_STATE,
+                awaitItem(),
+            )
+            mutableUserStateFlow.value = DEFAULT_USER_STATE.copy(
+                accounts = DEFAULT_USER_STATE.accounts.map {
+                    it.copy(
+                        firstTimeState = DEFAULT_FIRST_TIME_STATE.copy(
+                            showImportLoginsCard = false,
+                        ),
+                    )
+                },
+            )
+
+            assertEquals(
+                DEFAULT_STATE.copy(
+                    showImportActionCard = false,
+                ),
+                awaitItem(),
+            )
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when feature flag ImportLoginsFlow is disabled, should show action card should always be false`() =
+        runTest {
+            mutableImportLoginsFeatureFlow.update { false }
+            val viewModel = createViewModel()
+            viewModel.stateFlow.test {
+                assertEquals(
+                    DEFAULT_STATE.copy(showImportActionCard = false),
+                    awaitItem(),
+                )
+                mutableUserStateFlow.value = DEFAULT_USER_STATE.copy(
+                    accounts = DEFAULT_USER_STATE.accounts.map {
+                        it.copy(
+                            firstTimeState = DEFAULT_FIRST_TIME_STATE.copy(
+                                showImportLoginsCard = true,
+                            ),
+                        )
+                    },
+                )
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun `when DismissImportActionCard is sent, repository called to set value to false`() {
+        val viewModel = createViewModel()
+        viewModel.trySendAction(VaultAction.DismissImportActionCard)
+        verify(exactly = 1) {
+            authRepository.setShowImportLogins(false)
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when DismissImportActionCard is sent, repository is not called if value is already false`() {
+        mutableUserStateFlow.value = DEFAULT_USER_STATE.copy(
+            accounts = DEFAULT_USER_STATE.accounts.map {
+                it.copy(
+                    firstTimeState = DEFAULT_FIRST_TIME_STATE.copy(
+                        showImportLoginsCard = false,
+                    ),
+                )
+            },
+        )
+        val viewModel = createViewModel()
+        viewModel.trySendAction(VaultAction.DismissImportActionCard)
+        verify(exactly = 0) {
+            authRepository.setShowImportLogins(false)
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when ImportActionCardClick is sent, repository called to set value to false and NavigateToImportLogins event is sent`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.eventFlow.test {
+                viewModel.trySendAction(VaultAction.ImportActionCardClick)
+                assertEquals(VaultEvent.NavigateToImportLogins, awaitItem())
+            }
+            verify(exactly = 1) {
+                authRepository.setShowImportLogins(false)
+            }
+        }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when ImportActionCardClick is sent, repository is not called if value is already false`() {
+        mutableUserStateFlow.value = DEFAULT_USER_STATE.copy(
+            accounts = DEFAULT_USER_STATE.accounts.map {
+                it.copy(
+                    firstTimeState = DEFAULT_FIRST_TIME_STATE.copy(
+                        showImportLoginsCard = false,
+                    ),
+                )
+            },
+        )
+        val viewModel = createViewModel()
+        viewModel.trySendAction(VaultAction.ImportActionCardClick)
+        verify(exactly = 0) {
+            authRepository.setShowImportLogins(false)
+        }
+    }
+
     private fun createViewModel(): VaultViewModel =
         VaultViewModel(
             authRepository = authRepository,
@@ -1490,6 +1619,7 @@ class VaultViewModelTest : BaseViewModelTest() {
             settingsRepository = settingsRepository,
             vaultRepository = vaultRepository,
             organizationEventManager = organizationEventManager,
+            featureFlagManager = featureFlagManager,
         )
 }
 
@@ -1510,6 +1640,10 @@ private val VAULT_FILTER_DATA = VaultFilterData(
 private val DEFAULT_STATE: VaultState =
     createMockVaultState(viewState = VaultState.ViewState.Loading)
 
+private val DEFAULT_FIRST_TIME_STATE = FirstTimeState(
+    showImportLoginsCard = true,
+)
+
 private val DEFAULT_USER_STATE = UserState(
     activeUserId = "activeUserId",
     accounts = listOf(
@@ -1529,6 +1663,8 @@ private val DEFAULT_USER_STATE = UserState(
             trustedDevice = null,
             hasMasterPassword = true,
             isUsingKeyConnector = false,
+            onboardingStatus = OnboardingStatus.COMPLETE,
+            firstTimeState = DEFAULT_FIRST_TIME_STATE,
         ),
         UserState.Account(
             userId = "lockedUserId",
@@ -1546,6 +1682,8 @@ private val DEFAULT_USER_STATE = UserState(
             trustedDevice = null,
             hasMasterPassword = true,
             isUsingKeyConnector = false,
+            onboardingStatus = OnboardingStatus.COMPLETE,
+            firstTimeState = DEFAULT_FIRST_TIME_STATE,
         ),
     ),
 )
@@ -1589,5 +1727,6 @@ private fun createMockVaultState(
         isIconLoadingDisabled = false,
         hasMasterPassword = true,
         hideNotificationsDialog = true,
+        showImportActionCard = true,
         isRefreshing = false,
     )

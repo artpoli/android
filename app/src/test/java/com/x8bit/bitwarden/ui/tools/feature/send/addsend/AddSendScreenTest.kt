@@ -359,9 +359,6 @@ class AddSendScreenTest : BaseComposeTest() {
     fun `segmented buttons should appear based on state`() {
         mutableStateFlow.update { it.copy(isShared = true) }
         composeTestRule
-            .onNodeWithText("Type")
-            .assertDoesNotExist()
-        composeTestRule
             .onAllNodesWithText("File")
             .filterToOne(!isEditableText)
             .assertDoesNotExist()
@@ -377,27 +374,18 @@ class AddSendScreenTest : BaseComposeTest() {
             )
         }
         composeTestRule
-            .onNodeWithText("Type")
-            .performScrollTo()
-            .assertIsDisplayed()
-        composeTestRule
             .onAllNodesWithText("File")
             .filterToOne(!isEditableText)
-            .performScrollTo()
             .assertIsDisplayed()
         composeTestRule
             .onAllNodesWithText("Text")
             .filterToOne(!isEditableText)
-            .performScrollTo()
             .assertIsDisplayed()
 
         mutableStateFlow.update {
             it.copy(addSendType = AddSendType.EditItem(sendItemId = "sendId"))
         }
 
-        composeTestRule
-            .onNodeWithText("Type")
-            .assertIsNotDisplayed()
         composeTestRule
             .onAllNodesWithText("File")
             .filterToOne(!isEditableText)

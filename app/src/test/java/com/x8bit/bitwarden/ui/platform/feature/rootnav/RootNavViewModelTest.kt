@@ -1,6 +1,7 @@
 package com.x8bit.bitwarden.ui.platform.feature.rootnav
 
 import android.content.pm.SigningInfo
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.AuthState
 import com.x8bit.bitwarden.data.auth.repository.model.JwtTokenDataJson
@@ -16,6 +17,7 @@ import com.x8bit.bitwarden.data.platform.base.FakeDispatcherManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.model.CompleteRegistrationData
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
 import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
@@ -104,6 +106,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -137,6 +143,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -167,6 +177,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -207,6 +221,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         ),
                         hasMasterPassword = false,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -244,6 +262,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         ),
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -281,6 +303,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         ),
                         hasMasterPassword = false,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -315,6 +341,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
                 hasPendingAccountAddition = true,
@@ -362,6 +392,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -393,6 +427,88 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.VaultUnlocked(activeUserId = "activeUserId"),
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault but there is an AddTotpLoginItem special circumstance the nav state should be VaultUnlockedForNewTotp`() {
+        specialCircumstanceManager.specialCircumstance =
+            SpecialCircumstance.AddTotpLoginItem(data = mockk())
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.VaultUnlockedForNewTotp(activeUserId = "activeUserId"),
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault but there is an AccountSecurityShortcut special circumstance the nav state should be VaultUnlocked`() {
+        specialCircumstanceManager.specialCircumstance =
+            SpecialCircumstance.AccountSecurityShortcut
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        firstTimeState = FirstTimeState(false),
+                        onboardingStatus = OnboardingStatus.COMPLETE,
                     ),
                 ),
             ),
@@ -432,6 +548,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -471,6 +591,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -517,6 +641,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -563,6 +691,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -604,6 +736,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -644,6 +780,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -719,6 +859,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -769,6 +913,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -827,6 +975,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -865,6 +1017,10 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
@@ -898,12 +1054,282 @@ class RootNavViewModelTest : BaseViewModelTest() {
                         trustedDevice = null,
                         hasMasterPassword = true,
                         isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
                     ),
                 ),
             ),
         )
         val viewModel = createViewModel()
         assertEquals(RootNavState.VaultLocked, viewModel.stateFlow.value)
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault and they have a OnboardingStatus of NOT_STARTED the nav state should be OnboardingAccountLockSetup`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.NOT_STARTED,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.OnboardingAccountLockSetup,
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault and they have a OnboardingStatus of ACCOUNT_LOCK_SETUP the nav state should be OnboardingAccountLockSetup`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.ACCOUNT_LOCK_SETUP,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.OnboardingAccountLockSetup,
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault and they have a OnboardingStatus of AUTOFILL_SETUP the nav state should be OnboardingAutoFillSetup`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.AUTOFILL_SETUP,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.OnboardingAutoFillSetup,
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault and they have a OnboardingStatus of FINAL_STEP the nav state should be OnboardingAutoFillSetup`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.FINAL_STEP,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.OnboardingStepsComplete,
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an locked vault and they have a OnboardingStatus of NOT_STARTED the nav state should be VaultLocked`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = false,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.NOT_STARTED,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.VaultLocked,
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault and they have a OnboardingStatus of null the nav state should be VaultUnlocked`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.VaultUnlocked(activeUserId = "activeUserId"),
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when the active user has an unlocked vault and they have a OnboardingStatus of COMPLETED the nav state should be VaultUnlocked`() {
+        mutableUserStateFlow.tryEmit(
+            UserState(
+                activeUserId = "activeUserId",
+                accounts = listOf(
+                    UserState.Account(
+                        userId = "activeUserId",
+                        name = "name",
+                        email = "email",
+                        avatarColorHex = "avatarColorHex",
+                        environment = Environment.Us,
+                        isPremium = true,
+                        isLoggedIn = true,
+                        isVaultUnlocked = true,
+                        needsPasswordReset = false,
+                        isBiometricsEnabled = false,
+                        organizations = emptyList(),
+                        needsMasterPassword = false,
+                        trustedDevice = null,
+                        hasMasterPassword = true,
+                        isUsingKeyConnector = false,
+                        onboardingStatus = OnboardingStatus.COMPLETE,
+                        firstTimeState = FirstTimeState(
+                            showImportLoginsCard = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val viewModel = createViewModel()
+        assertEquals(
+            RootNavState.VaultUnlocked(activeUserId = "activeUserId"),
+            viewModel.stateFlow.value,
+        )
     }
 
     private fun createViewModel(): RootNavViewModel =

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
@@ -32,7 +31,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenFilledButton
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenOutlinedButton
@@ -40,12 +38,12 @@ import com.x8bit.bitwarden.ui.platform.components.content.BitwardenErrorContent
 import com.x8bit.bitwarden.ui.platform.components.content.BitwardenLoadingContent
 import com.x8bit.bitwarden.ui.platform.components.dialog.BasicDialogState
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenBasicDialog
+import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenTwoButtonDialog
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
 import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.composition.LocalExitManager
 import com.x8bit.bitwarden.ui.platform.manager.exit.ExitManager
-import com.x8bit.bitwarden.ui.platform.theme.LocalNonMaterialColors
-import com.x8bit.bitwarden.ui.platform.theme.LocalNonMaterialTypography
+import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
 
 /**
  * Displays the login approval screen.
@@ -72,17 +70,16 @@ fun LoginApprovalScreen(
         }
     }
 
-    BitwardenBasicDialog(
-        visibilityState = if (state.shouldShowErrorDialog) {
-            BasicDialogState.Shown(
-                title = R.string.an_error_has_occurred.asText(),
-                message = R.string.generic_error_message.asText(),
-            )
-        } else {
-            BasicDialogState.Hidden
-        },
-        onDismissRequest = remember(viewModel) {
+    LoginApprovalDialogs(
+        state = state.dialogState,
+        onDismissError = remember(viewModel) {
             { viewModel.trySendAction(LoginApprovalAction.ErrorDialogDismiss) }
+        },
+        onConfirmChangeAccount = remember(viewModel) {
+            { viewModel.trySendAction(LoginApprovalAction.ApproveAccountChangeClick) }
+        },
+        onDismissChangeAccount = remember(viewModel) {
+            { viewModel.trySendAction(LoginApprovalAction.CancelAccountChangeClick) }
         },
     )
 
@@ -159,8 +156,8 @@ private fun LoginApprovalContent(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(id = R.string.are_you_trying_to_log_in),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = BitwardenTheme.typography.headlineMedium,
+            color = BitwardenTheme.colorScheme.text.primary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
@@ -172,8 +169,8 @@ private fun LoginApprovalContent(
                 state.email,
                 state.domainUrl,
             ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = BitwardenTheme.typography.bodyMedium,
+            color = BitwardenTheme.colorScheme.text.primary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -183,8 +180,8 @@ private fun LoginApprovalContent(
 
         Text(
             text = stringResource(id = R.string.fingerprint_phrase),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = BitwardenTheme.typography.titleLarge,
+            color = BitwardenTheme.colorScheme.text.primary,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
@@ -194,8 +191,8 @@ private fun LoginApprovalContent(
         Text(
             text = state.fingerprint,
             textAlign = TextAlign.Start,
-            color = LocalNonMaterialColors.current.fingerprint,
-            style = LocalNonMaterialTypography.current.sensitiveInfoSmall,
+            color = BitwardenTheme.colorScheme.text.codePink,
+            style = BitwardenTheme.typography.sensitiveInfoSmall,
             modifier = Modifier
                 .testTag("FingerprintValueLabel")
                 .fillMaxWidth()
@@ -259,8 +256,8 @@ private fun LoginApprovalInfoColumn(
 
     Text(
         text = label,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = BitwardenTheme.typography.titleSmall,
+        color = BitwardenTheme.colorScheme.text.primary,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
@@ -270,8 +267,8 @@ private fun LoginApprovalInfoColumn(
 
     Text(
         text = value,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = BitwardenTheme.typography.bodyMedium,
+        color = BitwardenTheme.colorScheme.text.secondary,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
@@ -283,4 +280,34 @@ private fun LoginApprovalInfoColumn(
     )
 
     Spacer(modifier = Modifier.height(8.dp))
+}
+
+@Composable
+private fun LoginApprovalDialogs(
+    state: LoginApprovalState.DialogState?,
+    onDismissError: () -> Unit,
+    onConfirmChangeAccount: () -> Unit,
+    onDismissChangeAccount: () -> Unit,
+) {
+    when (state) {
+        is LoginApprovalState.DialogState.ChangeAccount -> BitwardenTwoButtonDialog(
+            title = stringResource(id = R.string.log_in_requested),
+            message = state.message(),
+            confirmButtonText = stringResource(id = R.string.ok),
+            dismissButtonText = stringResource(id = R.string.cancel),
+            onConfirmClick = onConfirmChangeAccount,
+            onDismissClick = onDismissChangeAccount,
+            onDismissRequest = onDismissChangeAccount,
+        )
+
+        is LoginApprovalState.DialogState.Error -> BitwardenBasicDialog(
+            visibilityState = BasicDialogState.Shown(
+                title = state.title,
+                message = state.message,
+            ),
+            onDismissRequest = onDismissError,
+        )
+
+        null -> Unit
+    }
 }

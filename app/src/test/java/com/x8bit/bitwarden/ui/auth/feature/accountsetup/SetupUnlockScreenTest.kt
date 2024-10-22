@@ -8,6 +8,7 @@ import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -16,6 +17,7 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.toggle.UnlockWithPinState
+import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricSupportStatus
 import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricsManager
 import com.x8bit.bitwarden.ui.util.assertNoDialogExists
 import io.mockk.every
@@ -24,24 +26,22 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
+import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.robolectric.annotation.Config
 import javax.crypto.Cipher
 
 class SetupUnlockScreenTest : BaseComposeTest() {
-
-    private var onNavigateToSetupAutofillCalled = false
-
+    private var onNavigateBackCalled = false
     private val captureBiometricsSuccess = slot<(cipher: Cipher?) -> Unit>()
     private val captureBiometricsCancel = slot<() -> Unit>()
     private val captureBiometricsLockOut = slot<() -> Unit>()
     private val captureBiometricsError = slot<() -> Unit>()
     private val biometricsManager: BiometricsManager = mockk {
-        every { isBiometricsSupported } returns true
+        every { biometricSupportStatus } returns BiometricSupportStatus.CLASS_3_SUPPORTED
         every {
             promptBiometrics(
                 onSuccess = capture(captureBiometricsSuccess),
@@ -65,9 +65,9 @@ class SetupUnlockScreenTest : BaseComposeTest() {
     fun setup() {
         composeTestRule.setContent {
             SetupUnlockScreen(
-                onNavigateToSetupAutofill = { onNavigateToSetupAutofillCalled = true },
                 viewModel = viewModel,
                 biometricsManager = biometricsManager,
+                onNavigateBack = { onNavigateBackCalled = true },
             )
         }
     }
@@ -89,12 +89,6 @@ class SetupUnlockScreenTest : BaseComposeTest() {
             .performScrollTo()
             .assertExists()
             .assertIsDisplayed()
-    }
-
-    @Test
-    fun `NavigateToSetupAutofill event should invoke the navigate to autofill lambda`() {
-        mutableEventFlow.tryEmit(SetupUnlockEvent.NavigateToSetupAutofill)
-        assertTrue(onNavigateToSetupAutofillCalled)
     }
 
     @Test
@@ -254,7 +248,7 @@ class SetupUnlockScreenTest : BaseComposeTest() {
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText(text = "Enter your PIN code.")
+            .onAllNodesWithText(text = "Enter your PIN code")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -353,7 +347,7 @@ class SetupUnlockScreenTest : BaseComposeTest() {
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText(text = "Unlock with PIN code")
+            .onAllNodesWithText(text = "Require master password on app restart?")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -520,6 +514,15 @@ class SetupUnlockScreenTest : BaseComposeTest() {
     }
 
     @Test
+    fun `on Set up later component should not be displayed when not in initial setup`() {
+        mutableStateFlow.update { it.copy(isInitialSetup = false) }
+        composeTestRule.assertNoDialogExists()
+        composeTestRule
+            .onNodeWithText(text = "Set up later")
+            .assertDoesNotExist()
+    }
+
+    @Test
     fun `on Set up later click should display confirmation dialog`() {
         composeTestRule.assertNoDialogExists()
         composeTestRule
@@ -620,6 +623,30 @@ class SetupUnlockScreenTest : BaseComposeTest() {
         mutableStateFlow.update { it.copy(dialogState = null) }
         composeTestRule.assertNoDialogExists()
     }
+
+    @Test
+    fun `on NavigateBack event should invoke onNavigateBack`() {
+        mutableEventFlow.tryEmit(SetupUnlockEvent.NavigateBack)
+        assertTrue(onNavigateBackCalled)
+    }
+
+    @Test
+    fun `close icon should not show when in initial setup`() {
+        composeTestRule
+            .onNodeWithContentDescription(label = "Close")
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `close icon should show when not initial setup and send action when clicked`() {
+        mutableStateFlow.update { it.copy(isInitialSetup = false) }
+        composeTestRule
+            .onNodeWithContentDescription(label = "Close")
+            .assertIsDisplayed()
+            .performClick()
+
+        verify { viewModel.trySendAction(SetupUnlockAction.CloseClick) }
+    }
 }
 
 private const val DEFAULT_USER_ID: String = "user_id"
@@ -629,6 +656,7 @@ private val DEFAULT_STATE: SetupUnlockState = SetupUnlockState(
     isUnlockWithPasswordEnabled = true,
     isUnlockWithBiometricsEnabled = false,
     dialogState = null,
+    isInitialSetup = true,
 )
 
 private val CIPHER = mockk<Cipher>()

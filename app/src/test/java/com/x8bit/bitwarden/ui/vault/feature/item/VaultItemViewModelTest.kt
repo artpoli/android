@@ -6,12 +6,14 @@ import app.cash.turbine.test
 import app.cash.turbine.turbineScope
 import com.bitwarden.vault.CipherView
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
 import com.x8bit.bitwarden.data.platform.manager.event.OrganizationEventManager
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
 import com.x8bit.bitwarden.data.platform.repository.model.DataState
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
@@ -2579,6 +2581,8 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                     trustedDevice = null,
                     hasMasterPassword = true,
                     isUsingKeyConnector = false,
+                    onboardingStatus = OnboardingStatus.COMPLETE,
+                    firstTimeState = FirstTimeState(showImportLoginsCard = true),
                 ),
             ),
         )

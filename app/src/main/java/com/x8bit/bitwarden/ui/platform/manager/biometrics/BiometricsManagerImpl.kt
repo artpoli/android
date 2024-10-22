@@ -22,12 +22,25 @@ class BiometricsManagerImpl(
     private val fragmentActivity: FragmentActivity get() = activity as FragmentActivity
 
     override val isBiometricsSupported: Boolean
-        get() = canAuthenticate(Authenticators.BIOMETRIC_STRONG)
+        get() = biometricSupportStatus == BiometricSupportStatus.CLASS_3_SUPPORTED
 
     override val isUserVerificationSupported: Boolean
         get() = canAuthenticate(
             authenticators = Authenticators.BIOMETRIC_STRONG or Authenticators.DEVICE_CREDENTIAL,
         )
+
+    override val biometricSupportStatus: BiometricSupportStatus
+        get() = when {
+            canAuthenticate(Authenticators.BIOMETRIC_STRONG) -> {
+                BiometricSupportStatus.CLASS_3_SUPPORTED
+            }
+
+            canAuthenticate(Authenticators.BIOMETRIC_WEAK) -> {
+                BiometricSupportStatus.CLASS_2_SUPPORTED
+            }
+
+            else -> BiometricSupportStatus.NOT_SUPPORTED
+        }
 
     override fun promptBiometrics(
         onSuccess: (cipher: Cipher?) -> Unit,
@@ -74,7 +87,7 @@ class BiometricsManagerImpl(
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED,
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
             BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED,
-            -> false
+                -> false
 
             else -> false
         }
@@ -106,13 +119,13 @@ class BiometricsManagerImpl(
                         BiometricPrompt.ERROR_NO_BIOMETRICS,
                         BiometricPrompt.ERROR_HW_NOT_PRESENT,
                         BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL,
-                        -> onError()
+                            -> onError()
 
                         BiometricPrompt.ERROR_NEGATIVE_BUTTON -> onCancel()
 
                         BiometricPrompt.ERROR_LOCKOUT,
                         BiometricPrompt.ERROR_LOCKOUT_PERMANENT,
-                        -> onLockOut()
+                            -> onLockOut()
                     }
                 }
 
@@ -133,6 +146,7 @@ class BiometricsManagerImpl(
                     .setDescription(activity.getString(R.string.biometrics_direction))
                     .setAllowedAuthenticators(Authenticators.BIOMETRIC_STRONG)
                     .setNegativeButtonText(activity.getString(R.string.cancel))
+                    .setConfirmationRequired(false)
                 biometricPrompt.authenticate(
                     promptInfoBuilder.build(),
                     BiometricPrompt.CryptoObject(it),
@@ -144,6 +158,7 @@ class BiometricsManagerImpl(
                     .setAllowedAuthenticators(
                         Authenticators.BIOMETRIC_STRONG or Authenticators.DEVICE_CREDENTIAL,
                     )
+                    .setConfirmationRequired(false)
                 biometricPrompt.authenticate(promptInfoBuilder.build())
             }
     }

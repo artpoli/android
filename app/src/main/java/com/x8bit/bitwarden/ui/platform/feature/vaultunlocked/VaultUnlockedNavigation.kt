@@ -4,6 +4,10 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.navigation
+import com.x8bit.bitwarden.ui.auth.feature.accountsetup.navigateToSetupAutoFillScreen
+import com.x8bit.bitwarden.ui.auth.feature.accountsetup.navigateToSetupUnlockScreen
+import com.x8bit.bitwarden.ui.auth.feature.accountsetup.setupAutoFillDestination
+import com.x8bit.bitwarden.ui.auth.feature.accountsetup.setupUnlockDestination
 import com.x8bit.bitwarden.ui.platform.feature.search.navigateToSearch
 import com.x8bit.bitwarden.ui.platform.feature.search.searchDestination
 import com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity.deleteaccount.deleteAccountDestination
@@ -35,6 +39,8 @@ import com.x8bit.bitwarden.ui.vault.feature.addedit.navigateToVaultAddEdit
 import com.x8bit.bitwarden.ui.vault.feature.addedit.vaultAddEditDestination
 import com.x8bit.bitwarden.ui.vault.feature.attachments.attachmentDestination
 import com.x8bit.bitwarden.ui.vault.feature.attachments.navigateToAttachment
+import com.x8bit.bitwarden.ui.vault.feature.importlogins.importLoginsScreenDestination
+import com.x8bit.bitwarden.ui.vault.feature.importlogins.navigateToImportLoginsScreen
 import com.x8bit.bitwarden.ui.vault.feature.item.navigateToVaultItem
 import com.x8bit.bitwarden.ui.vault.feature.item.vaultItemDestination
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.vaultItemListingDestinationAsRoot
@@ -98,6 +104,9 @@ fun NavGraphBuilder.vaultUnlockedGraph(
                     passwordHistoryMode = GeneratorPasswordHistoryMode.Default,
                 )
             },
+            onNavigateToSetupUnlockScreen = { navController.navigateToSetupUnlockScreen() },
+            onNavigateToSetupAutoFillScreen = { navController.navigateToSetupAutoFillScreen() },
+            onNavigateToImportLogins = { navController.navigateToImportLoginsScreen() },
         )
         deleteAccountDestination(
             onNavigateBack = { navController.popBackStack() },
@@ -199,6 +208,23 @@ fun NavGraphBuilder.vaultUnlockedGraph(
         )
         attachmentDestination(
             onNavigateBack = { navController.popBackStack() },
+        )
+        setupUnlockDestination(
+            onNavigateBack = {
+                navController.popBackStack()
+            },
+        )
+        setupAutoFillDestination(
+            onNavigateBack = {
+                navController.popBackStack()
+            },
+        )
+        importLoginsScreenDestination(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToImportSuccessScreen = {
+                // TODO: PM-11187 navigate to success screen with popping this screen from stack
+                navController.popBackStack()
+            },
         )
     }
 }

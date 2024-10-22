@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
+import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
@@ -23,10 +24,14 @@ import javax.inject.Inject
 class VaultUnlockedNavBarViewModel @Inject constructor(
     authRepository: AuthRepository,
     specialCircumstancesManager: SpecialCircumstanceManager,
+    firstTimeActionManager: FirstTimeActionManager,
 ) : BaseViewModel<VaultUnlockedNavBarState, VaultUnlockedNavBarEvent, VaultUnlockedNavBarAction>(
     initialState = VaultUnlockedNavBarState(
         vaultNavBarLabelRes = R.string.my_vault,
         vaultNavBarContentDescriptionRes = R.string.my_vault,
+        notificationState = VaultUnlockedNavBarNotificationState(
+            settingsTabNotificationCount = firstTimeActionManager.allSettingsBadgeCountFlow.value,
+        ),
     ),
 ) {
     init {
@@ -34,6 +39,13 @@ class VaultUnlockedNavBarViewModel @Inject constructor(
             .userStateFlow
             .onEach {
                 sendAction(VaultUnlockedNavBarAction.Internal.UserStateUpdateReceive(it))
+            }
+            .launchIn(viewModelScope)
+
+        firstTimeActionManager
+            .allSettingsBadgeCountFlow
+            .onEach {
+                sendAction(VaultUnlockedNavBarAction.Internal.SettingsNotificationCountUpdate(it))
             }
             .launchIn(viewModelScope)
 
@@ -51,6 +63,10 @@ class VaultUnlockedNavBarViewModel @Inject constructor(
                     ),
                 )
                 specialCircumstancesManager.specialCircumstance = null
+            }
+
+            SpecialCircumstance.AccountSecurityShortcut -> {
+                sendEvent(VaultUnlockedNavBarEvent.Shortcut.NavigateToSettingsScreen)
             }
 
             else -> Unit
@@ -71,6 +87,10 @@ class VaultUnlockedNavBarViewModel @Inject constructor(
         when (action) {
             is VaultUnlockedNavBarAction.Internal.UserStateUpdateReceive -> {
                 handleUserStateUpdateReceive(action)
+            }
+
+            is VaultUnlockedNavBarAction.Internal.SettingsNotificationCountUpdate -> {
+                handleSettingsNotificationCountUpdate(action)
             }
         }
     }
@@ -128,6 +148,18 @@ class VaultUnlockedNavBarViewModel @Inject constructor(
             )
         }
     }
+
+    private fun handleSettingsNotificationCountUpdate(
+        action: VaultUnlockedNavBarAction.Internal.SettingsNotificationCountUpdate,
+    ) {
+        mutableStateFlow.update {
+            it.copy(
+                notificationState = it.notificationState.copy(
+                    settingsTabNotificationCount = action.count,
+                ),
+            )
+        }
+    }
     // #endregion BottomTabViewModel Action Handlers
 }
 
@@ -137,6 +169,14 @@ class VaultUnlockedNavBarViewModel @Inject constructor(
 data class VaultUnlockedNavBarState(
     @StringRes val vaultNavBarLabelRes: Int,
     @StringRes val vaultNavBarContentDescriptionRes: Int,
+    val notificationState: VaultUnlockedNavBarNotificationState,
+)
+
+/**
+ * Models the notification state for each the tabs in the nav bar which support notification badges.
+ */
+data class VaultUnlockedNavBarNotificationState(
+    val settingsTabNotificationCount: Int,
 )
 
 /**
@@ -170,9 +210,12 @@ sealed class VaultUnlockedNavBarAction {
         /**
          * Indicates a change in user state has been received.
          */
-        data class UserStateUpdateReceive(
-            val userState: UserState?,
-        ) : Internal()
+        data class UserStateUpdateReceive(val userState: UserState?) : Internal()
+
+        /**
+         * Indicates a change to the count of settings notifications to show
+         */
+        data class SettingsNotificationCountUpdate(val count: Int) : Internal()
     }
 }
 
@@ -217,7 +260,7 @@ sealed class VaultUnlockedNavBarEvent {
      * Navigate to the Settings screen.
      */
     data object NavigateToSettingsScreen : VaultUnlockedNavBarEvent() {
-        override val tab: VaultUnlockedNavBarTab = VaultUnlockedNavBarTab.Settings
+        override val tab: VaultUnlockedNavBarTab = VaultUnlockedNavBarTab.Settings()
     }
 
     /**
@@ -243,6 +286,13 @@ sealed class VaultUnlockedNavBarEvent {
                 labelRes = labelRes,
                 contentDescriptionRes = contentDescRes,
             )
+        }
+
+        /**
+         * Navigate to the Settings Screen.
+         */
+        data object NavigateToSettingsScreen : Shortcut() {
+            override val tab: VaultUnlockedNavBarTab = VaultUnlockedNavBarTab.Settings()
         }
     }
 }

@@ -9,7 +9,11 @@ import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
 import com.x8bit.bitwarden.data.autofill.fido2.manager.Fido2CredentialManager
+import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialAssertionRequest
+import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2GetCredentialsRequest
 import com.x8bit.bitwarden.data.platform.manager.BiometricsEncryptionManager
+import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
+import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockResult
@@ -40,12 +44,13 @@ private const val KEY_STATE = "state"
 /**
  * Manages application state for the initial vault unlock screen.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 @HiltViewModel
 class VaultUnlockViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val vaultRepo: VaultRepository,
     private val biometricsEncryptionManager: BiometricsEncryptionManager,
+    private val specialCircumstanceManager: SpecialCircumstanceManager,
     private val fido2CredentialManager: Fido2CredentialManager,
     environmentRepo: EnvironmentRepository,
     savedStateHandle: SavedStateHandle,
@@ -66,6 +71,11 @@ class VaultUnlockViewModel @Inject constructor(
             // There is no valid way to unlock this app.
             authRepository.logout()
         }
+        val specialCircumstance = specialCircumstanceManager.specialCircumstance
+        val showAccountMenu =
+            VaultUnlockArgs(savedStateHandle).unlockType == UnlockType.STANDARD &&
+                (specialCircumstance !is SpecialCircumstance.Fido2GetCredentials &&
+                    specialCircumstance !is SpecialCircumstance.Fido2Assertion)
         VaultUnlockState(
             accountSummaries = accountSummaries,
             avatarColorString = activeAccountSummary.avatarColorHex,
@@ -77,10 +87,14 @@ class VaultUnlockViewModel @Inject constructor(
             input = "",
             isBiometricEnabled = activeAccount.isBiometricsEnabled,
             isBiometricsValid = isBiometricsValid,
-            showAccountMenu = VaultUnlockArgs(savedStateHandle).unlockType == UnlockType.STANDARD,
+            showAccountMenu = showAccountMenu,
             showBiometricInvalidatedMessage = false,
             vaultUnlockType = vaultUnlockType,
             userId = userState.activeUserId,
+            // TODO: [PM-13075] Handle Fido2GetCredentialsRequest special circumstance
+            fido2GetCredentialsRequest = null,
+            // TODO: [PM-13076] Handle Fido2CredentialAssertionRequest special circumstance
+            fido2CredentialAssertionRequest = null,
         )
     },
 ) {
@@ -133,6 +147,17 @@ class VaultUnlockViewModel @Inject constructor(
 
     private fun handleDismissDialog() {
         mutableStateFlow.update { it.copy(dialog = null) }
+        when {
+            state.fido2GetCredentialsRequest != null -> {
+                sendEvent(VaultUnlockEvent.Fido2GetCredentialsError)
+            }
+
+            state.fido2CredentialAssertionRequest != null -> {
+                sendEvent(VaultUnlockEvent.Fido2CredentialAssertionError)
+            }
+
+            else -> Unit
+        }
     }
 
     private fun handleConfirmLogoutClick() {
@@ -206,7 +231,8 @@ class VaultUnlockViewModel @Inject constructor(
             mutableStateFlow.update {
                 it.copy(
                     dialog = VaultUnlockState.VaultUnlockDialog.Error(
-                        it.vaultUnlockType.emptyInputDialogMessage,
+                        title = R.string.an_error_has_occurred.asText(),
+                        message = it.vaultUnlockType.emptyInputDialogMessage,
                     ),
                 )
             }
@@ -269,7 +295,8 @@ class VaultUnlockViewModel @Inject constructor(
                 mutableStateFlow.update {
                     it.copy(
                         dialog = VaultUnlockState.VaultUnlockDialog.Error(
-                            if (action.isBiometricLogin) {
+                            title = R.string.an_error_has_occurred.asText(),
+                            message = if (action.isBiometricLogin) {
                                 R.string.generic_error_message.asText()
                             } else {
                                 state.vaultUnlockType.unlockScreenErrorMessage
@@ -281,11 +308,12 @@ class VaultUnlockViewModel @Inject constructor(
 
             VaultUnlockResult.GenericError,
             VaultUnlockResult.InvalidStateError,
-            -> {
+                -> {
                 mutableStateFlow.update {
                     it.copy(
                         dialog = VaultUnlockState.VaultUnlockDialog.Error(
-                            R.string.generic_error_message.asText(),
+                            title = R.string.an_error_has_occurred.asText(),
+                            message = R.string.generic_error_message.asText(),
                         ),
                     )
                 }
@@ -308,8 +336,20 @@ class VaultUnlockViewModel @Inject constructor(
         // out.
         val userState = action.userState ?: return
 
+        // If the Vault is being unlocked for a FIDO 2 request, make sure we're unlocking the
+        // correct Vault
+        state.fido2RequestUserId
+            ?.let { fido2RequestUserId ->
+                // If the current Vault is not the selected Vault, switch accounts.
+                if (userState.activeUserId != fido2RequestUserId) {
+                    authRepository.switchAccount(fido2RequestUserId)
+                    return
+                }
+            }
         // If the Vault is already unlocked, do nothing.
         if (userState.activeAccount.isVaultUnlocked) return
+        // If the user state has changed to add a new account, do nothing.
+        if (userState.hasPendingAccountAddition) return
 
         mutableStateFlow.update {
             val accountSummaries = userState.toAccountSummaries()
@@ -361,6 +401,8 @@ data class VaultUnlockState(
     val showBiometricInvalidatedMessage: Boolean,
     val vaultUnlockType: VaultUnlockType,
     val userId: String,
+    val fido2GetCredentialsRequest: Fido2GetCredentialsRequest? = null,
+    val fido2CredentialAssertionRequest: Fido2CredentialAssertionRequest? = null,
 ) : Parcelable {
 
     /**
@@ -379,6 +421,20 @@ data class VaultUnlockState(
     val showKeyboard: Boolean get() = !showBiometricLogin && !hideInput
 
     /**
+     * Indicates if the vault is being unlocked as a result of receiving a FIDO 2 request.
+     */
+    val isUnlockingForFido2Request: Boolean
+        get() = fido2GetCredentialsRequest != null ||
+            fido2CredentialAssertionRequest != null
+
+    /**
+     * Returns the user ID present in the current FIDO 2 request, or null when no FIDO 2 request is
+     * present.
+     */
+    val fido2RequestUserId: String?
+        get() = fido2GetCredentialsRequest?.userId ?: fido2CredentialAssertionRequest?.userId
+
+    /**
      * Represents the various dialogs the vault unlock screen can display.
      */
     sealed class VaultUnlockDialog : Parcelable {
@@ -387,6 +443,7 @@ data class VaultUnlockState(
          */
         @Parcelize
         data class Error(
+            val title: Text,
             val message: Text,
         ) : VaultUnlockDialog()
 
@@ -413,6 +470,16 @@ sealed class VaultUnlockEvent {
      * Prompts the user for biometrics unlock.
      */
     data class PromptForBiometrics(val cipher: Cipher) : BackgroundEvent, VaultUnlockEvent()
+
+    /**
+     * Completes the FIDO2 get credentials request with an error response.
+     */
+    data object Fido2GetCredentialsError : VaultUnlockEvent()
+
+    /**
+     * Completes the FIDO2 credential assertion request with an error response.
+     */
+    data object Fido2CredentialAssertionError : VaultUnlockEvent()
 }
 
 /**

@@ -26,6 +26,7 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.toggle.UnlockWithPinState
+import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricSupportStatus
 import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricsManager
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.util.assertNoDialogExists
@@ -48,6 +49,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     private var onNavigateBackCalled = false
     private var onNavigateToDeleteAccountCalled = false
     private var onNavigateToPendingRequestsCalled = false
+    private var onNavigateToUnlockSetupScreenCalled = false
 
     private val intentManager = mockk<IntentManager> {
         every { launchUri(any()) } just runs
@@ -59,7 +61,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     private val captureBiometricsLockOut = slot<() -> Unit>()
     private val captureBiometricsError = slot<() -> Unit>()
     private val biometricsManager: BiometricsManager = mockk {
-        every { isBiometricsSupported } returns true
+        every { biometricSupportStatus } returns BiometricSupportStatus.CLASS_3_SUPPORTED
         every {
             promptBiometrics(
                 onSuccess = capture(captureBiometricsSuccess),
@@ -85,6 +87,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
                 onNavigateBack = { onNavigateBackCalled = true },
                 onNavigateToDeleteAccount = { onNavigateToDeleteAccountCalled = true },
                 onNavigateToPendingRequests = { onNavigateToPendingRequestsCalled = true },
+                onNavigateToSetupUnlockScreen = { onNavigateToUnlockSetupScreenCalled = true },
                 viewModel = viewModel,
                 biometricsManager = biometricsManager,
                 intentManager = intentManager,
@@ -270,7 +273,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText("Enter your PIN code.")
+            .onAllNodesWithText("Enter your PIN code")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -370,7 +373,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText("Unlock with PIN code")
+            .onAllNodesWithText("Require master password on app restart?")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -1488,6 +1491,48 @@ class AccountSecurityScreenTest : BaseComposeTest() {
             .performClick()
         verify { viewModel.trySendAction(AccountSecurityAction.AuthenticatorSyncToggle(true)) }
     }
+
+    @Test
+    fun `unlock action card should show when state is true and hide when false`() {
+        composeTestRule
+            .onNodeWithText("Get started")
+            .assertDoesNotExist()
+        mutableStateFlow.update { DEFAULT_STATE.copy(shouldShowUnlockActionCard = true) }
+        composeTestRule
+            .onNodeWithText("Get started")
+            .assertIsDisplayed()
+        mutableStateFlow.update { DEFAULT_STATE.copy(shouldShowUnlockActionCard = false) }
+        composeTestRule
+            .onNodeWithText("Get started")
+            .assertDoesNotExist()
+    }
+
+    @Test
+    fun `when unlock action card is visible clicking the cta button should send correct action`() {
+        mutableStateFlow.update { DEFAULT_STATE.copy(shouldShowUnlockActionCard = true) }
+        composeTestRule
+            .onNodeWithText("Get started")
+            .performScrollTo()
+            .performClick()
+
+        verify { viewModel.trySendAction(AccountSecurityAction.UnlockActionCardCtaClick) }
+    }
+
+    @Test
+    fun `when unlock action card is visible clicking dismissing should send correct action`() {
+        mutableStateFlow.update { DEFAULT_STATE.copy(shouldShowUnlockActionCard = true) }
+        composeTestRule
+            .onNodeWithContentDescription("Close")
+            .performScrollTo()
+            .performClick()
+        verify { viewModel.trySendAction(AccountSecurityAction.UnlockActionCardDismiss) }
+    }
+
+    @Test
+    fun `on NavigateToSetupUnlockScreen event invokes the correct lambda`() {
+        mutableEventFlow.tryEmit(AccountSecurityEvent.NavigateToSetupUnlockScreen)
+        assertTrue(onNavigateToUnlockSetupScreenCalled)
+    }
 }
 
 private val CIPHER = mockk<Cipher>()
@@ -1505,4 +1550,5 @@ private val DEFAULT_STATE = AccountSecurityState(
     vaultTimeoutAction = VaultTimeoutAction.LOCK,
     vaultTimeoutPolicyMinutes = null,
     vaultTimeoutPolicyAction = null,
+    shouldShowUnlockActionCard = false,
 )

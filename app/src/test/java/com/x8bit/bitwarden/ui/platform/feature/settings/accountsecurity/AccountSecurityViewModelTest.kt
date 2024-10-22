@@ -3,6 +3,7 @@ package com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.UserFingerprintResult
@@ -10,6 +11,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.platform.manager.BiometricsEncryptionManager
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
@@ -36,6 +38,7 @@ import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
@@ -44,6 +47,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import javax.crypto.Cipher
 
+@Suppress("LargeClass")
 class AccountSecurityViewModelTest : BaseViewModelTest() {
 
     private val fakeEnvironmentRepository = FakeEnvironmentRepository()
@@ -52,6 +56,7 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         every { userStateFlow } returns mutableUserStateFlow
     }
     private val vaultRepository: VaultRepository = mockk(relaxed = true)
+    private val mutableShowUnlockBadgeFlow = MutableStateFlow(false)
     private val settingsRepository: SettingsRepository = mockk {
         every { isAuthenticatorSyncEnabled } returns false
         every { isUnlockWithBiometricsEnabled } returns false
@@ -59,6 +64,8 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         every { vaultTimeout } returns VaultTimeout.ThirtyMinutes
         every { vaultTimeoutAction } returns VaultTimeoutAction.LOCK
         coEvery { getUserFingerprint() } returns UserFingerprintResult.Success(FINGERPRINT)
+        every { getShowUnlockBadgeFlow(any()) } returns mutableShowUnlockBadgeFlow
+        every { storeShowUnlockSettingBadge(any(), false) } just runs
     }
     private val mutableActivePolicyFlow = bufferedMutableSharedFlow<List<SyncResponseJson.Policy>>()
     private val biometricsEncryptionManager: BiometricsEncryptionManager = mockk {
@@ -358,6 +365,21 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                 awaitItem(),
             )
         }
+
+        verify(exactly = 0) {
+            settingsRepository.storeShowUnlockSettingBadge(DEFAULT_STATE.userId, false)
+        }
+    }
+
+    @Test
+    fun `on EnableBiometricsClick should update user show unlock badge status if shown`() {
+        mutableShowUnlockBadgeFlow.update { true }
+        val viewModel = createViewModel()
+        viewModel.trySendAction(AccountSecurityAction.EnableBiometricsClick)
+
+        verify(exactly = 1) {
+            settingsRepository.storeShowUnlockSettingBadge(DEFAULT_STATE.userId, false)
+        }
     }
 
     @Test
@@ -575,6 +597,41 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                 shouldRequireMasterPasswordOnRestart = true,
             )
         }
+
+        verify(exactly = 0) {
+            settingsRepository.storeShowUnlockSettingBadge(DEFAULT_STATE.userId, false)
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `on UnlockWithPinToggle Enabled should update show unlock badge state if card is visible`() {
+        mutableShowUnlockBadgeFlow.update { true }
+        val initialState = DEFAULT_STATE.copy(
+            isUnlockWithPinEnabled = false,
+        )
+        every { settingsRepository.storeUnlockPin(any(), any()) } just runs
+
+        val viewModel = createViewModel(initialState = initialState)
+        viewModel.trySendAction(
+            AccountSecurityAction.UnlockWithPinToggle(
+                UnlockWithPinState.Enabled(
+                    pin = "1234",
+                    shouldRequireMasterPasswordOnRestart = true,
+                ),
+            ),
+        )
+        assertEquals(
+            initialState.copy(isUnlockWithPinEnabled = true, shouldShowUnlockActionCard = true),
+            viewModel.stateFlow.value,
+        )
+        verify {
+            settingsRepository.storeUnlockPin(
+                pin = "1234",
+                shouldRequireMasterPasswordOnRestart = true,
+            )
+            settingsRepository.storeShowUnlockSettingBadge(DEFAULT_STATE.userId, false)
+        }
     }
 
     @Test
@@ -651,6 +708,44 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         }
     }
 
+    @Test
+    fun `when showUnlockBadgeFlow updates value, should update state`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.stateFlow.test {
+            assertEquals(DEFAULT_STATE, awaitItem())
+            mutableShowUnlockBadgeFlow.update { true }
+            assertEquals(DEFAULT_STATE.copy(shouldShowUnlockActionCard = true), awaitItem())
+        }
+    }
+
+    @Test
+    fun `when UnlockActionCardDismiss action received, should dismiss unlock action card`() {
+        mutableShowUnlockBadgeFlow.update { true }
+        val viewModel = createViewModel()
+        viewModel.trySendAction(AccountSecurityAction.UnlockActionCardDismiss)
+        verify {
+            settingsRepository.storeShowUnlockSettingBadge(DEFAULT_STATE.userId, false)
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `when UnlockActionCardCtaClick action received, should dismiss unlock action card and send NavigateToSetupUnlockScreen event`() =
+        runTest {
+            mutableShowUnlockBadgeFlow.update { true }
+            val viewModel = createViewModel()
+            viewModel.eventFlow.test {
+                viewModel.trySendAction(AccountSecurityAction.UnlockActionCardCtaClick)
+                assertEquals(
+                    AccountSecurityEvent.NavigateToSetupUnlockScreen,
+                    awaitItem(),
+                )
+            }
+            verify {
+                settingsRepository.storeShowUnlockSettingBadge(DEFAULT_STATE.userId, false)
+            }
+        }
+
     @Suppress("LongParameterList")
     private fun createViewModel(
         initialState: AccountSecurityState? = DEFAULT_STATE,
@@ -697,6 +792,8 @@ private val DEFAULT_USER_STATE = UserState(
             trustedDevice = null,
             hasMasterPassword = true,
             isUsingKeyConnector = false,
+            onboardingStatus = OnboardingStatus.COMPLETE,
+            firstTimeState = FirstTimeState(showImportLoginsCard = true),
         ),
     ),
 )
@@ -714,4 +811,5 @@ private val DEFAULT_STATE: AccountSecurityState = AccountSecurityState(
     vaultTimeoutPolicyMinutes = null,
     vaultTimeoutPolicyAction = null,
     shouldShowEnableAuthenticatorSync = false,
+    shouldShowUnlockActionCard = false,
 )

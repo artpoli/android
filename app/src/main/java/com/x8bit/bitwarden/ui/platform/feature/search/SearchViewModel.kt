@@ -3,10 +3,12 @@ package com.x8bit.bitwarden.ui.platform.feature.search
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.vault.CipherView
 import com.bitwarden.vault.LoginUriView
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
+import com.x8bit.bitwarden.data.autofill.accessibility.manager.AccessibilitySelectionManager
 import com.x8bit.bitwarden.data.autofill.manager.AutofillSelectionManager
 import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
@@ -15,6 +17,7 @@ import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardMan
 import com.x8bit.bitwarden.data.platform.manager.event.OrganizationEventManager
 import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
 import com.x8bit.bitwarden.data.platform.manager.util.toAutofillSelectionDataOrNull
+import com.x8bit.bitwarden.data.platform.manager.util.toTotpDataOrNull
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.model.DataState
@@ -44,6 +47,7 @@ import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterData
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterType
 import com.x8bit.bitwarden.ui.vault.feature.vault.util.toFilteredList
 import com.x8bit.bitwarden.ui.vault.feature.vault.util.toVaultFilterData
+import com.x8bit.bitwarden.ui.vault.model.TotpData
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -66,6 +70,7 @@ class SearchViewModel @Inject constructor(
     private val clock: Clock,
     private val clipboardManager: BitwardenClipboardManager,
     private val policyManager: PolicyManager,
+    private val accessibilitySelectionManager: AccessibilitySelectionManager,
     private val autofillSelectionManager: AutofillSelectionManager,
     private val organizationEventManager: OrganizationEventManager,
     private val vaultRepo: VaultRepository,
@@ -79,9 +84,7 @@ class SearchViewModel @Inject constructor(
         ?: run {
             val searchType = SearchArgs(savedStateHandle).type
             val userState = requireNotNull(authRepo.userStateFlow.value)
-            val autofillSelectionData = specialCircumstanceManager
-                .specialCircumstance
-                ?.toAutofillSelectionDataOrNull()
+            val specialCircumstance = specialCircumstanceManager.specialCircumstance
 
             SearchState(
                 searchTerm = "",
@@ -99,7 +102,8 @@ class SearchViewModel @Inject constructor(
                 baseWebSendUrl = environmentRepo.environment.environmentUrlData.baseWebSendUrl,
                 baseIconUrl = environmentRepo.environment.environmentUrlData.baseIconUrl,
                 isIconLoadingDisabled = settingsRepo.isIconLoadingDisabled,
-                autofillSelectionData = autofillSelectionData,
+                autofillSelectionData = specialCircumstance?.toAutofillSelectionDataOrNull(),
+                totpData = specialCircumstance?.toTotpDataOrNull(),
                 hasMasterPassword = userState.activeAccount.hasMasterPassword,
                 isPremium = userState.activeAccount.isPremium,
             )
@@ -148,7 +152,11 @@ class SearchViewModel @Inject constructor(
     private fun handleItemClick(action: SearchAction.ItemClick) {
         val event = when (state.searchType) {
             is SearchTypeData.Vault -> {
-                SearchEvent.NavigateToViewCipher(cipherId = action.itemId)
+                if (state.isTotp) {
+                    SearchEvent.NavigateToEditCipher(cipherId = action.itemId)
+                } else {
+                    SearchEvent.NavigateToViewCipher(cipherId = action.itemId)
+                }
             }
 
             is SearchTypeData.Sends -> {
@@ -160,7 +168,7 @@ class SearchViewModel @Inject constructor(
 
     private fun handleAutofillItemClick(action: SearchAction.AutofillItemClick) {
         val cipherView = getCipherViewOrNull(cipherId = action.itemId) ?: return
-        autofillSelectionManager.emitAutofillSelection(cipherView = cipherView)
+        useCipherForAutofill(cipherView = cipherView)
     }
 
     private fun handleAutofillAndSaveItemClick(action: SearchAction.AutofillAndSaveItemClick) {
@@ -497,7 +505,7 @@ class SearchViewModel @Inject constructor(
             UpdateCipherResult.Success -> {
                 // Complete the autofill selection flow
                 val cipherView = getCipherViewOrNull(cipherId = action.cipherId) ?: return
-                autofillSelectionManager.emitAutofillSelection(cipherView = cipherView)
+                useCipherForAutofill(cipherView = cipherView)
             }
         }
     }
@@ -622,6 +630,20 @@ class SearchViewModel @Inject constructor(
             }
     }
 
+    private fun useCipherForAutofill(cipherView: CipherView) {
+        when (state.autofillSelectionData?.framework) {
+            AutofillSelectionData.Framework.ACCESSIBILITY -> {
+                accessibilitySelectionManager.emitAccessibilitySelection(cipherView = cipherView)
+            }
+
+            AutofillSelectionData.Framework.AUTOFILL -> {
+                autofillSelectionManager.emitAutofillSelection(cipherView = cipherView)
+            }
+
+            null -> Unit
+        }
+    }
+
     private fun vaultPendingReceive(vaultData: DataState.Pending<VaultData>) {
         updateStateWithVaultData(vaultData = vaultData.data, clearDialogState = false)
     }
@@ -701,7 +723,8 @@ data class SearchState(
     val baseIconUrl: String,
     val isIconLoadingDisabled: Boolean,
     // Internal
-    val autofillSelectionData: AutofillSelectionData? = null,
+    val autofillSelectionData: AutofillSelectionData?,
+    val totpData: TotpData?,
     val hasMasterPassword: Boolean,
     val isPremium: Boolean,
 ) : Parcelable {
@@ -711,6 +734,11 @@ data class SearchState(
      */
     val isAutofill: Boolean
         get() = autofillSelectionData != null
+
+    /**
+     * Whether or not this represents a listing screen for totp.
+     */
+    val isTotp: Boolean get() = totpData != null
 
     /**
      * Represents the specific view states for the search screen.

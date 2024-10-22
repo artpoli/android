@@ -20,13 +20,14 @@ fun <T : Any> FlagKey<T>.ListItemContent(
     FlagKey.DummyBoolean,
     is FlagKey.DummyInt,
     FlagKey.DummyString,
-    -> Unit
+        -> Unit
 
     FlagKey.AuthenticatorSync,
     FlagKey.EmailVerification,
     FlagKey.OnboardingCarousel,
     FlagKey.OnboardingFlow,
-    -> BooleanFlagItem(
+    FlagKey.ImportLoginsFlow,
+        -> BooleanFlagItem(
         label = flagKey.getDisplayLabel(),
         key = flagKey as FlagKey<Boolean>,
         currentValue = currentValue as Boolean,
@@ -61,10 +62,11 @@ private fun <T : Any> FlagKey<T>.getDisplayLabel(): String = when (this) {
     FlagKey.DummyBoolean,
     is FlagKey.DummyInt,
     FlagKey.DummyString,
-    -> this.keyName
+        -> this.keyName
 
     FlagKey.AuthenticatorSync -> stringResource(R.string.authenticator_sync)
     FlagKey.EmailVerification -> stringResource(R.string.email_verification)
     FlagKey.OnboardingCarousel -> stringResource(R.string.onboarding_carousel)
     FlagKey.OnboardingFlow -> stringResource(R.string.onboarding_flow)
+    FlagKey.ImportLoginsFlow -> stringResource(R.string.import_logins_flow)
 }

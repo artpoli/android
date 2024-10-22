@@ -2,6 +2,8 @@ import com.google.firebase.crashlytics.buildtools.gradle.tasks.InjectMappingFile
 import com.google.firebase.crashlytics.buildtools.gradle.tasks.UploadMappingFileTask
 import com.google.gms.googleservices.GoogleServicesTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.FileInputStream
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -20,6 +22,16 @@ plugins {
     alias(libs.plugins.sonarqube)
 }
 
+/**
+ * Loads local user-specific build properties that are not checked into source control.
+ */
+val userProperties = Properties().apply {
+    val buildPropertiesFile = File(rootDir, "user.properties")
+    if (buildPropertiesFile.exists()) {
+        FileInputStream(buildPropertiesFile).use { load(it) }
+    }
+}
+
 android {
     namespace = "com.x8bit.bitwarden"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -29,7 +41,7 @@ android {
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
-        versionName = "2024.06.00"
+        versionName = "2024.9.0"
 
         setProperty("archivesBaseName", "com.x8bit.bitwarden")
 
@@ -63,6 +75,7 @@ android {
             isMinifyEnabled = false
 
             buildConfigField(type = "boolean", name = "HAS_DEBUG_MENU", value = "true")
+            buildConfigField(type = "boolean", name = "HAS_LOGS_ENABLED", value = "true")
         }
 
         // Beta and Release variants are identical except beta has a different package name
@@ -76,6 +89,7 @@ android {
             )
 
             buildConfigField(type = "boolean", name = "HAS_DEBUG_MENU", value = "false")
+            buildConfigField(type = "boolean", name = "HAS_LOGS_ENABLED", value = "false")
         }
         release {
             isDebuggable = false
@@ -86,6 +100,7 @@ android {
             )
 
             buildConfigField(type = "boolean", name = "HAS_DEBUG_MENU", value = "false")
+            buildConfigField(type = "boolean", name = "HAS_LOGS_ENABLED", value = "false")
         }
     }
 
@@ -130,13 +145,22 @@ kotlin {
     }
 }
 
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        if ((userProperties["localSdk"] as String?).toBoolean()) {
+            substitute(module("com.bitwarden:sdk-android"))
+                .using(module("com.bitwarden:sdk-android:LOCAL"))
+        }
+    }
+}
+
 dependencies {
     fun standardImplementation(dependencyNotation: Any) {
         add("standardImplementation", dependencyNotation)
     }
 
     // TODO: this should use a versioned AAR instead of referencing a local AAR BITAU-94
-    implementation(files("libs/bridge-0.1.0-SNAPSHOT-release.aar"))
+    implementation(files("libs/authenticatorbridge-0.1.0-SNAPSHOT-release.aar"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
@@ -179,6 +203,7 @@ dependencies {
     implementation(platform(libs.square.retrofit.bom))
     implementation(libs.square.retrofit)
     implementation(libs.square.retrofit.kotlinx.serialization)
+    implementation(libs.timber)
     implementation(libs.zxing.zxing.core)
 
     // For now we are restricted to running Compose tests for debug builds only
@@ -312,4 +337,4 @@ tasks {
     getByName("sonar") {
         dependsOn("check")
     }
-} 
+}

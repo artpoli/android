@@ -1,6 +1,7 @@
 package com.x8bit.bitwarden.ui.platform.feature.debugmenu
 
 import app.cash.turbine.test
+import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.repository.DebugMenuRepository
@@ -23,9 +24,20 @@ class DebugMenuViewModelTest : BaseViewModelTest() {
         every { getFeatureFlagFlow<Boolean>(any()) } returns flowOf(true)
     }
 
+    private val mockAuthRepository = mockk<AuthRepository>(relaxed = true) {
+        every { hasPendingAccountAddition = true } just runs
+    }
+
     private val mockDebugMenuRepository = mockk<DebugMenuRepository>(relaxed = true) {
         coEvery { resetFeatureFlagOverrides() } just runs
         every { updateFeatureFlag<Boolean>(any(), any()) } just runs
+        every { resetOnboardingStatusForCurrentUser() } just runs
+        every {
+            modifyStateToShowOnboardingCarousel(userStateUpdateTrigger = any())
+        } answers {
+            // invokes the passed in lambda, allowing verification in tests.
+            firstArg<() -> Unit>().invoke()
+        }
     }
 
     @Test
@@ -69,9 +81,28 @@ class DebugMenuViewModelTest : BaseViewModelTest() {
         verify { mockDebugMenuRepository.updateFeatureFlag(FlagKey.EmailVerification, false) }
     }
 
+    @Test
+    fun `handleResetOnboardingStatus should reset the onboarding status`() {
+        val viewModel = createViewModel()
+        viewModel.trySendAction(DebugMenuAction.RestartOnboarding)
+        verify { mockDebugMenuRepository.resetOnboardingStatusForCurrentUser() }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `handleResetOnboardingCarousel should reset the onboarding carousel and update user state pending account action`() {
+        val viewModel = createViewModel()
+        viewModel.trySendAction(DebugMenuAction.RestartOnboardingCarousel)
+        verify {
+            mockDebugMenuRepository.modifyStateToShowOnboardingCarousel(any())
+            mockAuthRepository.hasPendingAccountAddition = true
+        }
+    }
+
     private fun createViewModel(): DebugMenuViewModel = DebugMenuViewModel(
         featureFlagManager = mockFeatureFlagManager,
         debugMenuRepository = mockDebugMenuRepository,
+        authRepository = mockAuthRepository,
     )
 }
 
@@ -80,6 +111,7 @@ private val DEFAULT_MAP_VALUE: Map<FlagKey<Any>, Any> = mapOf(
     FlagKey.EmailVerification to true,
     FlagKey.OnboardingCarousel to true,
     FlagKey.OnboardingFlow to true,
+    FlagKey.ImportLoginsFlow to true,
 )
 
 private val UPDATED_MAP_VALUE: Map<FlagKey<Any>, Any> = mapOf(
@@ -87,6 +119,7 @@ private val UPDATED_MAP_VALUE: Map<FlagKey<Any>, Any> = mapOf(
     FlagKey.EmailVerification to false,
     FlagKey.OnboardingCarousel to true,
     FlagKey.OnboardingFlow to false,
+    FlagKey.ImportLoginsFlow to false,
 )
 
 private val DEFAULT_STATE = DebugMenuState(

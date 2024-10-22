@@ -49,7 +49,7 @@ fun BitwardenTextFieldWithActions(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    textStyle: TextStyle? = null,
+    textStyle: TextStyle = BitwardenTheme.typography.bodyLarge,
     shouldAddCustomLineBreaks: Boolean = false,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     readOnly: Boolean = false,
@@ -98,11 +98,11 @@ private fun BitwardenTextFieldWithActions_preview() {
             onValueChange = {},
             actions = {
                 Icon(
-                    painter = rememberVectorPainter(id = R.drawable.ic_tooltip),
+                    painter = rememberVectorPainter(id = R.drawable.ic_question_circle),
                     contentDescription = "Action 1",
                 )
                 Icon(
-                    painter = rememberVectorPainter(id = R.drawable.ic_generator),
+                    painter = rememberVectorPainter(id = R.drawable.ic_generate),
                     contentDescription = "Action 2",
                 )
             },

@@ -1,117 +1,155 @@
 package com.x8bit.bitwarden.ui.platform.components.card
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
+import android.content.res.Configuration
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.VectorPainter
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.ui.platform.components.badge.NotificationBadge
+import com.x8bit.bitwarden.ui.platform.components.button.BitwardenFilledButton
+import com.x8bit.bitwarden.ui.platform.components.button.BitwardenStandardIconButton
+import com.x8bit.bitwarden.ui.platform.components.card.color.bitwardenCardColors
 import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
+import kotlin.let
 
 /**
- * A reusable card for displaying actions to the user.
+ * A design component action card, which contains a title, action button, and a dismiss button
+ * by default, with optional leading icon content.
+ *
+ * @param cardTitle The title of the card.
+ * @param actionText The text content on the CTA button.
+ * @param onActionClick The action to perform when the CTA button is clicked.
+ * @param onDismissClick The action to perform when the dismiss button is clicked.
+ * @param leadingContent Optional content to display on the leading side of the
+ * [cardTitle] [Text].
  */
 @Composable
 fun BitwardenActionCard(
-    actionIcon: VectorPainter,
+    cardTitle: String,
     actionText: String,
-    callToActionText: String,
-    onCardClicked: () -> Unit,
+    onActionClick: () -> Unit,
+    onDismissClick: () -> Unit,
     modifier: Modifier = Modifier,
-    trailingContent: (@Composable BoxScope.() -> Unit)? = null,
+    cardSubtitle: String? = null,
+    leadingContent: @Composable (() -> Unit)? = null,
 ) {
     Card(
-        onClick = onCardClicked,
-        shape = RoundedCornerShape(size = 16.dp),
         modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-        ),
+        shape = BitwardenTheme.shapes.actionCard,
+        colors = bitwardenCardColors(),
         elevation = CardDefaults.elevatedCardElevation(),
+        border = BorderStroke(width = 1.dp, color = BitwardenTheme.colorScheme.stroke.border),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            Icon(
-                painter = actionIcon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.width(16.dp))
+            Row(modifier = Modifier.padding(top = 16.dp)) {
+                leadingContent?.let {
+                    it()
+                    Spacer(Modifier.width(12.dp))
+                }
+                Text(
+                    text = cardTitle,
+                    style = BitwardenTheme.typography.titleMedium,
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            BitwardenStandardIconButton(
+                painter = rememberVectorPainter(id = R.drawable.ic_close),
+                contentDescription = stringResource(id = R.string.close),
+                onClick = onDismissClick,
             )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(
-                modifier = Modifier.weight(weight = 1f),
-            ) {
-                Text(
-                    text = actionText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = callToActionText,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically),
-            ) {
-                trailingContent?.invoke(this)
-            }
         }
+        cardSubtitle?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = it,
+                style = BitwardenTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth(),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        BitwardenFilledButton(
+            label = actionText,
+            onClick = onActionClick,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth(),
+        )
+        Spacer(Modifier.height(16.dp))
     }
 }
 
+/**
+ * A default exit animation for [BitwardenActionCard] when using an animation wrapper like
+ * [androidx.compose.animation.AnimatedVisibility].
+ */
+fun actionCardExitAnimation() = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+
 @Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun ActionCardPreview() {
+private fun BitwardenActionCard_preview() {
     BitwardenTheme {
         BitwardenActionCard(
-            actionIcon = rememberVectorPainter(id = R.drawable.ic_generator),
-            actionText = "This is an action.",
-            callToActionText = "Take action",
-            onCardClicked = { },
+            cardTitle = "Title",
+            actionText = "Action",
+            onActionClick = {},
+            onDismissClick = {},
         )
     }
 }
 
 @Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun ActionCardWithTrailingPreview() {
+private fun BitwardenActionCardWithLeadingContent_preview() {
     BitwardenTheme {
         BitwardenActionCard(
-            actionIcon = rememberVectorPainter(id = R.drawable.ic_generator),
-            actionText = "An action with trailing content",
-            callToActionText = "Take action",
-            onCardClicked = {},
-            trailingContent = {
-                Icon(
-                    painter = rememberVectorPainter(id = R.drawable.ic_navigate_next),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            cardTitle = "Title",
+            actionText = "Action",
+            onActionClick = {},
+            onDismissClick = {},
+            leadingContent = {
+                NotificationBadge(
+                    notificationCount = 1,
+                )
+            },
+        )
+    }
+}
+
+@Preview
+@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun BitwardenActionCardWithSubtitle_preview() {
+    BitwardenTheme {
+        BitwardenActionCard(
+            cardTitle = "Title",
+            cardSubtitle = "Subtitle",
+            actionText = "Action",
+            onActionClick = {},
+            onDismissClick = {},
+            leadingContent = {
+                NotificationBadge(
+                    notificationCount = 1,
                 )
             },
         )

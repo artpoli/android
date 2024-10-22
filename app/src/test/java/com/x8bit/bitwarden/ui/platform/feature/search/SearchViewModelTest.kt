@@ -7,9 +7,12 @@ import app.cash.turbine.turbineScope
 import com.bitwarden.vault.CipherView
 import com.bitwarden.vault.LoginUriView
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
+import com.x8bit.bitwarden.data.autofill.accessibility.manager.AccessibilitySelectionManager
+import com.x8bit.bitwarden.data.autofill.accessibility.manager.AccessibilitySelectionManagerImpl
 import com.x8bit.bitwarden.data.autofill.manager.AutofillSelectionManager
 import com.x8bit.bitwarden.data.autofill.manager.AutofillSelectionManagerImpl
 import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
@@ -19,6 +22,7 @@ import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
 import com.x8bit.bitwarden.data.platform.manager.event.OrganizationEventManager
+import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
 import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
@@ -74,6 +78,8 @@ import java.time.ZoneOffset
 @Suppress("LargeClass")
 class SearchViewModelTest : BaseViewModelTest() {
 
+    private val accessibilitySelectionManager: AccessibilitySelectionManager =
+        AccessibilitySelectionManagerImpl()
     private val autofillSelectionManager: AutofillSelectionManager =
         AutofillSelectionManagerImpl()
 
@@ -187,11 +193,22 @@ class SearchViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `ItemClick for vault item should emit NavigateToViewCipher`() = runTest {
+    fun `ItemClick for vault item without totp should emit NavigateToViewCipher`() = runTest {
         val viewModel = createViewModel()
         viewModel.eventFlow.test {
             viewModel.trySendAction(SearchAction.ItemClick(itemId = "mock"))
             assertEquals(SearchEvent.NavigateToViewCipher(cipherId = "mock"), awaitItem())
+        }
+    }
+
+    @Test
+    fun `ItemClick for vault item with totp should emit NavigateToEditCipher`() = runTest {
+        specialCircumstanceManager.specialCircumstance =
+            SpecialCircumstance.AddTotpLoginItem(mockk())
+        val viewModel = createViewModel()
+        viewModel.eventFlow.test {
+            viewModel.trySendAction(SearchAction.ItemClick(itemId = "mock"))
+            assertEquals(SearchEvent.NavigateToEditCipher(cipherId = "mock"), awaitItem())
         }
     }
 
@@ -205,7 +222,23 @@ class SearchViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `AutofillItemClick should emit NavigateToViewCipher`() = runTest {
+    fun `AutofillItemClick should call emitAccessibilitySelection`() = runTest {
+        val cipherView = setupForAutofill(
+            autofillSelectionData = AUTOFILL_SELECTION_DATA.copy(
+                framework = AutofillSelectionData.Framework.ACCESSIBILITY,
+            ),
+        )
+        val cipherId = CIPHER_ID
+        val viewModel = createViewModel()
+
+        accessibilitySelectionManager.accessibilitySelectionFlow.test {
+            viewModel.trySendAction(SearchAction.AutofillItemClick(itemId = cipherId))
+            assertEquals(cipherView, awaitItem())
+        }
+    }
+
+    @Test
+    fun `AutofillItemClick should call emitAutofillSelection`() = runTest {
         val cipherView = setupForAutofill()
         val cipherId = CIPHER_ID
         val viewModel = createViewModel()
@@ -266,6 +299,64 @@ class SearchViewModelTest : BaseViewModelTest() {
             )
         }
     }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `AutofillAndSaveItemClick with request success should post to the AccessibilitySelectionManager`() =
+        runTest {
+            val autofillSelectionData = AUTOFILL_SELECTION_DATA.copy(
+                framework = AutofillSelectionData.Framework.ACCESSIBILITY,
+            )
+            val cipherView = setupForAutofill(autofillSelectionData = autofillSelectionData)
+            val cipherId = CIPHER_ID
+            val updatedCipherView = cipherView.copy(
+                login = createMockLoginView(number = 1, clock = clock).copy(
+                    uris = listOf(createMockUriView(number = 1)) +
+                        LoginUriView(
+                            uri = AUTOFILL_URI,
+                            match = null,
+                            uriChecksum = null,
+                        ),
+                ),
+            )
+            val initialState = INITIAL_STATE_FOR_AUTOFILL.copy(
+                autofillSelectionData = autofillSelectionData,
+            )
+            val viewModel = createViewModel()
+            coEvery {
+                vaultRepository.updateCipher(
+                    cipherId = cipherId,
+                    cipherView = updatedCipherView,
+                )
+            } returns UpdateCipherResult.Success
+
+            turbineScope {
+                val stateTurbine = viewModel
+                    .stateFlow
+                    .testIn(backgroundScope)
+                val selectionTurbine = accessibilitySelectionManager
+                    .accessibilitySelectionFlow
+                    .testIn(backgroundScope)
+
+                assertEquals(initialState, stateTurbine.awaitItem())
+
+                viewModel.trySendAction(SearchAction.AutofillAndSaveItemClick(itemId = cipherId))
+
+                assertEquals(
+                    initialState.copy(
+                        dialogState = SearchState.DialogState.Loading(
+                            message = R.string.loading.asText(),
+                        ),
+                    ),
+                    stateTurbine.awaitItem(),
+                )
+
+                assertEquals(initialState, stateTurbine.awaitItem())
+
+                // Autofill flow is completed
+                assertEquals(cipherView, selectionTurbine.awaitItem())
+            }
+        }
 
     @Suppress("MaxLineLength")
     @Test
@@ -394,6 +485,36 @@ class SearchViewModelTest : BaseViewModelTest() {
                 ),
                 viewModel.stateFlow.value,
             )
+        }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `MasterPasswordRepromptSubmit for a request Success with a valid password for autofill should post to the AccessibilitySelectionManager`() =
+        runTest {
+            setupMockUri()
+            val cipherView = setupForAutofill(
+                autofillSelectionData = AUTOFILL_SELECTION_DATA.copy(
+                    framework = AutofillSelectionData.Framework.ACCESSIBILITY,
+                ),
+            )
+            val cipherId = CIPHER_ID
+            val password = "password"
+            coEvery {
+                authRepository.validatePassword(password = password)
+            } returns ValidatePasswordResult.Success(isValid = true)
+            val viewModel = createViewModel()
+
+            accessibilitySelectionManager.accessibilitySelectionFlow.test {
+                viewModel.trySendAction(
+                    SearchAction.MasterPasswordRepromptSubmit(
+                        password = password,
+                        masterPasswordRepromptData = MasterPasswordRepromptData.Autofill(
+                            cipherId = cipherId,
+                        ),
+                    ),
+                )
+                assertEquals(cipherView, awaitItem())
+            }
         }
 
     @Suppress("MaxLineLength")
@@ -1332,6 +1453,7 @@ class SearchViewModelTest : BaseViewModelTest() {
         clipboardManager = clipboardManager,
         policyManager = policyManager,
         specialCircumstanceManager = specialCircumstanceManager,
+        accessibilitySelectionManager = accessibilitySelectionManager,
         autofillSelectionManager = autofillSelectionManager,
         organizationEventManager = organizationEventManager,
     )
@@ -1340,9 +1462,11 @@ class SearchViewModelTest : BaseViewModelTest() {
      * Generates and returns [CipherView] to be populated for autofill testing and sets up the
      * state to return that item.
      */
-    private fun setupForAutofill(): CipherView {
+    private fun setupForAutofill(
+        autofillSelectionData: AutofillSelectionData = AUTOFILL_SELECTION_DATA,
+    ): CipherView {
         specialCircumstanceManager.specialCircumstance = SpecialCircumstance.AutofillSelection(
-            autofillSelectionData = AUTOFILL_SELECTION_DATA,
+            autofillSelectionData = autofillSelectionData,
             shouldFinishWhenComplete = true,
         )
         val cipherView = createMockCipherView(
@@ -1402,6 +1526,8 @@ private val DEFAULT_STATE: SearchState = SearchState(
     baseIconUrl = "https://vault.bitwarden.com/icons",
     isIconLoadingDisabled = false,
     hasMasterPassword = true,
+    totpData = null,
+    autofillSelectionData = null,
     isPremium = true,
 )
 
@@ -1424,6 +1550,8 @@ private val DEFAULT_USER_STATE = UserState(
             trustedDevice = null,
             hasMasterPassword = true,
             isUsingKeyConnector = false,
+            onboardingStatus = OnboardingStatus.COMPLETE,
+            firstTimeState = FirstTimeState(showImportLoginsCard = true),
         ),
     ),
 )

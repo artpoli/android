@@ -138,6 +138,7 @@ class EnterpriseSignOnViewModel @Inject constructor(
         prevalidateSso()
     }
 
+    @Suppress("MaxLineLength")
     private fun handleOnLoginResult(action: EnterpriseSignOnAction.Internal.OnLoginResult) {
         when (val loginResult = action.loginResult) {
             is LoginResult.CaptchaRequired -> {
@@ -160,6 +161,17 @@ class EnterpriseSignOnViewModel @Inject constructor(
                 }
             }
 
+            is LoginResult.UnofficialServerError -> {
+                mutableStateFlow.update {
+                    it.copy(
+                        dialogState = EnterpriseSignOnState.DialogState.Error(
+                            message = R.string.this_is_not_a_recognized_bitwarden_server_you_may_need_to_check_with_your_provider_or_update_your_server
+                                .asText(),
+                        ),
+                    )
+                }
+            }
+
             is LoginResult.Success -> {
                 mutableStateFlow.update { it.copy(dialogState = null) }
                 authRepository.rememberedOrgIdentifier = state.orgIdentifierInput
@@ -170,6 +182,7 @@ class EnterpriseSignOnViewModel @Inject constructor(
                 sendEvent(
                     EnterpriseSignOnEvent.NavigateToTwoFactorLogin(
                         emailAddress = EnterpriseSignOnArgs(savedStateHandle).emailAddress,
+                        orgIdentifier = state.orgIdentifierInput,
                     ),
                 )
             }
@@ -481,7 +494,10 @@ sealed class EnterpriseSignOnEvent {
     /**
      * Navigates to the two-factor login screen.
      */
-    data class NavigateToTwoFactorLogin(val emailAddress: String) : EnterpriseSignOnEvent()
+    data class NavigateToTwoFactorLogin(
+        val emailAddress: String,
+        val orgIdentifier: String,
+    ) : EnterpriseSignOnEvent()
 }
 
 /**
