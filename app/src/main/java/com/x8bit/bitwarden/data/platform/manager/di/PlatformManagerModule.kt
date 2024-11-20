@@ -6,6 +6,7 @@ import androidx.core.content.getSystemService
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.auth.manager.AddTotpItemFromAuthenticatorManager
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.autofill.manager.AutofillEnabledManager
 import com.x8bit.bitwarden.data.platform.datasource.disk.EventDiskSource
 import com.x8bit.bitwarden.data.platform.datasource.disk.PushDiskSource
 import com.x8bit.bitwarden.data.platform.datasource.disk.SettingsDiskSource
@@ -14,8 +15,8 @@ import com.x8bit.bitwarden.data.platform.datasource.network.authenticator.Refres
 import com.x8bit.bitwarden.data.platform.datasource.network.interceptor.BaseUrlInterceptors
 import com.x8bit.bitwarden.data.platform.datasource.network.service.EventService
 import com.x8bit.bitwarden.data.platform.datasource.network.service.PushService
-import com.x8bit.bitwarden.data.platform.manager.AppForegroundManager
-import com.x8bit.bitwarden.data.platform.manager.AppForegroundManagerImpl
+import com.x8bit.bitwarden.data.platform.manager.AppStateManager
+import com.x8bit.bitwarden.data.platform.manager.AppStateManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.AssetManager
 import com.x8bit.bitwarden.data.platform.manager.AssetManagerImpl
 import com.x8bit.bitwarden.data.platform.manager.BiometricsEncryptionManager
@@ -80,8 +81,9 @@ object PlatformManagerModule {
 
     @Provides
     @Singleton
-    fun provideAppForegroundManager(): AppForegroundManager =
-        AppForegroundManagerImpl()
+    fun provideAppStateManager(
+        application: Application,
+    ): AppStateManager = AppStateManagerImpl(application = application)
 
     @Provides
     @Singleton
@@ -267,11 +269,11 @@ object PlatformManagerModule {
     @Singleton
     fun provideRestrictionManager(
         @ApplicationContext context: Context,
-        appForegroundManager: AppForegroundManager,
+        appStateManager: AppStateManager,
         dispatcherManager: DispatcherManager,
         environmentRepository: EnvironmentRepository,
     ): RestrictionManager = RestrictionManagerImpl(
-        appForegroundManager = appForegroundManager,
+        appStateManager = appStateManager,
         dispatcherManager = dispatcherManager,
         context = context,
         environmentRepository = environmentRepository,
@@ -292,19 +294,23 @@ object PlatformManagerModule {
         vaultDiskSource: VaultDiskSource,
         dispatcherManager: DispatcherManager,
         featureFlagManager: FeatureFlagManager,
+        autofillEnabledManager: AutofillEnabledManager,
     ): FirstTimeActionManager = FirstTimeActionManagerImpl(
         authDiskSource = authDiskSource,
         settingsDiskSource = settingsDiskSource,
         vaultDiskSource = vaultDiskSource,
         dispatcherManager = dispatcherManager,
         featureFlagManager = featureFlagManager,
+        autofillEnabledManager = autofillEnabledManager,
     )
 
     @Provides
     @Singleton
     fun provideDatabaseSchemeManager(
         settingsDiskSource: SettingsDiskSource,
+        dispatcherManager: DispatcherManager,
     ): DatabaseSchemeManager = DatabaseSchemeManagerImpl(
         settingsDiskSource = settingsDiskSource,
+        dispatcherManager = dispatcherManager,
     )
 }

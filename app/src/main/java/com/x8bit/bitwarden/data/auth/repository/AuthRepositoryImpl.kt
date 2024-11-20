@@ -2,7 +2,6 @@ package com.x8bit.bitwarden.data.auth.repository
 
 import com.bitwarden.core.AuthRequestMethod
 import com.bitwarden.core.InitUserCryptoMethod
-import com.bitwarden.core.InitUserCryptoRequest
 import com.bitwarden.crypto.HashPurpose
 import com.bitwarden.crypto.Kdf
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
@@ -23,6 +22,7 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterResponseJs
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendEmailRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailRequestJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorAuthMethod
@@ -68,6 +68,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePinResult
 import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
+import com.x8bit.bitwarden.data.auth.repository.model.VerifiedOrganizationDomainSsoDetailsResult
 import com.x8bit.bitwarden.data.auth.repository.model.VerifyOtpResult
 import com.x8bit.bitwarden.data.auth.repository.model.toLoginErrorResult
 import com.x8bit.bitwarden.data.auth.repository.util.CaptchaCallbackTokenResult
@@ -113,7 +114,6 @@ import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
 import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
 import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
-import com.x8bit.bitwarden.data.vault.datasource.sdk.model.InitializeCryptoResult
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockData
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockError
@@ -1123,9 +1123,25 @@ class AuthRepositoryImpl(
                 OrganizationDomainSsoDetailsResult.Success(
                     isSsoAvailable = it.isSsoAvailable,
                     organizationIdentifier = it.organizationIdentifier,
+                    verifiedDate = it.verifiedDate,
                 )
             },
             onFailure = { OrganizationDomainSsoDetailsResult.Failure },
+        )
+
+    override suspend fun getVerifiedOrganizationDomainSsoDetails(
+        email: String,
+    ): VerifiedOrganizationDomainSsoDetailsResult = organizationService
+        .getVerifiedOrganizationDomainSsoDetails(
+            email = email,
+        )
+        .fold(
+            onSuccess = {
+                VerifiedOrganizationDomainSsoDetailsResult.Success(
+                    verifiedOrganizationDomainSsoDetails = it.verifiedOrganizationDomainSsoDetails,
+                )
+            },
+            onFailure = { VerifiedOrganizationDomainSsoDetailsResult.Failure },
         )
 
     override suspend fun prevalidateSso(
@@ -1232,41 +1248,17 @@ class AuthRepositoryImpl(
             ?.activeAccount
             ?.profile
             ?: return ValidatePinResult.Error
-        val privateKey = authDiskSource
-            .getPrivateKey(userId = activeAccount.userId)
-            ?: return ValidatePinResult.Error
         val pinProtectedUserKey = authDiskSource
             .getPinProtectedUserKey(userId = activeAccount.userId)
             ?: return ValidatePinResult.Error
-
-        // HACK: As the SDK doesn't provide a way to directly validate the pin yet, we instead
-        // try to initialize the user crypto, and if it succeeds then the PIN is correct, otherwise
-        // the PIN is incorrect.
         return vaultSdkSource
-            .initializeCrypto(
+            .validatePin(
                 userId = activeAccount.userId,
-                request = InitUserCryptoRequest(
-                    kdfParams = activeAccount.toSdkParams(),
-                    email = activeAccount.email,
-                    privateKey = privateKey,
-                    method = InitUserCryptoMethod.Pin(
-                        pin = pin,
-                        pinProtectedUserKey = pinProtectedUserKey,
-                    ),
-                ),
+                pin = pin,
+                pinProtectedUserKey = pinProtectedUserKey,
             )
             .fold(
-                onSuccess = {
-                    when (it) {
-                        InitializeCryptoResult.Success -> {
-                            ValidatePinResult.Success(isValid = true)
-                        }
-
-                        is InitializeCryptoResult.AuthenticationError -> {
-                            ValidatePinResult.Success(isValid = false)
-                        }
-                    }
-                },
+                onSuccess = { ValidatePinResult.Success(isValid = it) },
                 onFailure = { ValidatePinResult.Error },
             )
     }
@@ -1285,13 +1277,21 @@ class AuthRepositoryImpl(
             .sendVerificationEmail(
                 SendVerificationEmailRequestJson(
                     email = email,
-                    name = name,
+                    name = name.takeUnless { it.isBlank() },
                     receiveMarketingEmails = receiveMarketingEmails,
                 ),
             )
             .fold(
                 onSuccess = {
-                    SendVerificationEmailResult.Success(it)
+                    when (it) {
+                        is SendVerificationEmailResponseJson.Invalid -> {
+                            SendVerificationEmailResult.Error(it.message)
+                        }
+
+                        is SendVerificationEmailResponseJson.Success -> {
+                            SendVerificationEmailResult.Success(it.emailVerificationToken)
+                        }
+                    }
                 },
                 onFailure = {
                     SendVerificationEmailResult.Error(null)

@@ -38,11 +38,13 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterResponseJs
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendEmailRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailRequestJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorAuthMethod
 import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorDataModel
 import com.x8bit.bitwarden.data.auth.datasource.network.model.UserDecryptionOptionsJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifiedOrganizationDomainSsoDetailsResponse
 import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyEmailTokenRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyEmailTokenResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.service.AccountsService
@@ -85,6 +87,7 @@ import com.x8bit.bitwarden.data.auth.repository.model.UserOrganizations
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePinResult
 import com.x8bit.bitwarden.data.auth.repository.model.VaultUnlockType
+import com.x8bit.bitwarden.data.auth.repository.model.VerifiedOrganizationDomainSsoDetailsResult
 import com.x8bit.bitwarden.data.auth.repository.model.VerifyOtpResult
 import com.x8bit.bitwarden.data.auth.repository.util.CaptchaCallbackTokenResult
 import com.x8bit.bitwarden.data.auth.repository.util.DuoCallbackTokenResult
@@ -121,7 +124,6 @@ import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockOrganization
 import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockPolicy
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
-import com.x8bit.bitwarden.data.vault.datasource.sdk.model.InitializeCryptoResult
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockData
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockResult
@@ -149,6 +151,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.time.ZonedDateTime
 
 @Suppress("LargeClass")
 class AuthRepositoryTest {
@@ -3563,6 +3566,8 @@ class AuthRepositoryTest {
             val pendingAuthRequest = PendingAuthRequestJson(
                 requestId = "requestId",
                 requestPrivateKey = "requestPrivateKey",
+                requestFingerprint = "fingerprint",
+                requestAccessCode = "accessCode",
             )
             val successResponse = GET_TOKEN_RESPONSE_SUCCESS.copy(
                 key = null,
@@ -5217,6 +5222,7 @@ class AuthRepositoryTest {
         } returns OrganizationDomainSsoDetailsResponseJson(
             isSsoAvailable = true,
             organizationIdentifier = "Test Org",
+            verifiedDate = ZonedDateTime.parse("2023-10-27T12:00:00Z"),
         )
             .asSuccess()
         val result = repository.getOrganizationDomainSsoDetails(email)
@@ -5224,9 +5230,51 @@ class AuthRepositoryTest {
             OrganizationDomainSsoDetailsResult.Success(
                 isSsoAvailable = true,
                 organizationIdentifier = "Test Org",
+                verifiedDate = ZonedDateTime.parse("2023-10-27T12:00:00Z"),
             ),
             result,
         )
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `getVerifiedOrganizationDomainSsoDetails Success should return Success`() = runTest {
+        val email = "test@gmail.com"
+        coEvery {
+            organizationService.getVerifiedOrganizationDomainSsoDetails(email)
+        } returns VerifiedOrganizationDomainSsoDetailsResponse(
+            verifiedOrganizationDomainSsoDetails = listOf(
+                VerifiedOrganizationDomainSsoDetailsResponse.VerifiedOrganizationDomainSsoDetail(
+                    organizationIdentifier = "Test Identifier",
+                    organizationName = "Bitwarden",
+                    domainName = "bitwarden.com",
+                ),
+            ),
+        ).asSuccess()
+        val result = repository.getVerifiedOrganizationDomainSsoDetails(email)
+        assertEquals(
+            VerifiedOrganizationDomainSsoDetailsResult.Success(
+                verifiedOrganizationDomainSsoDetails = listOf(
+                    VerifiedOrganizationDomainSsoDetailsResponse.VerifiedOrganizationDomainSsoDetail(
+                        organizationIdentifier = "Test Identifier",
+                        organizationName = "Bitwarden",
+                        domainName = "bitwarden.com",
+                    ),
+                ),
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `getVerifiedOrganizationDomainSsoDetails Failure should return Failure `() = runTest {
+        val email = "test@gmail.com"
+        val throwable = Throwable()
+        coEvery {
+            organizationService.getVerifiedOrganizationDomainSsoDetails(email)
+        } returns throwable.asFailure()
+        val result = repository.getVerifiedOrganizationDomainSsoDetails(email)
+        assertEquals(VerifiedOrganizationDomainSsoDetailsResult.Failure, result)
     }
 
     @Test
@@ -5781,32 +5829,10 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `validatePin returns ValidatePinResult Error when no private key found`() = runTest {
-        val pin = "PIN"
-        fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
-        fakeAuthDiskSource.storePrivateKey(
-            userId = SINGLE_USER_STATE_1.activeUserId,
-            privateKey = null,
-        )
-
-        val result = repository.validatePin(pin = pin)
-
-        assertEquals(
-            ValidatePinResult.Error,
-            result,
-        )
-    }
-
-    @Test
     fun `validatePin returns ValidatePinResult Error when no pin protected user key found`() =
         runTest {
             val pin = "PIN"
-            val privateKey = "privateKey"
             fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
-            fakeAuthDiskSource.storePrivateKey(
-                userId = SINGLE_USER_STATE_1.activeUserId,
-                privateKey = privateKey,
-            )
             fakeAuthDiskSource.storePinProtectedUserKey(
                 userId = SINGLE_USER_STATE_1.activeUserId,
                 pinProtectedUserKey = null,
@@ -5821,23 +5847,19 @@ class AuthRepositoryTest {
         }
 
     @Test
-    fun `validatePin returns ValidatePinResult Error when initialize crypto fails`() = runTest {
+    fun `validatePin returns ValidatePinResult Error when SDK validatePin fails`() = runTest {
         val pin = "PIN"
-        val privateKey = "privateKey"
         val pinProtectedUserKey = "pinProtectedUserKey"
         fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
-        fakeAuthDiskSource.storePrivateKey(
-            userId = SINGLE_USER_STATE_1.activeUserId,
-            privateKey = privateKey,
-        )
         fakeAuthDiskSource.storePinProtectedUserKey(
             userId = SINGLE_USER_STATE_1.activeUserId,
             pinProtectedUserKey = pinProtectedUserKey,
         )
         coEvery {
-            vaultSdkSource.initializeCrypto(
+            vaultSdkSource.validatePin(
                 userId = SINGLE_USER_STATE_1.activeUserId,
-                request = any(),
+                pin = pin,
+                pinProtectedUserKey = pinProtectedUserKey,
             )
         } returns Throwable().asFailure()
 
@@ -5847,36 +5869,33 @@ class AuthRepositoryTest {
             ValidatePinResult.Error,
             result,
         )
-        coVerify {
-            vaultSdkSource.initializeCrypto(
+        coVerify(exactly = 1) {
+            vaultSdkSource.validatePin(
                 userId = SINGLE_USER_STATE_1.activeUserId,
-                request = any(),
+                pin = pin,
+                pinProtectedUserKey = pinProtectedUserKey,
             )
         }
     }
 
     @Suppress("MaxLineLength")
     @Test
-    fun `validatePin returns ValidatePinResult Success with valid false when initialize cryto returns AuthenticationError`() =
+    fun `validatePin returns ValidatePinResult Success with valid false when SDK validatePin returns false`() =
         runTest {
             val pin = "PIN"
-            val privateKey = "privateKey"
             val pinProtectedUserKey = "pinProtectedUserKey"
             fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
-            fakeAuthDiskSource.storePrivateKey(
-                userId = SINGLE_USER_STATE_1.activeUserId,
-                privateKey = privateKey,
-            )
             fakeAuthDiskSource.storePinProtectedUserKey(
                 userId = SINGLE_USER_STATE_1.activeUserId,
                 pinProtectedUserKey = pinProtectedUserKey,
             )
             coEvery {
-                vaultSdkSource.initializeCrypto(
+                vaultSdkSource.validatePin(
                     userId = SINGLE_USER_STATE_1.activeUserId,
-                    request = any(),
+                    pin = pin,
+                    pinProtectedUserKey = pinProtectedUserKey,
                 )
-            } returns InitializeCryptoResult.AuthenticationError().asSuccess()
+            } returns false.asSuccess()
 
             val result = repository.validatePin(pin = pin)
 
@@ -5884,36 +5903,33 @@ class AuthRepositoryTest {
                 ValidatePinResult.Success(isValid = false),
                 result,
             )
-            coVerify {
-                vaultSdkSource.initializeCrypto(
+            coVerify(exactly = 1) {
+                vaultSdkSource.validatePin(
                     userId = SINGLE_USER_STATE_1.activeUserId,
-                    request = any(),
+                    pin = pin,
+                    pinProtectedUserKey = pinProtectedUserKey,
                 )
             }
         }
 
     @Suppress("MaxLineLength")
     @Test
-    fun `validatePin returns ValidatePinResult Success with valid true when initialize cryto returns Success`() =
+    fun `validatePin returns ValidatePinResult Success with valid true when SDK validatePin returns true`() =
         runTest {
             val pin = "PIN"
-            val privateKey = "privateKey"
             val pinProtectedUserKey = "pinProtectedUserKey"
             fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
-            fakeAuthDiskSource.storePrivateKey(
-                userId = SINGLE_USER_STATE_1.activeUserId,
-                privateKey = privateKey,
-            )
             fakeAuthDiskSource.storePinProtectedUserKey(
                 userId = SINGLE_USER_STATE_1.activeUserId,
                 pinProtectedUserKey = pinProtectedUserKey,
             )
             coEvery {
-                vaultSdkSource.initializeCrypto(
+                vaultSdkSource.validatePin(
                     userId = SINGLE_USER_STATE_1.activeUserId,
-                    request = any(),
+                    pin = pin,
+                    pinProtectedUserKey = pinProtectedUserKey,
                 )
-            } returns InitializeCryptoResult.Success.asSuccess()
+            } returns true.asSuccess()
 
             val result = repository.validatePin(pin = pin)
 
@@ -5921,10 +5937,11 @@ class AuthRepositoryTest {
                 ValidatePinResult.Success(isValid = true),
                 result,
             )
-            coVerify {
-                vaultSdkSource.initializeCrypto(
+            coVerify(exactly = 1) {
+                vaultSdkSource.validatePin(
                     userId = SINGLE_USER_STATE_1.activeUserId,
-                    request = any(),
+                    pin = pin,
+                    pinProtectedUserKey = pinProtectedUserKey,
                 )
             }
         }
@@ -6027,7 +6044,7 @@ class AuthRepositoryTest {
                     receiveMarketingEmails = true,
                 ),
             )
-        } returns EMAIL_VERIFICATION_TOKEN.asSuccess()
+        } returns SendVerificationEmailResponseJson.Success(EMAIL_VERIFICATION_TOKEN).asSuccess()
 
         val result = repository.sendVerificationEmail(
             email = EMAIL,
@@ -6036,6 +6053,32 @@ class AuthRepositoryTest {
         )
         assertEquals(
             SendVerificationEmailResult.Success(EMAIL_VERIFICATION_TOKEN),
+            result,
+        )
+    }
+
+    @Test
+    fun `sendVerificationEmail success with invalid email should return error`() = runTest {
+        val errorMessage = "Failure"
+        coEvery {
+            identityService.sendVerificationEmail(
+                SendVerificationEmailRequestJson(
+                    email = EMAIL,
+                    name = NAME,
+                    receiveMarketingEmails = true,
+                ),
+            )
+        } returns SendVerificationEmailResponseJson
+            .Invalid(invalidMessage = errorMessage, validationErrors = null)
+            .asSuccess()
+
+        val result = repository.sendVerificationEmail(
+            email = EMAIL,
+            name = NAME,
+            receiveMarketingEmails = true,
+        )
+        assertEquals(
+            SendVerificationEmailResult.Error(errorMessage = errorMessage),
             result,
         )
     }
@@ -6050,7 +6093,7 @@ class AuthRepositoryTest {
                     receiveMarketingEmails = true,
                 ),
             )
-        } returns null.asSuccess()
+        } returns SendVerificationEmailResponseJson.Success(null).asSuccess()
 
         val result = repository.sendVerificationEmail(
             email = EMAIL,
@@ -6059,6 +6102,29 @@ class AuthRepositoryTest {
         )
         assertEquals(
             SendVerificationEmailResult.Success(null),
+            result,
+        )
+    }
+
+    @Test
+    fun `sendVerificationEmail with empty name should use null and return success`() = runTest {
+        coEvery {
+            identityService.sendVerificationEmail(
+                SendVerificationEmailRequestJson(
+                    email = EMAIL,
+                    name = null,
+                    receiveMarketingEmails = true,
+                ),
+            )
+        } returns SendVerificationEmailResponseJson.Success(EMAIL_VERIFICATION_TOKEN).asSuccess()
+
+        val result = repository.sendVerificationEmail(
+            email = EMAIL,
+            name = "",
+            receiveMarketingEmails = true,
+        )
+        assertEquals(
+            SendVerificationEmailResult.Success(EMAIL_VERIFICATION_TOKEN),
             result,
         )
     }

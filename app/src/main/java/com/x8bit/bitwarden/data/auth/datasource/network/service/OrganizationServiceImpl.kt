@@ -7,6 +7,9 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.OrganizationDomain
 import com.x8bit.bitwarden.data.auth.datasource.network.model.OrganizationDomainSsoDetailsResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.OrganizationKeysResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.OrganizationResetPasswordEnrollRequestJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifiedOrganizationDomainSsoDetailsRequest
+import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifiedOrganizationDomainSsoDetailsResponse
+import com.x8bit.bitwarden.data.platform.datasource.network.util.toResult
 
 /**
  * Default implementation of [OrganizationService].
@@ -29,6 +32,7 @@ class OrganizationServiceImpl(
                 resetPasswordKey = resetPasswordKey,
             ),
         )
+        .toResult()
 
     override suspend fun getOrganizationDomainSsoDetails(
         email: String,
@@ -38,6 +42,7 @@ class OrganizationServiceImpl(
                 email = email,
             ),
         )
+        .toResult()
 
     override suspend fun getOrganizationAutoEnrollStatus(
         organizationIdentifier: String,
@@ -45,6 +50,7 @@ class OrganizationServiceImpl(
         .getOrganizationAutoEnrollResponse(
             organizationIdentifier = organizationIdentifier,
         )
+        .toResult()
 
     override suspend fun getOrganizationKeys(
         organizationId: String,
@@ -52,4 +58,15 @@ class OrganizationServiceImpl(
         .getOrganizationKeys(
             organizationId = organizationId,
         )
+        .toResult()
+
+    override suspend fun getVerifiedOrganizationDomainSsoDetails(
+        email: String,
+    ): Result<VerifiedOrganizationDomainSsoDetailsResponse> = unauthenticatedOrganizationApi
+        .getVerifiedOrganizationDomainsByEmail(
+            body = VerifiedOrganizationDomainSsoDetailsRequest(
+                email = email,
+            ),
+        )
+        .toResult()
 }
