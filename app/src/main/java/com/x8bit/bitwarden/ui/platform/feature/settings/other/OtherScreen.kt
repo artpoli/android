@@ -35,10 +35,10 @@ import com.x8bit.bitwarden.data.platform.repository.util.displayLabel
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenOutlinedButton
+import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenBasicDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenLoadingDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenSelectionDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenTwoButtonDialog
-import com.x8bit.bitwarden.ui.platform.components.dialog.LoadingDialogState
 import com.x8bit.bitwarden.ui.platform.components.dialog.row.BitwardenSelectionRow
 import com.x8bit.bitwarden.ui.platform.components.row.BitwardenTextRow
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
@@ -75,6 +75,9 @@ fun OtherScreen(
 
     OtherDialogs(
         dialogState = state.dialogState,
+        onDismissRequest = remember(viewModel) {
+            { viewModel.trySendAction(OtherAction.DismissDialog) }
+        },
     )
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -257,10 +260,17 @@ private fun ClearClipboardFrequencyRow(
 @Composable
 private fun OtherDialogs(
     dialogState: OtherState.DialogState?,
+    onDismissRequest: () -> Unit,
 ) {
     when (dialogState) {
         is OtherState.DialogState.Loading -> BitwardenLoadingDialog(
-            visibilityState = LoadingDialogState.Shown(dialogState.message),
+            text = dialogState.message(),
+        )
+
+        is OtherState.DialogState.Error -> BitwardenBasicDialog(
+            title = dialogState.title.invoke(),
+            message = dialogState.message(),
+            onDismissRequest = onDismissRequest,
         )
 
         null -> Unit

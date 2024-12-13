@@ -8,6 +8,7 @@ import com.bitwarden.vault.CipherView
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
+import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
@@ -245,7 +246,7 @@ class VaultItemViewModel @Inject constructor(
 
     private fun handleRefreshClick() {
         // No need to update the view state, the vault repo will emit a new state during this time
-        vaultRepository.sync()
+        vaultRepository.sync(forced = true)
     }
 
     private fun handleCopyCustomHiddenFieldClick(
@@ -1028,14 +1029,19 @@ class VaultItemViewModel @Inject constructor(
     ): VaultItemState.ViewState = this
         .data
         ?.cipher
-        ?.toViewState(
-            previousState = state.viewState.asContentOrNull(),
-            isPremiumUser = account.isPremium,
-            hasMasterPassword = account.hasMasterPassword,
-            totpCodeItemData = this.data?.totpCodeItemData,
-            canDelete = this.data?.canDelete == true,
-            canAssignToCollections = this.data?.canAssociateToCollections == true,
-        )
+        ?.let { cipher ->
+            val ownerOrg: Organization? = account.organizations.find {
+                cipher.organizationId == it.id
+            }
+            cipher.toViewState(
+                previousState = state.viewState.asContentOrNull(),
+                isPremiumUser = ownerOrg?.shouldUsersGetPremium ?: account.isPremium,
+                hasMasterPassword = account.hasMasterPassword,
+                totpCodeItemData = this.data?.totpCodeItemData,
+                canDelete = this.data?.canDelete == true,
+                canAssignToCollections = this.data?.canAssociateToCollections == true,
+            )
+        }
         ?: VaultItemState.ViewState.Error(message = errorText)
 
     private fun handleValidatePasswordReceive(

@@ -40,7 +40,6 @@
   <string name="invalid_master_password">Μη έγκυρος κύριος κωδικός. Δοκιμάστε ξανά.</string>
   <string name="invalid_pin">Μη έγκυρο PIN. Προσπάθηστε ξανά.</string>
   <string name="launch">Εκκίνηση</string>
-  <string name="log_in">Σύνδεση</string>
   <string name="log_in_verb">Σύνδεση</string>
   <string name="log_in_noun">Σύνδεση</string>
   <string name="log_out">Αποσύνδεση</string>
@@ -241,7 +240,7 @@
   <string name="verification_code_totp">Κωδικός επαλήθευσης (TOTP)</string>
   <string name="authenticator_key_added">Το κλειδί επαλήθευσης προστέθηκε.</string>
   <string name="authenticator_key_read_error">Αδυναμία ανάγνωσης κλειδιού επαλήθευσης.</string>
-  <string name="point_your_camera_at_the_qr_code">Σημαδέψτε με την κάμερα σας τον κωδικό QR.
+  <string name="point_your_camera_at_the_qr_code">Σημαδέψτε με την κάμερα σας τον κωδικό QR. 
 Η σάρωση θα γίνει αυτόματα.</string>
   <string name="scan_qr_title">Σάρωση κώδικα QR</string>
   <string name="camera">Κάμερα</string>
@@ -952,7 +951,7 @@
   <string name="or_log_in_you_may_already_have_an_account">Ή συνδεθείτε, μπορεί να έχετε ήδη λογαριασμό.</string>
   <string name="get_emails_from_bitwarden_for_announcements_advices_and_research_opportunities_unsubscribe_any_time">Λάβετε μηνύματα ηλ. ταχυδρομείου από το Bitwarden για ανακοινώσεις, συμβουλές και ερευνητικές ευκαιρίες. Ακυρώστε τη συνδρομή σας ανα πάσα στιγμή.</string>
   <string name="get_advice_announcements_and_research_opportunities_from_bitwarden_in_your_inbox_unsubscribe_any_time">Λάβετε συμβουλές, ανακοινώσεις και ευκαιρίες έρευνας από το Bitwarden στα εισερχόμενά σας. Μπορείτε να απεγγραφείτε ανα πάσα στιγμή.</string>
-  <string name="security_prioritized">Προταιρεότητα, η ιδιωτικότητα</string>
+  <string name="security_prioritized">Security, prioritized</string>
   <string name="welcome_message_1">Αποθηκεύστε συνδέσεις, κάρτες και ταυτότητες στο ασφαλές θησαυ/κιό σας. Το Bitwarden χρησιμοποιεί κρυπτογράφηση από άκρο σε άκρο και μηδενικής γνώσης για να προστατεύσει ό,τι είναι σημαντικό για εσάς.</string>
   <string name="welcome_message_2">Ρυθμίστε το βιομετρικό ξεκλείδωμα και την αυτόματη συμπλήρωση για σύνδεση στους λογαριασμούς σας χωρίς να πληκτρολογήσετε ούτε ένα γράμμα.</string>
   <string name="quick_and_easy_login">Γρήγορη και εύκολη σύνδεση</string>
@@ -963,6 +962,7 @@
   <string name="remove_passkey">Αφαίρεση κλειδιού πρόσβασης</string>
   <string name="passkey_removed">Το κλειδί πρόσβασης αφαιρέθηκε</string>
   <string name="what_makes_a_password_strong">Τι κάνει έναν κωδικό πρόσβασης ισχυρό;</string>
+  <string name="a_secure_memorable_password">A secure, memorable password</string>
   <string name="the_longer_your_password_the_more_difficult_to_hack">Όσο μεγαλύτερος ο κωδικός προσβασής σας, τόσο πιο δύσκολα χακάρεται. Το ελάχιστο μήκος για δημιουργία λογαριασμού είναι 12 χαρακτήρες αλλά τον κάνετε 14 χαρακτήρες, ο χρόνος για να σπασει ο κωδικός πρόσβασής σας θα ειναι κάποιοι αιώνες!</string>
   <string name="the_strongest_passwords_are_usually">Οι ισχυρότεροι κωδικοί πρόσβασης είναι συνήθως:</string>
   <string name="twelve_or_more_characters">12 ή περισσότεροι χαρακτήρες</string>
@@ -978,7 +978,8 @@
   <string name="confirm">Επιβεβαίωση</string>
   <string name="set_up_biometrics_or_choose_a_pin_code_to_quickly_access_your_vault_and_autofill_your_logins">Ρυθμίστε τα βιομετρικά στοιχεία ή επιλέξτε έναν κωδικό PIN για γρήγορη πρόσβαση στο θησαυ/κιο και αυτόματη συμπλήρωση των συνδέσεών σας.</string>
   <string name="never_lose_access_to_your_vault">Δεν θα χάσετε ποτέ πρόσβαση στο θησαυ/κιό σας</string>
-  <string name="the_best_way_to_make_sure_you_can_always_access_your_account">Ο καλύτερος τρόπος για να βεβαιωθείτε ότι μπορείτε πάντα να έχετε πρόσβαση στο λογαριασμό σας είναι να δημιουργήσετε διασφαλίσεις από την αρχή.</string>
+  <string name="the_best_way_to_make_sure_you_can_always_access_your_vault">The best way to make sure you can always access your vault is to set up safeguards from the start.</string>
+  <string name="one_of_the_best_ways_to_create_a_secure_and_memorable_password">One of the best ways to create a secure and memorable password is to use a passphrase. \nHere’s how:</string>
   <string name="create_a_hint">Δημιουργήστε μια υπόδειξη</string>
   <string name="your_hint_will_be_send_to_you_via_email_when_you_request_it">Η υπόδειξή σας θα σας αποσταλεί μέσω μηνύματος ηλ. ταχυδρομείου όταν το ζητήσετε.</string>
   <string name="write_your_password_down">Γράψτε τον κωδικό σας</string>
@@ -1073,6 +1074,7 @@
   <string name="bitwarden_tools">Bitwarden Tools</string>
   <string name="got_it">Got it</string>
   <string name="no_logins_were_imported">No logins were imported</string>
+  <string name="import_error">Import error</string>
   <string name="verified_sso_domain_verified">Verified SSO Domain Endpoint</string>
   <string name="logins_imported">Logins imported</string>
   <string name="remember_to_delete_your_imported_password_file_from_your_computer">Remember to delete your imported password file from your computer</string>
@@ -1087,4 +1089,29 @@
   <string name="bitwarden_can_notify_you_each_time_you_receive_a_new_login_request_from_another_device">Bitwarden can notify you each time you receive a new login request from another device.</string>
   <string name="skip_for_now">Skip for now</string>
   <string name="done_text">Done</string>
+  <string name="page_number_x_of_y">%1$s of %2$s</string>
+  <string name="copy_identity_name">Copy identity name</string>
+  <string name="copy_company">Copy company</string>
+  <string name="copy_ssn">Copy social security number</string>
+  <string name="copy_passport_number">Copy passport number</string>
+  <string name="copy_license_number">Copy license number</string>
+  <string name="copy_email">Copy email</string>
+  <string name="copy_phone">Copy phone number</string>
+  <string name="copy_address">Copy address</string>
+  <string name="biometrics_no_longer_supported_title">Biometrics are no longer supported on this device</string>
+  <string name="biometrics_no_longer_supported">You’ve been logged out because your device’s biometrics don’t meet the latest security requirements. To update settings, log in once again or contact your administrator for access.</string>
+  <string name="cxp_import">CXP Import</string>
+  <string name="cxp_export">CXP Export</string>
+  <string name="choose_three_or_four_random_words">Choose three or four random words</string>
+  <string name="pick_three_or_four_random_unrelated_words">Pick three or four random, unrelated words that you can easily remember. Think of objects, places, or things you like.</string>
+  <string name="pick_three_or_four_random_unrelated_words_highlight">objects, places, or things</string>
+  <string name="combine_those_words_together">Combine those words together</string>
+  <string name="put_the_words_together_in_any_order_to_form_your_passphrase">Put the words together in any order to form your passphrase. Use hyphens, spaces, or leave them as one long word—your choice!</string>
+  <string name="use_hyphens_spaces_or_leave_them_as_long_word_highlight">Use hyphens, spaces, or leave them as one long word</string>
+  <string name="make_it_yours">Make it yours</string>
+  <string name="add_a_number_or_symbol_to_make_it_even_stronger">Add a number or symbol to make it even stronger. Now you have a unique, secure, and memorable passphrase!</string>
+  <string name="add_a_number_or_symbol_highlight">Add a number or symbol</string>
+  <string name="need_some_inspiration">"Need some inspiration?"</string>
+  <string name="check_out_the_passphrase_generator">"Check out the passphrase generator"</string>
+  <string name="copied_to_clipboard">Copied to clipboard.</string>
 </resources>

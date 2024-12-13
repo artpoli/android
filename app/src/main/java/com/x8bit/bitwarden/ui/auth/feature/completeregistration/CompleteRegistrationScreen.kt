@@ -41,16 +41,15 @@ import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.handlers.CompleteRegistrationHandler
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.handlers.rememberCompleteRegistrationHandler
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenFilledButton
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenTextButton
 import com.x8bit.bitwarden.ui.platform.components.card.BitwardenActionCardSmall
+import com.x8bit.bitwarden.ui.platform.components.card.color.bitwardenCardColors
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenBasicDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenLoadingDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenTwoButtonDialog
-import com.x8bit.bitwarden.ui.platform.components.dialog.LoadingDialogState
 import com.x8bit.bitwarden.ui.platform.components.field.BitwardenPasswordField
 import com.x8bit.bitwarden.ui.platform.components.field.BitwardenTextField
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
@@ -105,7 +104,8 @@ fun CompleteRegistrationScreen(
     when (val dialog = state.dialog) {
         is CompleteRegistrationDialog.Error -> {
             BitwardenBasicDialog(
-                visibilityState = dialog.state,
+                title = dialog.title?.invoke(),
+                message = dialog.message(),
                 onDismissRequest = handler.onDismissErrorDialog,
             )
         }
@@ -123,9 +123,7 @@ fun CompleteRegistrationScreen(
         }
 
         CompleteRegistrationDialog.Loading -> {
-            BitwardenLoadingDialog(
-                visibilityState = LoadingDialogState.Shown(R.string.create_account.asText()),
-            )
+            BitwardenLoadingDialog(text = stringResource(id = R.string.create_account))
         }
 
         null -> Unit
@@ -214,6 +212,10 @@ private fun CompleteRegistrationContent(
                 actionIcon = rememberVectorPainter(id = R.drawable.ic_question_circle),
                 actionText = stringResource(id = R.string.what_makes_a_password_strong),
                 callToActionText = stringResource(id = R.string.learn_more),
+                callToActionTextColor = BitwardenTheme.colorScheme.text.interaction,
+                colors = bitwardenCardColors(
+                    containerColor = BitwardenTheme.colorScheme.background.primary,
+                ),
                 onCardClicked = handler.onMakeStrongPassword,
                 modifier = Modifier
                     .fillMaxWidth()
