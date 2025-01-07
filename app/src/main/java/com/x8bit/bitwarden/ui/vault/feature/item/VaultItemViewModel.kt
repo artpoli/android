@@ -116,11 +116,14 @@ class VaultItemViewModel @Inject constructor(
                             .data
                             .canAssignToCollections(cipherViewState.data?.collectionIds)
 
+                        val canEdit = cipherViewState.data?.edit == true
+
                         VaultItemStateData(
                             cipher = cipherViewState.data,
                             totpCodeItemData = totpCodeData,
                             canDelete = canDelete,
                             canAssociateToCollections = canAssignToCollections,
+                            canEdit = canEdit,
                         )
                     },
             )
@@ -790,6 +793,8 @@ class VaultItemViewModel @Inject constructor(
                 handlePrivateKeyVisibilityClicked(action)
             }
 
+            is VaultItemAction.ItemType.SshKey.CopyPrivateKeyClick -> handleCopyPrivateKeyClick()
+
             VaultItemAction.ItemType.SshKey.CopyFingerprintClick -> handleCopyFingerprintClick()
         }
     }
@@ -804,6 +809,16 @@ class VaultItemViewModel @Inject constructor(
         action: VaultItemAction.ItemType.SshKey.PrivateKeyVisibilityClicked,
     ) {
         onSshKeyContent { content, sshKey ->
+            if (content.common.requiresReprompt) {
+                updateDialogState(
+                    VaultItemState.DialogState.MasterPasswordDialog(
+                        action = PasswordRepromptAction.ViewPrivateKeyClicked(
+                            isVisible = action.isVisible,
+                        ),
+                    ),
+                )
+                return@onSshKeyContent
+            }
             mutableStateFlow.update { currentState ->
                 currentState.copy(
                     viewState = content.copy(
@@ -811,6 +826,20 @@ class VaultItemViewModel @Inject constructor(
                     ),
                 )
             }
+        }
+    }
+
+    private fun handleCopyPrivateKeyClick() {
+        onSshKeyContent { content, sshKey ->
+            if (content.common.requiresReprompt) {
+                updateDialogState(
+                    VaultItemState.DialogState.MasterPasswordDialog(
+                        action = PasswordRepromptAction.CopyClick(value = sshKey.privateKey),
+                    ),
+                )
+                return@onSshKeyContent
+            }
+            clipboardManager.setText(text = sshKey.privateKey)
         }
     }
 
@@ -1040,6 +1069,7 @@ class VaultItemViewModel @Inject constructor(
                 totpCodeItemData = this.data?.totpCodeItemData,
                 canDelete = this.data?.canDelete == true,
                 canAssignToCollections = this.data?.canAssociateToCollections == true,
+                canEdit = this.data?.canEdit == true,
             )
         }
         ?: VaultItemState.ViewState.Error(message = errorText)
@@ -1277,11 +1307,16 @@ data class VaultItemState(
             ?.currentCipher
             ?.deletedDate != null
 
+    private val isCipherEditable: Boolean
+        get() = viewState.asContentOrNull()
+            ?.common
+            ?.canEdit == true
+
     /**
      * Whether or not the fab is visible.
      */
     val isFabVisible: Boolean
-        get() = viewState is ViewState.Content && !isCipherDeleted
+        get() = viewState is ViewState.Content && !isCipherDeleted && isCipherEditable
 
     /**
      * Whether or not the cipher is in a collection.
@@ -1377,6 +1412,7 @@ data class VaultItemState(
                 val attachments: List<AttachmentItem>?,
                 val canDelete: Boolean,
                 val canAssignToCollections: Boolean,
+                val canEdit: Boolean,
             ) : Parcelable {
 
                 /**
@@ -1951,6 +1987,11 @@ sealed class VaultItemAction {
             data class PrivateKeyVisibilityClicked(val isVisible: Boolean) : SshKey()
 
             /**
+             * The user has clicked the copy button for the private key.
+             */
+            data object CopyPrivateKeyClick : SshKey()
+
+            /**
              * The user has clicked the copy button for the fingerprint.
              */
             data object CopyFingerprintClick : SshKey()
@@ -2230,5 +2271,19 @@ sealed class PasswordRepromptAction : Parcelable {
     data object RestoreItemClick : PasswordRepromptAction() {
         override val vaultItemAction: VaultItemAction
             get() = VaultItemAction.Common.RestoreVaultItemClick
+    }
+
+    /**
+     * Indicates that we should launch the
+     * [VaultItemAction.ItemType.SshKey.PrivateKeyVisibilityClicked] upon password validation.
+     */
+    @Parcelize
+    data class ViewPrivateKeyClicked(
+        val isVisible: Boolean,
+    ) : PasswordRepromptAction() {
+        override val vaultItemAction: VaultItemAction
+            get() = VaultItemAction.ItemType.SshKey.PrivateKeyVisibilityClicked(
+                isVisible = isVisible,
+            )
     }
 }

@@ -2546,6 +2546,18 @@ class VaultItemScreenTest : BaseComposeTest() {
     }
 
     @Test
+    fun `in ssh key state, on copy private key click should send CopyPrivateKeyClick`() {
+        mutableStateFlow.update { it.copy(viewState = DEFAULT_SSH_KEY_VIEW_STATE) }
+        composeTestRule
+            .onNodeWithContentDescriptionAfterScroll("Copy private key")
+            .performClick()
+
+        verify(exactly = 1) {
+            viewModel.trySendAction(VaultItemAction.ItemType.SshKey.CopyPrivateKeyClick)
+        }
+    }
+
+    @Test
     fun `in ssh key state, fingerprint should be displayed according to state`() {
         val fingerprint = "the fingerprint"
         mutableStateFlow.update { it.copy(viewState = DEFAULT_SSH_KEY_VIEW_STATE) }
@@ -2698,6 +2710,7 @@ private val DEFAULT_COMMON: VaultItemState.ViewState.Content.Common =
         ),
         canDelete = true,
         canAssignToCollections = true,
+        canEdit = true,
     )
 
 private val DEFAULT_PASSKEY = R.string.created_xy.asText(
@@ -2781,6 +2794,7 @@ private val EMPTY_COMMON: VaultItemState.ViewState.Content.Common =
         attachments = emptyList(),
         canDelete = true,
         canAssignToCollections = true,
+        canEdit = true,
     )
 
 private val EMPTY_LOGIN_TYPE: VaultItemState.ViewState.Content.ItemType.Login =
