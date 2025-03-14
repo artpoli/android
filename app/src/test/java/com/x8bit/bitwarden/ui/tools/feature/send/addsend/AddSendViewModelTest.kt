@@ -9,11 +9,11 @@ import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
-import com.x8bit.bitwarden.data.platform.manager.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
 import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
+import com.x8bit.bitwarden.data.platform.manager.network.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.model.DataState
 import com.x8bit.bitwarden.data.platform.repository.model.Environment
@@ -27,6 +27,7 @@ import com.x8bit.bitwarden.data.vault.repository.model.DeleteSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.RemovePasswordSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.UpdateSendResult
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
+import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.tools.feature.send.addsend.model.AddSendType
@@ -64,7 +65,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
         ZoneOffset.UTC,
     )
     private val clipboardManager: BitwardenClipboardManager = mockk {
-        every { setText(any<String>()) } just runs
+        every { setText(any<String>(), toastDescriptorOverride = any<Text>()) } just runs
     }
     private val mutableUserStateFlow = MutableStateFlow<UserState?>(DEFAULT_USER_STATE)
     private val authRepository: AuthRepository = mockk {
@@ -157,36 +158,6 @@ class AddSendViewModelTest : BaseViewModelTest() {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `SaveClick with createSend success should emit NavigateBack and ShowShareSheet when not an external shared`() =
-        runTest {
-            val viewState = DEFAULT_VIEW_STATE.copy(
-                common = DEFAULT_COMMON_STATE.copy(name = "input"),
-            )
-            val initialState = DEFAULT_STATE.copy(viewState = viewState)
-            val mockSendView = mockk<SendView>()
-            every { viewState.toSendView(clock) } returns mockSendView
-            val sendUrl = "www.test.com/send/test"
-            val resultSendView = mockk<SendView> {
-                every { toSendUrl(DEFAULT_ENVIRONMENT_URL) } returns sendUrl
-            }
-            coEvery {
-                vaultRepository.createSend(sendView = mockSendView, fileUri = null)
-            } returns CreateSendResult.Success(sendView = resultSendView)
-            val viewModel = createViewModel(initialState)
-
-            viewModel.eventFlow.test {
-                viewModel.trySendAction(AddSendAction.SaveClick)
-                assertEquals(AddSendEvent.NavigateBack, awaitItem())
-                assertEquals(AddSendEvent.ShowShareSheet(sendUrl), awaitItem())
-            }
-            assertEquals(initialState, viewModel.stateFlow.value)
-            coVerify(exactly = 1) {
-                vaultRepository.createSend(sendView = mockSendView, fileUri = null)
-            }
-        }
-
-    @Suppress("MaxLineLength")
-    @Test
     fun `SaveClick with createSend success should copy the send URL to the clipboard and emit NavigateBack`() =
         runTest {
             val viewState = DEFAULT_VIEW_STATE.copy(
@@ -211,12 +182,15 @@ class AddSendViewModelTest : BaseViewModelTest() {
             viewModel.eventFlow.test {
                 viewModel.trySendAction(AddSendAction.SaveClick)
                 assertEquals(AddSendEvent.NavigateBack, awaitItem())
+                assertEquals(
+                    AddSendEvent.ShowShareSheet(message = "www.test.com/send/test"),
+                    awaitItem(),
+                )
             }
             assertEquals(initialState, viewModel.stateFlow.value)
             coVerify(exactly = 1) {
                 vaultRepository.createSend(sendView = mockSendView, fileUri = null)
                 specialCircumstanceManager.specialCircumstance = null
-                clipboardManager.setText(sendUrl)
             }
         }
 
@@ -246,12 +220,15 @@ class AddSendViewModelTest : BaseViewModelTest() {
             viewModel.eventFlow.test {
                 viewModel.trySendAction(AddSendAction.SaveClick)
                 assertEquals(AddSendEvent.ExitApp, awaitItem())
+                assertEquals(
+                    AddSendEvent.ShowShareSheet(message = "www.test.com/send/test"),
+                    awaitItem(),
+                )
             }
             assertEquals(initialState, viewModel.stateFlow.value)
             coVerify(exactly = 1) {
                 vaultRepository.createSend(sendView = mockSendView, fileUri = null)
                 specialCircumstanceManager.specialCircumstance = null
-                clipboardManager.setText(sendUrl)
             }
         }
 
@@ -492,7 +469,10 @@ class AddSendViewModelTest : BaseViewModelTest() {
         viewModel.trySendAction(AddSendAction.CopyLinkClick)
 
         verify(exactly = 1) {
-            clipboardManager.setText(sendUrl)
+            clipboardManager.setText(
+                text = sendUrl,
+                toastDescriptorOverride = R.string.send_link.asText(),
+            )
         }
     }
 
@@ -746,47 +726,6 @@ class AddSendViewModelTest : BaseViewModelTest() {
                     ),
                 ),
             ),
-            viewModel.stateFlow.value,
-        )
-    }
-
-    @Test
-    fun `ExpirationDateChange should store the new expiration date`() {
-        val viewModel = createViewModel()
-        val newDeletionDate = ZonedDateTime.parse("2024-09-13T00:00Z")
-        // DEFAULT expiration date is null
-        assertEquals(DEFAULT_STATE, viewModel.stateFlow.value)
-
-        viewModel.trySendAction(AddSendAction.ExpirationDateChange(newDeletionDate))
-
-        assertEquals(
-            DEFAULT_STATE.copy(
-                viewState = DEFAULT_VIEW_STATE.copy(
-                    common = DEFAULT_COMMON_STATE.copy(
-                        expirationDate = newDeletionDate,
-                    ),
-                ),
-            ),
-            viewModel.stateFlow.value,
-        )
-    }
-
-    @Test
-    fun `ClearExpirationDate should clear the expiration date`() {
-        val initialState = DEFAULT_STATE.copy(
-            viewState = DEFAULT_VIEW_STATE.copy(
-                DEFAULT_COMMON_STATE.copy(
-                    expirationDate = ZonedDateTime.parse("2024-09-13T00:00Z"),
-                ),
-            ),
-        )
-        val viewModel = createViewModel(initialState)
-
-        viewModel.trySendAction(AddSendAction.ClearExpirationDate)
-
-        assertEquals(
-            // DEFAULT expiration date is null
-            DEFAULT_STATE,
             viewModel.stateFlow.value,
         )
     }

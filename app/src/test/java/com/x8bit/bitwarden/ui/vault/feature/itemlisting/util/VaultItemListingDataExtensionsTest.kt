@@ -3,6 +3,7 @@ package com.x8bit.bitwarden.ui.vault.feature.itemlisting.util
 import android.content.pm.SigningInfo
 import android.net.Uri
 import com.bitwarden.send.SendType
+import com.bitwarden.send.SendView
 import com.bitwarden.vault.CipherRepromptType
 import com.bitwarden.vault.CipherType
 import com.bitwarden.vault.CipherView
@@ -464,7 +465,6 @@ class VaultItemListingDataExtensionsTest {
             fido2CredentialAutofillViews = null,
             totpData = null,
             isPremiumUser = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -558,7 +558,6 @@ class VaultItemListingDataExtensionsTest {
             fido2CredentialAutofillViews = fido2CredentialAutofillViews,
             totpData = null,
             isPremiumUser = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -645,7 +644,6 @@ class VaultItemListingDataExtensionsTest {
             fido2CredentialAutofillViews = fido2CredentialAutofillViews,
             totpData = null,
             isPremiumUser = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -689,10 +687,9 @@ class VaultItemListingDataExtensionsTest {
         // Trash
         assertEquals(
             VaultItemListingState.ViewState.NoItems(
-                header = R.string.save_and_protect_your_data.asText(),
                 message = R.string.no_items_trash.asText(),
                 shouldShowAddButton = false,
-                buttonText = R.string.add_an_item.asText(),
+                buttonText = R.string.new_item.asText(),
             ),
             vaultData.toViewState(
                 itemListingType = VaultItemListingState.ItemListingType.Vault.Trash,
@@ -705,17 +702,15 @@ class VaultItemListingDataExtensionsTest {
                 fido2CredentialAutofillViews = null,
                 totpData = null,
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
             ),
         )
 
         // Folders
         assertEquals(
             VaultItemListingState.ViewState.NoItems(
-                header = R.string.save_and_protect_your_data.asText(),
                 message = R.string.no_items_folder.asText(),
-                shouldShowAddButton = false,
-                buttonText = R.string.add_an_item.asText(),
+                shouldShowAddButton = true,
+                buttonText = R.string.new_item.asText(),
             ),
             vaultData.toViewState(
                 itemListingType = VaultItemListingState.ItemListingType.Vault.Folder(
@@ -730,17 +725,15 @@ class VaultItemListingDataExtensionsTest {
                 fido2CredentialAutofillViews = null,
                 totpData = null,
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
             ),
         )
 
         // SSH keys
         assertEquals(
             VaultItemListingState.ViewState.NoItems(
-                header = R.string.save_and_protect_your_data.asText(),
-                message = R.string.no_items.asText(),
+                message = R.string.no_ssh_keys.asText(),
                 shouldShowAddButton = false,
-                buttonText = R.string.add_an_item.asText(),
+                buttonText = R.string.new_ssh_key.asText(),
             ),
             vaultData.toViewState(
                 itemListingType = VaultItemListingState.ItemListingType.Vault.SshKey,
@@ -753,17 +746,16 @@ class VaultItemListingDataExtensionsTest {
                 fido2CredentialAutofillViews = null,
                 totpData = null,
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
             ),
         )
 
         // Other ciphers
+        // Login Type
         assertEquals(
             VaultItemListingState.ViewState.NoItems(
-                header = R.string.save_and_protect_your_data.asText(),
-                message = R.string.no_items.asText(),
+                message = R.string.no_logins.asText(),
                 shouldShowAddButton = true,
-                buttonText = R.string.add_an_item.asText(),
+                buttonText = R.string.new_login.asText(),
             ),
             vaultData.toViewState(
                 itemListingType = VaultItemListingState.ItemListingType.Vault.Login,
@@ -776,17 +768,78 @@ class VaultItemListingDataExtensionsTest {
                 fido2CredentialAutofillViews = null,
                 totpData = null,
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
+            ),
+        )
+
+        // Card type
+        assertEquals(
+            VaultItemListingState.ViewState.NoItems(
+                message = R.string.no_cards.asText(),
+                shouldShowAddButton = true,
+                buttonText = R.string.new_card.asText(),
+            ),
+            vaultData.toViewState(
+                itemListingType = VaultItemListingState.ItemListingType.Vault.Card,
+                vaultFilterType = VaultFilterType.AllVaults,
+                hasMasterPassword = true,
+                baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
+                isIconLoadingDisabled = false,
+                autofillSelectionData = null,
+                fido2CreationData = null,
+                fido2CredentialAutofillViews = null,
+                totpData = null,
+                isPremiumUser = true,
+            ),
+        )
+
+        // Secure note type
+        assertEquals(
+            VaultItemListingState.ViewState.NoItems(
+                message = R.string.no_notes.asText(),
+                shouldShowAddButton = true,
+                buttonText = R.string.new_note.asText(),
+            ),
+            vaultData.toViewState(
+                itemListingType = VaultItemListingState.ItemListingType.Vault.SecureNote,
+                vaultFilterType = VaultFilterType.AllVaults,
+                hasMasterPassword = true,
+                baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
+                isIconLoadingDisabled = false,
+                autofillSelectionData = null,
+                fido2CreationData = null,
+                fido2CredentialAutofillViews = null,
+                totpData = null,
+                isPremiumUser = true,
+            ),
+        )
+
+        // Identity type
+        assertEquals(
+            VaultItemListingState.ViewState.NoItems(
+                message = R.string.no_identities.asText(),
+                shouldShowAddButton = true,
+                buttonText = R.string.new_identity.asText(),
+            ),
+            vaultData.toViewState(
+                itemListingType = VaultItemListingState.ItemListingType.Vault.Identity,
+                vaultFilterType = VaultFilterType.AllVaults,
+                hasMasterPassword = true,
+                baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
+                isIconLoadingDisabled = false,
+                autofillSelectionData = null,
+                fido2CreationData = null,
+                fido2CredentialAutofillViews = null,
+                totpData = null,
+                isPremiumUser = true,
             ),
         )
 
         // Autofill
         assertEquals(
             VaultItemListingState.ViewState.NoItems(
-                header = R.string.save_and_protect_your_data.asText(),
                 message = R.string.no_items_for_uri.asText("www.test.com"),
                 shouldShowAddButton = true,
-                buttonText = R.string.add_an_item.asText(),
+                buttonText = R.string.new_login.asText(),
             ),
             vaultData.toViewState(
                 itemListingType = VaultItemListingState.ItemListingType.Vault.Login,
@@ -803,14 +856,12 @@ class VaultItemListingDataExtensionsTest {
                 fido2CredentialAutofillViews = null,
                 totpData = null,
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
             ),
         )
 
         // Autofill passkey
         assertEquals(
             VaultItemListingState.ViewState.NoItems(
-                header = R.string.save_and_protect_your_data.asText(),
                 message = R.string.no_items_for_uri.asText("www.test.com"),
                 shouldShowAddButton = true,
                 buttonText = R.string.save_passkey_as_new_login.asText(),
@@ -828,11 +879,11 @@ class VaultItemListingDataExtensionsTest {
                     packageName = "",
                     signingInfo = SigningInfo(),
                     origin = "https://www.test.com",
+                    isUserVerified = true,
                 ),
                 fido2CredentialAutofillViews = null,
                 totpData = null,
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
             ),
         )
 
@@ -842,7 +893,7 @@ class VaultItemListingDataExtensionsTest {
                 header = R.string.no_items_for_vault.asText("issuer"),
                 message = R.string.search_for_a_login_or_add_a_new_login.asText(),
                 shouldShowAddButton = false,
-                buttonText = R.string.add_an_item.asText(),
+                buttonText = R.string.new_item.asText(),
                 vectorRes = R.drawable.img_folder_question,
             ),
             vaultData.toViewState(
@@ -859,7 +910,6 @@ class VaultItemListingDataExtensionsTest {
                     every { issuer } returns "issuer"
                 },
                 isPremiumUser = true,
-                organizationPremiumStatusMap = emptyMap(),
             ),
         )
     }
@@ -872,6 +922,7 @@ class VaultItemListingDataExtensionsTest {
         )
 
         val result = sendViewList.toViewState(
+            itemListingType = VaultItemListingState.ItemListingType.Send.SendFile,
             baseWebSendUrl = Environment.Us.environmentUrlData.baseWebSendUrl,
             clock = clock,
         )
@@ -884,6 +935,42 @@ class VaultItemListingDataExtensionsTest {
                     createMockDisplayItemForSend(number = 2, sendType = SendType.TEXT),
                 ),
                 displayFolderList = emptyList(),
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `toViewState should return NoLogins state for empty SendFile list`() {
+        val result = emptyList<SendView>().toViewState(
+            itemListingType = VaultItemListingState.ItemListingType.Send.SendFile,
+            baseWebSendUrl = Environment.Us.environmentUrlData.baseWebSendUrl,
+            clock = clock,
+        )
+
+        assertEquals(
+            VaultItemListingState.ViewState.NoItems(
+                message = R.string.no_file_sends.asText(),
+                shouldShowAddButton = true,
+                buttonText = R.string.new_file_send.asText(),
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `toViewState should return NoLogins state for empty SendText list`() {
+        val result = emptyList<SendView>().toViewState(
+            itemListingType = VaultItemListingState.ItemListingType.Send.SendText,
+            baseWebSendUrl = Environment.Us.environmentUrlData.baseWebSendUrl,
+            clock = clock,
+        )
+
+        assertEquals(
+            VaultItemListingState.ViewState.NoItems(
+                message = R.string.no_text_sends.asText(),
+                shouldShowAddButton = true,
+                buttonText = R.string.new_text_send.asText(),
             ),
             result,
         )
@@ -915,6 +1002,7 @@ class VaultItemListingDataExtensionsTest {
             VaultItemListingState.ItemListingType.Vault.Folder(
                 folderId = "mockId-1",
                 folderName = "mockName-1",
+                fullyQualifiedName = "mockName-1",
             ),
             result,
         )
@@ -1064,7 +1152,6 @@ class VaultItemListingDataExtensionsTest {
             fido2CredentialAutofillViews = null,
             totpData = null,
             isPremiumUser = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -1109,7 +1196,6 @@ class VaultItemListingDataExtensionsTest {
             fido2CredentialAutofillViews = null,
             totpData = null,
             isPremiumUser = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(

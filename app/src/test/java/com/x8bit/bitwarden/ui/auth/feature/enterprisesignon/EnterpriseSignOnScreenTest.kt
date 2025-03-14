@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -16,6 +17,7 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
+import com.x8bit.bitwarden.ui.util.assertNoPopupExists
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -45,7 +47,9 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
 
     @Before
     fun setup() {
-        composeTestRule.setContent {
+        setContent(
+            intentManager = intentManager,
+        ) {
             EnterpriseSignOnScreen(
                 onNavigateBack = { onNavigateBackCalled = true },
                 onNavigateToSetPassword = { onNavigateToSetPasswordCalled = true },
@@ -53,7 +57,6 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
                     onNavigateToTwoFactorLoginEmailAndOrgIdentifier = email to orgIdentifier
                 },
                 viewModel = viewModel,
-                intentManager = intentManager,
             )
         }
     }
@@ -141,6 +144,7 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
         mutableStateFlow.update {
             it.copy(
                 dialogState = EnterpriseSignOnState.DialogState.Error(
+                    title = "Error dialog title".asText(),
                     message = "Error dialog message".asText(),
                 ),
             )
@@ -149,7 +153,7 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
         composeTestRule.onNode(isDialog()).assertIsDisplayed()
 
         composeTestRule
-            .onNodeWithText("An error has occurred.")
+            .onNodeWithText("Error dialog title")
             .assert(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -164,7 +168,7 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
 
     @Test
     fun `loading dialog should be displayed according to state`() {
-        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+        composeTestRule.assertNoPopupExists()
         composeTestRule.onNodeWithText("Loading").assertDoesNotExist()
 
         mutableStateFlow.update {
@@ -178,7 +182,7 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
         composeTestRule
             .onNodeWithText("Loading")
             .assertIsDisplayed()
-            .assert(hasAnyAncestor(isDialog()))
+            .assert(hasAnyAncestor(isPopup()))
     }
 
     @Test
@@ -186,6 +190,7 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
         mutableStateFlow.update {
             DEFAULT_STATE.copy(
                 dialogState = EnterpriseSignOnState.DialogState.Error(
+                    title = "title".asText(),
                     message = "message".asText(),
                 ),
             )

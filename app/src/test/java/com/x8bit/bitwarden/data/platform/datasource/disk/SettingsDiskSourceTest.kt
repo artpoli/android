@@ -4,12 +4,15 @@ import androidx.core.content.edit
 import app.cash.turbine.test
 import com.x8bit.bitwarden.data.platform.base.FakeSharedPreferences
 import com.x8bit.bitwarden.data.platform.datasource.network.di.PlatformNetworkModule
+import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
 import com.x8bit.bitwarden.data.platform.repository.model.ClearClipboardFrequency
 import com.x8bit.bitwarden.data.platform.repository.model.UriMatchType
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
+import com.x8bit.bitwarden.data.platform.util.decodeFromStringOrNull
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppLanguage
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -49,6 +52,20 @@ class SettingsDiskSourceTest {
             expected,
             actual,
         )
+    }
+
+    @Test
+    fun `appLanguageFlow should react to changes in appLanguage`() = runTest {
+        val appLanguage = AppLanguage.ENGLISH_BRITISH
+        settingsDiskSource.appLanguageFlow.test {
+            // The initial values of the Flow and the property are in sync
+            assertNull(settingsDiskSource.appLanguage)
+            assertNull(awaitItem())
+
+            // Updating the repository updates shared preferences
+            settingsDiskSource.appLanguage = appLanguage
+            assertEquals(appLanguage, awaitItem())
+        }
     }
 
     @Test
@@ -1238,5 +1255,114 @@ class SettingsDiskSourceTest {
         val createActionCountKey = "bwPreferencesStorage:createActionCount"
         settingsDiskSource.storeCreateSendActionCount(count = 1)
         assertEquals(1, fakeSharedPreferences.getInt(createActionCountKey, 0))
+    }
+
+    @Test
+    fun `getShouldShowAddLoginCoachMark should pull value from SharedPreferences`() {
+        val hasSeenAddLoginCoachMarkKey = "bwPreferencesStorage:shouldShowAddLoginCoachMark"
+        fakeSharedPreferences.edit { putBoolean(hasSeenAddLoginCoachMarkKey, true) }
+        assertTrue(settingsDiskSource.getShouldShowAddLoginCoachMark() == true)
+    }
+
+    @Test
+    fun `storeShouldShowAddLoginCoachMark should update SharedPreferences`() {
+        val hasSeenAddLoginCoachMarkKey = "bwPreferencesStorage:shouldShowAddLoginCoachMark"
+        settingsDiskSource.storeShouldShowAddLoginCoachMark(shouldShow = true)
+        assertTrue(
+            fakeSharedPreferences.getBoolean(
+                key = hasSeenAddLoginCoachMarkKey,
+                defaultValue = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `getShouldShowAddLoginCoachMarkFlow emits changes to stored value`() = runTest {
+        settingsDiskSource.getShouldShowAddLoginCoachMarkFlow().test {
+            assertNull(awaitItem())
+            settingsDiskSource.storeShouldShowAddLoginCoachMark(shouldShow = false)
+            assertFalse(awaitItem() ?: true)
+            settingsDiskSource.storeShouldShowAddLoginCoachMark(shouldShow = true)
+            assertTrue(awaitItem() ?: false)
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `getShouldShowGeneratorCoachMarkGeneratorCoachMark should pull value from SharedPreferences`() {
+        val hasSeenGeneratorCoachMarkKey = "bwPreferencesStorage:shouldShowGeneratorCoachMark"
+        fakeSharedPreferences.edit { putBoolean(hasSeenGeneratorCoachMarkKey, true) }
+        assertTrue(settingsDiskSource.getShouldShowGeneratorCoachMark() == true)
+    }
+
+    @Test
+    fun `storeShouldShowGeneratorCoachMarkGeneratorCoachMark should update SharedPreferences`() {
+        val hasSeenGeneratorCoachMarkKey = "bwPreferencesStorage:shouldShowGeneratorCoachMark"
+        settingsDiskSource.storeShouldShowGeneratorCoachMark(shouldShow = true)
+        assertTrue(
+            fakeSharedPreferences.getBoolean(
+                key = hasSeenGeneratorCoachMarkKey,
+                defaultValue = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `getShouldShowGeneratorCoachMarkFlow emits changes to stored value`() = runTest {
+        settingsDiskSource.getShouldShowGeneratorCoachMarkFlow().test {
+            assertNull(awaitItem())
+            settingsDiskSource.storeShouldShowGeneratorCoachMark(shouldShow = false)
+            assertFalse(awaitItem() ?: true)
+            settingsDiskSource.storeShouldShowGeneratorCoachMark(shouldShow = true)
+            assertTrue(awaitItem() ?: false)
+        }
+    }
+
+    @Test
+    fun `getAppResumeScreen should pull from SharedPreferences`() {
+        val mockUserId = "mockUserId"
+        val resumeScreenKey = "bwPreferencesStorage:resumeScreen_$mockUserId"
+        val expectedData = AppResumeScreenData.GeneratorScreen
+        fakeSharedPreferences.edit {
+            putString(
+                resumeScreenKey,
+                json.encodeToString<AppResumeScreenData>(expectedData),
+            )
+        }
+        assertEquals(expectedData, settingsDiskSource.getAppResumeScreen(mockUserId))
+    }
+
+    @Test
+    fun `storeAppResumeScreen should update SharedPreferences`() {
+        val mockUserId = "mockUserId"
+        val resumeScreenKey = "bwPreferencesStorage:resumeScreen_$mockUserId"
+        val expectedData = AppResumeScreenData.GeneratorScreen
+        settingsDiskSource.storeAppResumeScreen(mockUserId, expectedData)
+        assertEquals(
+            expectedData,
+            fakeSharedPreferences.getString(resumeScreenKey, "")?.let {
+                Json.decodeFromStringOrNull<AppResumeScreenData>(it)
+            },
+        )
+    }
+
+    @Test
+    fun `storeAppResumeScreen should save null when passed`() {
+        val mockUserId = "mockUserId"
+        val resumeScreenKey = "bwPreferencesStorage:resumeScreen_$mockUserId"
+        val expectedData = AppResumeScreenData.GeneratorScreen
+        settingsDiskSource.storeAppResumeScreen(mockUserId, expectedData)
+        assertEquals(
+            expectedData,
+            fakeSharedPreferences.getString(resumeScreenKey, "")?.let {
+                Json.decodeFromStringOrNull<AppResumeScreenData>(it)
+            },
+        )
+        settingsDiskSource.storeAppResumeScreen(mockUserId, null)
+        assertNull(
+            fakeSharedPreferences.getString(resumeScreenKey, "")?.let {
+                Json.decodeFromStringOrNull<AppResumeScreenData>(it)
+            },
+        )
     }
 }

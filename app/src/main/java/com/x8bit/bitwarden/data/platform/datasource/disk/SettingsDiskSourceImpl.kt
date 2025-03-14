@@ -1,6 +1,7 @@
 package com.x8bit.bitwarden.data.platform.datasource.disk
 
 import android.content.SharedPreferences
+import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
 import com.x8bit.bitwarden.data.platform.repository.model.UriMatchType
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
@@ -10,7 +11,6 @@ import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppThem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.onSubscription
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
 
@@ -40,6 +40,9 @@ private const val IS_VAULT_REGISTERED_FOR_EXPORT = "isVaultRegisteredForExport"
 private const val ADD_ACTION_COUNT = "addActionCount"
 private const val COPY_ACTION_COUNT = "copyActionCount"
 private const val CREATE_ACTION_COUNT = "createActionCount"
+private const val SHOULD_SHOW_ADD_LOGIN_COACH_MARK = "shouldShowAddLoginCoachMark"
+private const val SHOULD_SHOW_GENERATOR_COACH_MARK = "shouldShowGeneratorCoachMark"
+private const val RESUME_SCREEN = "resumeScreen"
 
 /**
  * Primary implementation of [SettingsDiskSource].
@@ -50,6 +53,7 @@ class SettingsDiskSourceImpl(
     private val json: Json,
 ) : BaseDiskSource(sharedPreferences = sharedPreferences),
     SettingsDiskSource {
+    private val mutableAppLanguageFlow = bufferedMutableSharedFlow<AppLanguage?>(replay = 1)
     private val mutableAppThemeFlow = bufferedMutableSharedFlow<AppTheme>(replay = 1)
 
     private val mutableLastSyncFlowMap = mutableMapOf<String, MutableSharedFlow<Instant?>>()
@@ -78,6 +82,10 @@ class SettingsDiskSourceImpl(
 
     private val mutableHasUserLoggedInOrCreatedAccountFlow = bufferedMutableSharedFlow<Boolean?>()
 
+    private val mutableHasSeenAddLoginCoachMarkFlow = bufferedMutableSharedFlow<Boolean?>()
+
+    private val mutableHasSeenGeneratorCoachMarkFlow = bufferedMutableSharedFlow<Boolean?>()
+
     private val mutableScreenCaptureAllowedFlowMap =
         mutableMapOf<String, MutableSharedFlow<Boolean?>>()
 
@@ -94,7 +102,11 @@ class SettingsDiskSourceImpl(
                 key = APP_LANGUAGE_KEY,
                 value = value?.localeName,
             )
+            mutableAppLanguageFlow.tryEmit(value)
         }
+
+    override val appLanguageFlow: Flow<AppLanguage?>
+        get() = mutableAppLanguageFlow.onSubscription { emit(appLanguage) }
 
     override var initialAutofillDialogShown: Boolean?
         get() = getBoolean(key = INITIAL_AUTOFILL_DIALOG_SHOWN)
@@ -175,12 +187,15 @@ class SettingsDiskSourceImpl(
         storeClearClipboardFrequencySeconds(userId = userId, frequency = null)
         removeWithPrefix(prefix = ACCOUNT_BIOMETRIC_INTEGRITY_VALID_KEY.appendIdentifier(userId))
         storeVaultRegisteredForExport(userId = userId, isRegistered = null)
+        storeAppResumeScreen(userId = userId, screenData = null)
 
         // The following are intentionally not cleared so they can be
         // restored after logging out and back in:
         // - screen capture allowed
         // - show autofill setting badge
         // - show unlock setting badge
+        // - should show add login coach mark
+        // - should show generator coach mark
     }
 
     override fun getAccountBiometricIntegrityValidity(
@@ -481,6 +496,48 @@ class SettingsDiskSourceImpl(
             value = count,
         )
     }
+
+    override fun getShouldShowAddLoginCoachMark(): Boolean? =
+        getBoolean(key = SHOULD_SHOW_ADD_LOGIN_COACH_MARK)
+
+    override fun storeShouldShowAddLoginCoachMark(shouldShow: Boolean?) {
+        putBoolean(
+            key = SHOULD_SHOW_ADD_LOGIN_COACH_MARK,
+            value = shouldShow,
+        )
+        mutableHasSeenAddLoginCoachMarkFlow.tryEmit(shouldShow)
+    }
+
+    override fun getShouldShowAddLoginCoachMarkFlow(): Flow<Boolean?> =
+        mutableHasSeenAddLoginCoachMarkFlow.onSubscription {
+            emit(getBoolean(key = SHOULD_SHOW_ADD_LOGIN_COACH_MARK))
+        }
+
+    override fun getShouldShowGeneratorCoachMark(): Boolean? =
+        getBoolean(key = SHOULD_SHOW_GENERATOR_COACH_MARK)
+
+    override fun storeShouldShowGeneratorCoachMark(shouldShow: Boolean?) {
+        putBoolean(
+            key = SHOULD_SHOW_GENERATOR_COACH_MARK,
+            value = shouldShow,
+        )
+        mutableHasSeenGeneratorCoachMarkFlow.tryEmit(shouldShow)
+    }
+
+    override fun getShouldShowGeneratorCoachMarkFlow(): Flow<Boolean?> =
+        mutableHasSeenGeneratorCoachMarkFlow.onSubscription {
+            emit(getShouldShowGeneratorCoachMark())
+        }
+
+    override fun storeAppResumeScreen(userId: String, screenData: AppResumeScreenData?) {
+        putString(
+            key = RESUME_SCREEN.appendIdentifier(userId),
+            value = screenData?.let { json.encodeToString(it) },
+        )
+    }
+
+    override fun getAppResumeScreen(userId: String): AppResumeScreenData? =
+        getString(RESUME_SCREEN.appendIdentifier(userId))?.let { json.decodeFromStringOrNull(it) }
 
     private fun getMutableLastSyncFlow(
         userId: String,

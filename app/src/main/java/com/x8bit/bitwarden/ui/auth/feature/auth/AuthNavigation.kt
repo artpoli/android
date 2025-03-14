@@ -83,9 +83,6 @@ fun NavGraphBuilder.authGraph(
         )
         checkEmailDestination(
             onNavigateBack = { navController.popBackStack() },
-            onNavigateBackToLanding = {
-                navController.popBackStack(route = LANDING_ROUTE, inclusive = false)
-            },
         )
         completeRegistrationDestination(
             onNavigateBack = { navController.popBackStack() },
@@ -153,11 +150,12 @@ fun NavGraphBuilder.authGraph(
                     loginType = LoginWithDeviceType.OTHER_DEVICE,
                 )
             },
-            onNavigateToTwoFactorLogin = { emailAddress, password ->
+            onNavigateToTwoFactorLogin = { emailAddress, password, isNewDeviceVerification ->
                 navController.navigateToTwoFactorLogin(
                     emailAddress = emailAddress,
                     password = password,
                     orgIdentifier = null,
+                    isNewDeviceVerification = isNewDeviceVerification,
                 )
             },
         )

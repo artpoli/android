@@ -6,6 +6,7 @@ import app.cash.turbine.test
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.UserFingerprintResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
@@ -24,8 +25,9 @@ import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
 import com.x8bit.bitwarden.data.platform.repository.util.FakeEnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.data.platform.util.isBuildVersionBelow
+import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
 import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
+import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson.Policy
 import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockPolicy
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
@@ -81,7 +83,8 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         every { firstTimeStateFlow } returns mutableFirstTimeStateFlow
         every { storeShowUnlockSettingBadge(any()) } just runs
     }
-    private val mutableActivePolicyFlow = bufferedMutableSharedFlow<List<SyncResponseJson.Policy>>()
+    private val mutableActivePolicyFlow = bufferedMutableSharedFlow<List<Policy>>()
+    private val mutableRemovePinPolicyFlow = bufferedMutableSharedFlow<List<Policy>>()
     private val biometricsEncryptionManager: BiometricsEncryptionManager = mockk {
         every { createCipherOrNull(DEFAULT_USER_STATE.activeUserId) } returns CIPHER
         every { getOrCreateCipher(DEFAULT_USER_STATE.activeUserId) } returns CIPHER
@@ -96,6 +99,9 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         every {
             getActivePoliciesFlow(type = PolicyTypeJson.MAXIMUM_VAULT_TIMEOUT)
         } returns mutableActivePolicyFlow
+        every {
+            getActivePoliciesFlow(type = PolicyTypeJson.REMOVE_UNLOCK_WITH_PIN)
+        } returns mutableRemovePinPolicyFlow
     }
     private val featureFlagManager: FeatureFlagManager = mockk(relaxed = true) {
         every { getFeatureFlag(FlagKey.AuthenticatorSync) } returns false
@@ -158,6 +164,102 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                 DEFAULT_STATE.copy(
                     vaultTimeoutPolicyMinutes = 10,
                     vaultTimeoutPolicyAction = "lock",
+                ),
+                awaitItem(),
+            )
+        }
+    }
+
+    @Test
+    fun `state updates when remove pin policies change`() = runTest {
+        val viewModel = createViewModel()
+
+        mutableRemovePinPolicyFlow.emit(
+            listOf(
+                createMockPolicy(
+                    isEnabled = true,
+                    type = PolicyTypeJson.REMOVE_UNLOCK_WITH_PIN,
+                    organizationId = "organizationUser",
+                    ),
+            ),
+        )
+
+        viewModel.stateFlow.test {
+            assertEquals(
+                DEFAULT_STATE.copy(
+                    removeUnlockWithPinPolicyEnabled = true,
+                ),
+                awaitItem(),
+            )
+        }
+    }
+
+    @Test
+    fun `remove pin policy is true when user role is ADMIN`() = runTest {
+        val viewModel = createViewModel()
+
+        mutableRemovePinPolicyFlow.emit(
+            listOf(
+                createMockPolicy(
+                    organizationId = "organizationAdmin",
+                    isEnabled = true,
+                    type = PolicyTypeJson.REMOVE_UNLOCK_WITH_PIN,
+                ),
+            ),
+        )
+
+        viewModel.stateFlow.test {
+            assertEquals(
+                DEFAULT_STATE.copy(
+                    removeUnlockWithPinPolicyEnabled = true,
+                ),
+                awaitItem(),
+            )
+        }
+    }
+
+    @Test
+    fun `remove pin policy is true when user role is OWNER`() = runTest {
+        val viewModel = createViewModel()
+
+        mutableRemovePinPolicyFlow.emit(
+            listOf(
+                createMockPolicy(
+                    organizationId = "organizationOwner",
+                    isEnabled = true,
+                    type = PolicyTypeJson.REMOVE_UNLOCK_WITH_PIN,
+                ),
+            ),
+        )
+
+        viewModel.stateFlow.test {
+            assertEquals(
+                DEFAULT_STATE.copy(
+                    removeUnlockWithPinPolicyEnabled = true,
+                ),
+                awaitItem(),
+            )
+        }
+    }
+
+    @Test
+    fun `remove pin policy is true when user role is CUSTOM with manage policies`() = runTest {
+        val viewModel = createViewModel()
+
+        mutableRemovePinPolicyFlow.emit(
+            listOf(
+                createMockPolicy(
+                    organizationId = "organizationCustom",
+                    isEnabled = true,
+                    type = PolicyTypeJson.REMOVE_UNLOCK_WITH_PIN,
+                ),
+            ),
+        )
+
+        viewModel.stateFlow.test {
+            assertEquals(
+                DEFAULT_STATE.copy(
+                    removeUnlockWithPinPolicyEnabled = true,
                 ),
                 awaitItem(),
             )
@@ -385,7 +487,7 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
             viewModel.trySendAction(AccountSecurityAction.EnableBiometricsClick)
 
             assertEquals(
-                AccountSecurityEvent.ShowBiometricsPrompt(CIPHER),
+                AccountSecurityEvent.ShowBiometricsPrompt(cipher = CIPHER),
                 awaitItem(),
             )
         }
@@ -426,41 +528,46 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         )
     }
 
+    @Suppress("MaxLineLength")
     @Test
-    fun `on UnlockWithBiometricToggle false should call clearBiometricsKey and update the state`() =
+    fun `on UnlockWithBiometricToggleDisabled should call clearBiometricsKey and update the state`() =
         runTest {
             val initialState = DEFAULT_STATE.copy(isUnlockWithBiometricsEnabled = true)
             every { settingsRepository.isUnlockWithBiometricsEnabled } returns true
-            every { settingsRepository.clearBiometricsKey() } just runs
+            every {
+                biometricsEncryptionManager.clearBiometrics(userId = DEFAULT_USER_ID)
+            } just runs
             val viewModel = createViewModel(initialState)
             assertEquals(initialState, viewModel.stateFlow.value)
 
-            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggle(false))
+            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggleDisabled)
 
             assertEquals(
                 initialState.copy(isUnlockWithBiometricsEnabled = false),
                 viewModel.stateFlow.value,
             )
             verify(exactly = 1) {
-                settingsRepository.clearBiometricsKey()
+                biometricsEncryptionManager.clearBiometrics(userId = DEFAULT_USER_ID)
             }
         }
 
     @Suppress("MaxLineLength")
     @Test
-    fun `on UnlockWithBiometricToggle false should call clearBiometricsKey, reset the vaultTimeoutAction, and update the state`() =
+    fun `on UnlockWithBiometricToggleDisabled should call clearBiometricsKey, reset the vaultTimeoutAction, and update the state`() =
         runTest {
             val initialState = DEFAULT_STATE.copy(
                 isUnlockWithPasswordEnabled = false,
                 isUnlockWithBiometricsEnabled = true,
             )
             every { settingsRepository.isUnlockWithBiometricsEnabled } returns true
-            every { settingsRepository.clearBiometricsKey() } just runs
+            every {
+                biometricsEncryptionManager.clearBiometrics(userId = DEFAULT_USER_ID)
+            } just runs
             every { settingsRepository.vaultTimeoutAction = VaultTimeoutAction.LOGOUT } just runs
             val viewModel = createViewModel(initialState)
             assertEquals(initialState, viewModel.stateFlow.value)
 
-            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggle(false))
+            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggleDisabled)
 
             assertEquals(
                 initialState.copy(
@@ -470,21 +577,25 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                 viewModel.stateFlow.value,
             )
             verify(exactly = 1) {
-                settingsRepository.clearBiometricsKey()
+                biometricsEncryptionManager.clearBiometrics(userId = DEFAULT_USER_ID)
                 settingsRepository.vaultTimeoutAction = VaultTimeoutAction.LOGOUT
             }
         }
 
     @Suppress("MaxLineLength")
     @Test
-    fun `on UnlockWithBiometricToggle true and setupBiometricsKey error should call update the state accordingly`() =
+    fun `on UnlockWithBiometricToggleEnabled and setupBiometricsKey error should call update the state accordingly`() =
         runTest {
-            coEvery { settingsRepository.setupBiometricsKey() } returns BiometricsKeyResult.Error
+            coEvery {
+                settingsRepository.setupBiometricsKey(cipher = CIPHER)
+            } returns BiometricsKeyResult.Error
             val viewModel = createViewModel()
 
             viewModel.stateFlow.test {
                 assertEquals(DEFAULT_STATE, awaitItem())
-                viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggle(true))
+                viewModel.trySendAction(
+                    AccountSecurityAction.UnlockWithBiometricToggleEnabled(cipher = CIPHER),
+                )
                 assertEquals(
                     DEFAULT_STATE.copy(
                         dialog = AccountSecurityDialog.Loading(R.string.saving.asText()),
@@ -501,20 +612,24 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                 )
             }
             coVerify(exactly = 1) {
-                settingsRepository.setupBiometricsKey()
+                settingsRepository.setupBiometricsKey(cipher = CIPHER)
             }
         }
 
     @Suppress("MaxLineLength")
     @Test
-    fun `on UnlockWithBiometricToggle true and setupBiometricsKey success should call update the state accordingly`() =
+    fun `on UnlockWithBiometricToggleEnabled and setupBiometricsKey success should call update the state accordingly`() =
         runTest {
-            coEvery { settingsRepository.setupBiometricsKey() } returns BiometricsKeyResult.Success
+            coEvery {
+                settingsRepository.setupBiometricsKey(cipher = CIPHER)
+            } returns BiometricsKeyResult.Success
             val viewModel = createViewModel()
 
             viewModel.stateFlow.test {
                 assertEquals(DEFAULT_STATE, awaitItem())
-                viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggle(true))
+                viewModel.trySendAction(
+                    AccountSecurityAction.UnlockWithBiometricToggleEnabled(cipher = CIPHER),
+                )
                 assertEquals(
                     DEFAULT_STATE.copy(
                         dialog = AccountSecurityDialog.Loading(R.string.saving.asText()),
@@ -531,7 +646,7 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                 )
             }
             coVerify(exactly = 1) {
-                settingsRepository.setupBiometricsKey()
+                settingsRepository.setupBiometricsKey(cipher = CIPHER)
             }
         }
 
@@ -854,8 +969,9 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
 private val CIPHER = mockk<Cipher>()
 private const val FINGERPRINT: String = "fingerprint"
 
+private const val DEFAULT_USER_ID: String = "activeUserId"
 private val DEFAULT_USER_STATE = UserState(
-    activeUserId = "activeUserId",
+    activeUserId = DEFAULT_USER_ID,
     accounts = listOf(
         UserState.Account(
             userId = "activeUserId",
@@ -868,7 +984,36 @@ private val DEFAULT_USER_STATE = UserState(
             isVaultUnlocked = true,
             needsPasswordReset = false,
             isBiometricsEnabled = false,
-            organizations = emptyList(),
+            organizations = listOf(
+                Organization(
+                    id = "organizationUser",
+                    name = "Organization User",
+                    shouldUseKeyConnector = false,
+                    shouldManageResetPassword = false,
+                    role = OrganizationType.USER,
+                ),
+                Organization(
+                    id = "organizationAdmin",
+                    name = "Organization Admin",
+                    shouldUseKeyConnector = false,
+                    shouldManageResetPassword = false,
+                    role = OrganizationType.ADMIN,
+                ),
+                Organization(
+                    id = "organizationOwner",
+                    name = "Organization Owner",
+                    shouldUseKeyConnector = false,
+                    shouldManageResetPassword = false,
+                    role = OrganizationType.OWNER,
+                ),
+                Organization(
+                    id = "organizationCustom",
+                    name = "Organization Owner",
+                    shouldUseKeyConnector = false,
+                    shouldManageResetPassword = false,
+                    role = OrganizationType.CUSTOM,
+                ),
+            ),
             needsMasterPassword = false,
             trustedDevice = null,
             hasMasterPassword = true,
@@ -886,11 +1031,12 @@ private val DEFAULT_STATE: AccountSecurityState = AccountSecurityState(
     isUnlockWithBiometricsEnabled = false,
     isUnlockWithPasswordEnabled = true,
     isUnlockWithPinEnabled = false,
-    userId = DEFAULT_USER_STATE.activeUserId,
+    userId = DEFAULT_USER_ID,
     vaultTimeout = VaultTimeout.ThirtyMinutes,
     vaultTimeoutAction = VaultTimeoutAction.LOCK,
     vaultTimeoutPolicyMinutes = null,
     vaultTimeoutPolicyAction = null,
     shouldShowEnableAuthenticatorSync = false,
     shouldShowUnlockActionCard = false,
+    removeUnlockWithPinPolicyEnabled = false,
 )

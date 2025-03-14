@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -49,10 +50,11 @@ import com.x8bit.bitwarden.ui.tools.feature.generator.generatorGraph
 import com.x8bit.bitwarden.ui.tools.feature.generator.navigateToGeneratorGraph
 import com.x8bit.bitwarden.ui.tools.feature.send.navigateToSendGraph
 import com.x8bit.bitwarden.ui.tools.feature.send.sendGraph
+import com.x8bit.bitwarden.ui.vault.feature.addedit.VaultAddEditArgs
+import com.x8bit.bitwarden.ui.vault.feature.item.VaultItemArgs
 import com.x8bit.bitwarden.ui.vault.feature.vault.VAULT_GRAPH_ROUTE
 import com.x8bit.bitwarden.ui.vault.feature.vault.navigateToVaultGraph
 import com.x8bit.bitwarden.ui.vault.feature.vault.vaultGraph
-import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
 
 /**
  * Top level composable for the Vault Unlocked Screen.
@@ -62,9 +64,9 @@ import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
 fun VaultUnlockedNavBarScreen(
     viewModel: VaultUnlockedNavBarViewModel = hiltViewModel(),
     navController: NavHostController = rememberNavController(),
-    onNavigateToVaultAddItem: (VaultItemCipherType, String?, String?) -> Unit,
-    onNavigateToVaultItem: (vaultItemId: String) -> Unit,
-    onNavigateToVaultEditItem: (vaultItemId: String) -> Unit,
+    onNavigateToVaultAddItem: (args: VaultAddEditArgs) -> Unit,
+    onNavigateToVaultItem: (args: VaultItemArgs) -> Unit,
+    onNavigateToVaultEditItem: (args: VaultAddEditArgs) -> Unit,
     onNavigateToSearchSend: (searchType: SearchType.Sends) -> Unit,
     onNavigateToSearchVault: (searchType: SearchType.Vault) -> Unit,
     onNavigateToAddSend: () -> Unit,
@@ -77,6 +79,7 @@ fun VaultUnlockedNavBarScreen(
     onNavigateToSetupUnlockScreen: () -> Unit,
     onNavigateToSetupAutoFillScreen: () -> Unit,
     onNavigateToImportLogins: (SnackbarRelay) -> Unit,
+    onNavigateToAddFolderScreen: (selectedFolderId: String?) -> Unit,
 ) {
     val state by viewModel.stateFlow.collectAsStateWithLifecycle()
 
@@ -90,7 +93,9 @@ fun VaultUnlockedNavBarScreen(
                     navigateToVaultGraph(navOptions)
                 }
 
-                VaultUnlockedNavBarEvent.NavigateToSendScreen -> {
+                VaultUnlockedNavBarEvent.Shortcut.NavigateToSendScreen,
+                VaultUnlockedNavBarEvent.NavigateToSendScreen,
+                    -> {
                     navigateToSendGraph(navOptions)
                 }
 
@@ -141,6 +146,7 @@ fun VaultUnlockedNavBarScreen(
         onNavigateToSetupUnlockScreen = onNavigateToSetupUnlockScreen,
         onNavigateToSetupAutoFillScreen = onNavigateToSetupAutoFillScreen,
         onNavigateToImportLogins = onNavigateToImportLogins,
+        onNavigateToAddFolderScreen = onNavigateToAddFolderScreen,
     )
 }
 
@@ -156,9 +162,9 @@ private fun VaultUnlockedNavBarScaffold(
     sendTabClickedAction: () -> Unit,
     generatorTabClickedAction: () -> Unit,
     settingsTabClickedAction: () -> Unit,
-    navigateToVaultAddItem: (VaultItemCipherType, String?, String?) -> Unit,
-    onNavigateToVaultItem: (vaultItemId: String) -> Unit,
-    onNavigateToVaultEditItem: (vaultItemId: String) -> Unit,
+    navigateToVaultAddItem: (args: VaultAddEditArgs) -> Unit,
+    onNavigateToVaultItem: (args: VaultItemArgs) -> Unit,
+    onNavigateToVaultEditItem: (args: VaultAddEditArgs) -> Unit,
     onNavigateToSearchSend: (searchType: SearchType.Sends) -> Unit,
     onNavigateToSearchVault: (searchType: SearchType.Vault) -> Unit,
     navigateToAddSend: () -> Unit,
@@ -171,8 +177,9 @@ private fun VaultUnlockedNavBarScaffold(
     onNavigateToSetupUnlockScreen: () -> Unit,
     onNavigateToSetupAutoFillScreen: () -> Unit,
     onNavigateToImportLogins: (SnackbarRelay) -> Unit,
+    onNavigateToAddFolderScreen: (selectedFolderId: String?) -> Unit,
 ) {
-    var shouldDimNavBar by remember { mutableStateOf(false) }
+    var shouldDimNavBar by rememberSaveable { mutableStateOf(false) }
 
     // This scaffold will host screens that contain top bars while not hosting one itself.
     // We need to ignore the all insets here and let the content screens handle it themselves.
@@ -230,6 +237,7 @@ private fun VaultUnlockedNavBarScaffold(
                     shouldDimNavBar = shouldDim
                 },
                 onNavigateToImportLogins = onNavigateToImportLogins,
+                onNavigateToAddFolderScreen = onNavigateToAddFolderScreen,
             )
             sendGraph(
                 navController = navController,
@@ -239,6 +247,9 @@ private fun VaultUnlockedNavBarScaffold(
             )
             generatorGraph(
                 onNavigateToPasswordHistory = { navigateToPasswordHistory() },
+                onDimNavBarRequest = { shouldDim ->
+                    shouldDimNavBar = shouldDim
+                },
             )
             settingsGraph(
                 navController = navController,

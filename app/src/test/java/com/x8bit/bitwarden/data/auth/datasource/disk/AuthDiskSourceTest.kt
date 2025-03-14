@@ -27,13 +27,13 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import java.time.ZonedDateTime
 
 @Suppress("LargeClass")
@@ -263,6 +263,7 @@ class AuthDiskSourceTest {
         authDiskSource.storeIsTdeLoginComplete(userId = userId, isTdeLoginComplete = true)
         val deviceKey = "deviceKey"
         authDiskSource.storeDeviceKey(userId = userId, deviceKey = deviceKey)
+        authDiskSource.storeUserBiometricInitVector(userId = userId, iv = byteArrayOf())
         authDiskSource.storeUserBiometricUnlockKey(
             userId = userId,
             biometricsKey = "1234-9876-0192",
@@ -324,6 +325,7 @@ class AuthDiskSourceTest {
         )
 
         // These should be cleared
+        assertNull(authDiskSource.getUserBiometricInitVector(userId = userId))
         assertNull(authDiskSource.getUserBiometricUnlockKey(userId = userId))
         assertNull(authDiskSource.getPinProtectedUserKey(userId = userId))
         assertNull(authDiskSource.getInvalidUnlockAttempts(userId = userId))
@@ -665,6 +667,33 @@ class AuthDiskSourceTest {
         }
         val actual = authDiskSource.getUserBiometricUnlockKey(userId = mockUserId)
         assertEquals(biometricsKey, actual)
+    }
+
+    @Test
+    fun `storeUserBiometricInitVector for non-null values should update SharedPreferences`() {
+        val biometricsInitVectorBaseKey = "bwSecureStorage:biometricInitializationVector"
+        val mockUserId = "mockUserId"
+        val biometricsInitVectorKey = "${biometricsInitVectorBaseKey}_$mockUserId"
+        val initVector = byteArrayOf(1, 2)
+        authDiskSource.storeUserBiometricInitVector(userId = mockUserId, iv = initVector)
+        val actual = fakeEncryptedSharedPreferences.getString(
+            key = biometricsInitVectorKey,
+            defaultValue = null,
+        )
+        assertEquals(initVector.toString(Charsets.ISO_8859_1), actual)
+    }
+
+    @Test
+    fun `storeUserBiometricInitVector for null values should clear SharedPreferences`() {
+        val biometricsInitVectorBaseKey = "bwSecureStorage:biometricInitializationVector"
+        val mockUserId = "mockUserId"
+        val biometricsInitVectorKey = "${biometricsInitVectorBaseKey}_$mockUserId"
+        val initVector = "1234"
+        fakeEncryptedSharedPreferences.edit {
+            putString(biometricsInitVectorKey, initVector)
+        }
+        authDiskSource.storeUserBiometricInitVector(userId = mockUserId, iv = null)
+        assertFalse(fakeEncryptedSharedPreferences.contains(biometricsInitVectorKey))
     }
 
     @Test
@@ -1305,6 +1334,62 @@ class AuthDiskSourceTest {
             json.encodeToString(mockStatus),
             actual,
         )
+    }
+
+    @Test
+    fun `getLastLockTimestamp should pull from SharedPreferences`() {
+        val storeKey = "bwPreferencesStorage:lastLockTimestamp"
+        val mockUserId = "mockUserId"
+        val expectedState = Instant.parse("2025-01-13T12:00:00Z")
+        fakeSharedPreferences.edit {
+            putLong(
+                "${storeKey}_$mockUserId",
+                expectedState.toEpochMilli(),
+            )
+        }
+        val actual = authDiskSource.getLastLockTimestamp(userId = mockUserId)
+        assertEquals(
+            expectedState,
+            actual,
+        )
+    }
+
+    @Test
+    fun `getLastLockTimestamp should pull null from SharedPreferences if there is no data`() {
+        val mockUserId = "mockUserId"
+        val expectedState = null
+        val actual = authDiskSource.getLastLockTimestamp(userId = mockUserId)
+        assertEquals(
+            expectedState,
+            actual,
+        )
+    }
+
+    @Test
+    fun `setLastLockTimestamp should update SharedPreferences`() {
+        val mockUserId = "mockUserId"
+        val expectedState = Instant.parse("2025-01-13T12:00:00Z")
+        authDiskSource.storeLastLockTimestamp(
+            userId = mockUserId,
+            expectedState,
+        )
+        val actual = authDiskSource.getLastLockTimestamp(userId = mockUserId)
+        assertEquals(
+            expectedState,
+            actual,
+        )
+    }
+
+    @Test
+    fun `setLastLockTimestamp should clear SharedPreferences when null is passed`() {
+        val mockUserId = "mockUserId"
+        val expectedState = null
+        authDiskSource.storeLastLockTimestamp(
+            userId = mockUserId,
+            expectedState,
+        )
+        val actual = authDiskSource.getLastLockTimestamp(userId = mockUserId)
+        assertNull(actual)
     }
 }
 

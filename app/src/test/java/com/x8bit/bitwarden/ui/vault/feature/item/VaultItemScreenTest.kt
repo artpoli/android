@@ -1,5 +1,6 @@
 package com.x8bit.bitwarden.ui.vault.feature.item
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onSiblings
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.core.net.toUri
 import com.x8bit.bitwarden.R
@@ -30,21 +32,28 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
+import com.x8bit.bitwarden.ui.platform.components.model.IconData
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.util.assertNoDialogExists
+import com.x8bit.bitwarden.ui.util.assertNoPopupExists
 import com.x8bit.bitwarden.ui.util.assertScrollableNodeDoesNotExist
 import com.x8bit.bitwarden.ui.util.isProgressBar
 import com.x8bit.bitwarden.ui.util.onFirstNodeWithTextAfterScroll
 import com.x8bit.bitwarden.ui.util.onNodeWithContentDescriptionAfterScroll
 import com.x8bit.bitwarden.ui.util.onNodeWithTextAfterScroll
+import com.x8bit.bitwarden.ui.vault.feature.addedit.VaultAddEditArgs
 import com.x8bit.bitwarden.ui.vault.feature.item.model.TotpCodeItemData
+import com.x8bit.bitwarden.ui.vault.feature.item.model.VaultItemLocation
+import com.x8bit.bitwarden.ui.vault.model.VaultAddEditType
 import com.x8bit.bitwarden.ui.vault.model.VaultCardBrand
+import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
 import com.x8bit.bitwarden.ui.vault.model.VaultLinkedFieldType
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import org.junit.Assert.assertEquals
@@ -57,7 +66,7 @@ import java.time.Instant
 class VaultItemScreenTest : BaseComposeTest() {
 
     private var onNavigateBackCalled = false
-    private var onNavigateToVaultEditItemId: String? = null
+    private var onNavigateToVaultEditItemArgs: VaultAddEditArgs? = null
     private var onNavigateToMoveToOrganizationItemId: String? = null
     private var onNavigateToAttachmentsId: String? = null
     private var onNavigateToPasswordHistoryId: String? = null
@@ -73,17 +82,18 @@ class VaultItemScreenTest : BaseComposeTest() {
 
     @Before
     fun setUp() {
-        composeTestRule.setContent {
+        setContent(
+            intentManager = intentManager,
+        ) {
             VaultItemScreen(
                 viewModel = viewModel,
                 onNavigateBack = { onNavigateBackCalled = true },
-                onNavigateToVaultAddEditItem = { id, _ -> onNavigateToVaultEditItemId = id },
+                onNavigateToVaultAddEditItem = { onNavigateToVaultEditItemArgs = it },
                 onNavigateToMoveToOrganization = { id, _ ->
                     onNavigateToMoveToOrganizationItemId = id
                 },
                 onNavigateToAttachments = { onNavigateToAttachmentsId = it },
                 onNavigateToPasswordHistory = { onNavigateToPasswordHistoryId = it },
-                intentManager = intentManager,
             )
         }
     }
@@ -92,8 +102,20 @@ class VaultItemScreenTest : BaseComposeTest() {
     @Test
     fun `NavigateToEdit event should invoke onNavigateToVaultEditItem`() {
         val id = "id1234"
-        mutableEventFlow.tryEmit(VaultItemEvent.NavigateToAddEdit(itemId = id, isClone = false))
-        assertEquals(id, onNavigateToVaultEditItemId)
+        mutableEventFlow.tryEmit(
+            value = VaultItemEvent.NavigateToAddEdit(
+                itemId = id,
+                isClone = false,
+                type = VaultItemCipherType.LOGIN,
+            ),
+        )
+        assertEquals(
+            VaultAddEditArgs(
+                vaultAddEditType = VaultAddEditType.EditItem(vaultItemId = id),
+                vaultItemCipherType = VaultItemCipherType.LOGIN,
+            ),
+            onNavigateToVaultEditItemArgs,
+        )
     }
 
     @Test
@@ -188,7 +210,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
     @Test
     fun `loading dialog should be displayed according to state`() {
-        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+        composeTestRule.assertNoPopupExists()
         composeTestRule.onNodeWithText("Loading").assertDoesNotExist()
 
         mutableStateFlow.update {
@@ -198,7 +220,7 @@ class VaultItemScreenTest : BaseComposeTest() {
         composeTestRule
             .onNodeWithText("Loading")
             .assertIsDisplayed()
-            .assert(hasAnyAncestor(isDialog()))
+            .assert(hasAnyAncestor(isPopup()))
     }
 
     @Test
@@ -255,17 +277,265 @@ class VaultItemScreenTest : BaseComposeTest() {
                 mutableStateFlow.update { it.copy(viewState = typeState) }
 
                 composeTestRule
-                    .onNodeWithTextAfterScroll("Name")
-                    .assertTextContains("cipher")
+                    .onNodeWithText("cipher")
+                    .assertIsDisplayed()
 
                 mutableStateFlow.update { currentState ->
                     updateCommonContent(currentState) { copy(name = "Test Name") }
                 }
 
                 composeTestRule
-                    .onNodeWithTextAfterScroll("Name")
-                    .assertTextContains("Test Name")
+                    .onNodeWithText("Test Name")
+                    .assertIsDisplayed()
             }
+    }
+
+    @Test
+    fun `favorite icon should be displayed according to state`() {
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                viewState = DEFAULT_LOGIN_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        favorite = false,
+                    ),
+                ),
+            )
+        }
+        composeTestRule
+            .onNodeWithContentDescription(label = "Unfavorite")
+            .assertIsDisplayed()
+
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                viewState = DEFAULT_LOGIN_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        favorite = true,
+                    ),
+                ),
+            )
+        }
+        composeTestRule
+            .onNodeWithContentDescription(label = "Favorite")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `no folder should be displayed according to state`() {
+        DEFAULT_VIEW_STATES.forEach { defaultViewState ->
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = defaultViewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithText("No folder")
+                .assertIsDisplayed()
+
+            // Verify "No folder" is not displayed when relatedLocations is not empty
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = defaultViewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(
+                                VaultItemLocation.Collection("collection"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithText("No folder")
+                .assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `organization locations should be displayed according to state`() {
+        val organizationName = "My organization"
+        DEFAULT_VIEW_STATES.forEach { viewState ->
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(
+                                VaultItemLocation.Organization(
+                                    organizationName,
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithText(organizationName)
+                .assertIsDisplayed()
+
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithText(organizationName)
+                .assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `collection locations should be displayed according to state`() {
+        DEFAULT_VIEW_STATES.forEach { viewState ->
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(
+                                VaultItemLocation.Collection("My collection"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithText("My collection")
+                .assertIsDisplayed()
+
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithText("My collection")
+                .assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `ExpandingHeader should be displayed according to state`() {
+        DEFAULT_VIEW_STATES.forEach { viewState ->
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(
+                                VaultItemLocation.Organization("My organization"),
+                                VaultItemLocation.Collection("My collection"),
+                                VaultItemLocation.Collection("My other collection"),
+                                VaultItemLocation.Folder("My folder"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+            composeTestRule
+                .onNodeWithTextAfterScroll("Show more")
+                .assertIsDisplayed()
+                .performClick()
+
+            composeTestRule
+                .onNodeWithText("Show less")
+                .assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun `ExpandingHeader should show expanded content according to state`() {
+        DEFAULT_VIEW_STATES.forEach { viewState ->
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(
+                                VaultItemLocation.Organization("My organization"),
+                                VaultItemLocation.Collection("My collection"),
+                                VaultItemLocation.Collection("My other collection"),
+                                VaultItemLocation.Folder("My folder"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+
+            // Verify only the first collection name is shown
+            composeTestRule
+                .onNodeWithText("My collection...")
+                .assertIsDisplayed()
+
+            // Verify other collection names are not shown by default.
+            composeTestRule
+                .onNodeWithText("My other collection")
+                .assertIsNotDisplayed()
+
+            // Verify folder name is not shown by default.
+            composeTestRule
+                .onNodeWithText("My folder")
+                .assertIsNotDisplayed()
+
+            // Verify all locations are show when content is expanded and ellipses is removed from
+            // the first collection name.
+            composeTestRule
+                .onNodeWithText("Show more")
+                .performClick()
+            composeTestRule
+                .onNodeWithText("My collection")
+                .assertIsDisplayed()
+            composeTestRule
+                .onNodeWithText("My other collection")
+                .assertIsDisplayed()
+            composeTestRule
+                .onNodeWithText("My folder")
+                .assertIsDisplayed()
+        }
+    }
+
+    @Test
+    fun `ExpandingHeader should show all locations when assigned to org, collection, and folder`() {
+        DEFAULT_VIEW_STATES.forEach { viewState ->
+            mutableStateFlow.update {
+                DEFAULT_STATE.copy(
+                    viewState = viewState.copy(
+                        common = DEFAULT_COMMON.copy(
+                            relatedLocations = persistentListOf(
+                                VaultItemLocation.Organization("My organization"),
+                                VaultItemLocation.Collection("My collection"),
+                                VaultItemLocation.Folder("My folder"),
+                            ),
+                        ),
+                    ),
+                )
+            }
+
+            // Verify all location names are not shown by default.
+            composeTestRule
+                .onNodeWithText("My organization")
+                .assertIsDisplayed()
+            composeTestRule
+                .onNodeWithText("My collection")
+                .assertIsDisplayed()
+            composeTestRule
+                .onNodeWithText("My folder")
+                .assertIsDisplayed()
+
+            // Verify expander button is not displayed when all locations are shown.
+            composeTestRule
+                .onNodeWithText("Show more")
+                .assertIsNotDisplayed()
+            composeTestRule
+                .onNodeWithText("Show less")
+                .assertIsNotDisplayed()
+        }
     }
 
     @Test
@@ -564,7 +834,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
                 composeTestRule
                     .onNodeWithTextAfterScroll(hiddenField.name)
-                    .onSiblings()
+                    .onChildren()
                     .filterToOne(hasContentDescription("Copy"))
                     .assertIsDisplayed()
 
@@ -605,7 +875,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
                 composeTestRule
                     .onNodeWithTextAfterScroll(hiddenField.name)
-                    .onSiblings()
+                    .onChildren()
                     .filterToOne(hasContentDescription("Copy"))
                     .performClick()
 
@@ -639,7 +909,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
                 composeTestRule
                     .onNodeWithTextAfterScroll(textField.name)
-                    .onSiblings()
+                    .onChildren()
                     .filterToOne(hasContentDescription("Copy"))
                     .performClick()
 
@@ -673,7 +943,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
                 composeTestRule
                     .onNodeWithTextAfterScroll(textField.name)
-                    .onSiblings()
+                    .onChildren()
                     .filterToOne(hasContentDescription("Copy"))
                     .assertIsDisplayed()
 
@@ -714,7 +984,7 @@ class VaultItemScreenTest : BaseComposeTest() {
             .assertTextEquals("Password", "••••••••")
             .assertIsEnabled()
         composeTestRule
-            .onNodeWithContentDescription("Check known data breaches for this password")
+            .onNodeWithTextAfterScroll("Check password for data breaches")
             .assertIsDisplayed()
         composeTestRule
             .onNodeWithContentDescription("Copy password")
@@ -742,7 +1012,7 @@ class VaultItemScreenTest : BaseComposeTest() {
             .assertTextEquals("Password", "p@ssw0rd")
             .assertIsEnabled()
         composeTestRule
-            .onNodeWithContentDescription("Check known data breaches for this password")
+            .onNodeWithTextAfterScroll("Check password for data breaches")
             .assertIsDisplayed()
         composeTestRule
             .onNodeWithContentDescription("Copy password")
@@ -1261,15 +1531,15 @@ class VaultItemScreenTest : BaseComposeTest() {
 
     @Test
     fun `on login copy notes field click should send CopyNotesClick`() {
-
         mutableStateFlow.update { currentState ->
             currentState.copy(
                 viewState = DEFAULT_LOGIN_VIEW_STATE,
             )
         }
-        composeTestRule.onNodeWithTextAfterScroll("Lots of notes")
+        // We scroll to custom fields, which is right after notes to avoid clicking on the FAB
+        composeTestRule.onNodeWithTextAfterScroll("CUSTOM FIELDS")
         composeTestRule
-            .onNodeWithTag("CipherNotesCopyButton")
+            .onNodeWithContentDescription("Copy note")
             .performClick()
 
         verify {
@@ -1360,7 +1630,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTag("CipherNotesCopyButton")
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify {
             viewModel.trySendAction(VaultItemAction.Common.CopyNotesClick)
@@ -1402,6 +1672,212 @@ class VaultItemScreenTest : BaseComposeTest() {
             viewModel.trySendAction(VaultItemAction.Common.CopyNotesClick)
         }
     }
+
+    @Test
+    fun `in login state, password history should be displayed according to state`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = DEFAULT_LOGIN_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 1,
+                    ),
+                ),
+            )
+        }
+        composeTestRule.onNodeWithTextAfterScroll("Password history: 1").assertIsDisplayed()
+
+        mutableStateFlow.update { currentState ->
+            updateCommonContent(currentState) { copy(passwordHistoryCount = null) }
+        }
+
+        composeTestRule.assertScrollableNodeDoesNotExist("Password history: 1")
+    }
+
+    @Test
+    fun `in identity state, password history should be displayed according to state`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = DEFAULT_IDENTITY_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 1,
+                    ),
+                ),
+            )
+        }
+        composeTestRule.onNodeWithTextAfterScroll("Password history: 1").assertIsDisplayed()
+
+        mutableStateFlow.update { currentState ->
+            updateCommonContent(currentState) { copy(passwordHistoryCount = null) }
+        }
+
+        composeTestRule.assertScrollableNodeDoesNotExist("Password history: 1")
+    }
+
+    @Test
+    fun `in secure note state, password history should be displayed according to state`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = DEFAULT_SECURE_NOTE_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 1,
+                    ),
+                ),
+            )
+        }
+        composeTestRule.onNodeWithTextAfterScroll("Password history: 1").assertIsDisplayed()
+
+        mutableStateFlow.update { currentState ->
+            updateCommonContent(currentState) { copy(passwordHistoryCount = null) }
+        }
+
+        composeTestRule.assertScrollableNodeDoesNotExist("Password history: 1")
+    }
+
+    @Test
+    fun `in card state, password history should be displayed according to state`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = DEFAULT_CARD_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 1,
+                    ),
+                ),
+            )
+        }
+        composeTestRule.onNodeWithTextAfterScroll("Password history: 1").assertIsDisplayed()
+
+        mutableStateFlow.update { currentState ->
+            updateCommonContent(currentState) { copy(passwordHistoryCount = null) }
+        }
+
+        composeTestRule.assertScrollableNodeDoesNotExist("Password history: 1")
+    }
+
+    @Test
+    fun `in ssh key state, password history should be displayed according to state`() {
+        mutableStateFlow.update {
+            it.copy(
+                viewState = DEFAULT_SSH_KEY_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 1,
+                    ),
+                ),
+            )
+        }
+        composeTestRule.onNodeWithTextAfterScroll("Password history: 1").assertIsDisplayed()
+
+        mutableStateFlow.update { currentState ->
+            updateCommonContent(currentState) { copy(passwordHistoryCount = null) }
+        }
+
+        composeTestRule.assertScrollableNodeDoesNotExist("Password history: 1")
+    }
+
+    @Test
+    fun `in login state, on password history click should send PasswordHistoryClick`() {
+        mutableStateFlow.update { currentState ->
+            currentState.copy(
+                viewState = EMPTY_LOGIN_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 5,
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTextAfterScroll("Password history: 5")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(VaultItemAction.Common.PasswordHistoryClick)
+        }
+    }
+
+    @Test
+    fun `in identity state, on password history click should send PasswordHistoryClick`() {
+        mutableStateFlow.update { currentState ->
+            currentState.copy(
+                viewState = EMPTY_IDENTITY_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 5,
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTextAfterScroll("Password history: 5")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(VaultItemAction.Common.PasswordHistoryClick)
+        }
+    }
+
+    @Test
+    fun `in card state, on password history click should send PasswordHistoryClick`() {
+        mutableStateFlow.update { currentState ->
+            currentState.copy(
+                viewState = EMPTY_CARD_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 5,
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTextAfterScroll("Password history: 5")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(VaultItemAction.Common.PasswordHistoryClick)
+        }
+    }
+
+    @Test
+    fun `in secure note state, on password history click should send PasswordHistoryClick`() {
+        mutableStateFlow.update { currentState ->
+            currentState.copy(
+                viewState = EMPTY_SECURE_NOTE_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 5,
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTextAfterScroll("Password history: 5")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(VaultItemAction.Common.PasswordHistoryClick)
+        }
+    }
+
+    @Test
+    fun `in ssh key state, on password history click should send PasswordHistoryClick`() {
+        mutableStateFlow.update { currentState ->
+            currentState.copy(
+                viewState = EMPTY_SSH_KEY_VIEW_STATE.copy(
+                    common = DEFAULT_COMMON.copy(
+                        passwordHistoryCount = 5,
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTextAfterScroll("Password history: 5")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(VaultItemAction.Common.PasswordHistoryClick)
+        }
+    }
+
     //endregion common
 
     //region login
@@ -1464,7 +1940,6 @@ class VaultItemScreenTest : BaseComposeTest() {
                     type = VaultItemState.ViewState.Content.ItemType.Login(
                         username = username,
                         passwordData = null,
-                        passwordHistoryCount = null,
                         uris = emptyList(),
                         passwordRevisionDate = null,
                         isPremiumUser = true,
@@ -1478,7 +1953,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTextAfterScroll(username)
-            .onSiblings()
+            .onChildren()
             .filterToOne(hasContentDescription("Copy username"))
             .performClick()
 
@@ -1505,9 +1980,7 @@ class VaultItemScreenTest : BaseComposeTest() {
         }
 
         composeTestRule
-            .onNodeWithTextAfterScroll(passwordData.password)
-            .onSiblings()
-            .filterToOne(hasContentDescription("Check known data breaches for this password"))
+            .onNodeWithTextAfterScroll(text = "Check password for data breaches")
             .performClick()
 
         verify {
@@ -1526,7 +1999,11 @@ class VaultItemScreenTest : BaseComposeTest() {
             .performClick()
 
         verify(exactly = 1) {
-            viewModel.trySendAction(VaultItemAction.ItemType.Login.PasswordVisibilityClicked(true))
+            viewModel.trySendAction(
+                VaultItemAction.ItemType.Login.PasswordVisibilityClicked(
+                    true,
+                ),
+            )
         }
     }
 
@@ -1549,7 +2026,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTextAfterScroll(passwordData.password)
-            .onSiblings()
+            .onChildren()
             .filterToOne(hasContentDescription("Copy password"))
             .performClick()
 
@@ -1638,6 +2115,7 @@ class VaultItemScreenTest : BaseComposeTest() {
             )
         }
 
+        composeTestRule.onNodeWithTextAfterScroll("Authenticator key")
         // There are 2 because of the pull-to-refresh
         composeTestRule.onAllNodes(isProgressBar).assertCountEquals(2)
 
@@ -1654,11 +2132,12 @@ class VaultItemScreenTest : BaseComposeTest() {
             )
         }
 
+        composeTestRule.onNodeWithTextAfterScroll("Authenticator key")
         // There are 2 because of the pull-to-refresh
         composeTestRule.onAllNodes(isProgressBar).assertCountEquals(2)
 
         composeTestRule
-            .onNodeWithContentDescription("Copy TOTP")
+            .onNodeWithContentDescriptionAfterScroll("Copy TOTP")
             .assertIsDisplayed()
 
         mutableStateFlow.update { currentState ->
@@ -1671,6 +2150,7 @@ class VaultItemScreenTest : BaseComposeTest() {
             )
         }
 
+        composeTestRule.onNodeWithTextAfterScroll("Authenticator key")
         // Only pull-to-refresh remains
         composeTestRule.onAllNodes(isProgressBar).assertCountEquals(1)
 
@@ -1688,11 +2168,26 @@ class VaultItemScreenTest : BaseComposeTest() {
         }
 
         composeTestRule
-            .onNodeWithContentDescription("Copy TOTP")
-            .performClick()
+            .onNodeWithContentDescriptionAfterScroll("Copy TOTP")
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify {
             viewModel.trySendAction(VaultItemAction.ItemType.Login.CopyTotpClick)
+        }
+    }
+
+    @Test
+    fun `in login state, on totp help tooltip click should send AuthenticatorHelpToolTipClick`() {
+        mutableStateFlow.update { currentState ->
+            currentState.copy(viewState = DEFAULT_LOGIN_VIEW_STATE)
+        }
+
+        composeTestRule
+            .onNodeWithContentDescriptionAfterScroll("Authenticator key help")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(VaultItemAction.ItemType.Login.AuthenticatorHelpToolTipClick)
         }
     }
 
@@ -1715,7 +2210,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTextAfterScroll(uriData.uri)
-            .onSiblings()
+            .onChildren()
             .filterToOne(hasContentDescription("Launch"))
             .assertIsDisplayed()
 
@@ -1751,7 +2246,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTextAfterScroll(uriData.uri)
-            .onSiblings()
+            .onChildren()
             .filterToOne(hasContentDescription("Copy"))
             .assertIsDisplayed()
 
@@ -1785,7 +2280,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTextAfterScroll(uriData.uri)
-            .onSiblings()
+            .onChildren()
             .filterToOne(hasContentDescription("Launch"))
             .performClick()
 
@@ -1813,32 +2308,12 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTextAfterScroll(uriData.uri)
-            .onSiblings()
+            .onChildren()
             .filterToOne(hasContentDescription("Copy"))
             .performClick()
 
         verify {
             viewModel.trySendAction(VaultItemAction.ItemType.Login.CopyUriClick(uriData.uri))
-        }
-    }
-
-    @Test
-    fun `in login state, on password history click should send PasswordHistoryClick`() {
-        mutableStateFlow.update { currentState ->
-            currentState.copy(
-                viewState = EMPTY_LOGIN_VIEW_STATE.copy(
-                    type = EMPTY_LOGIN_TYPE.copy(
-                        passwordHistoryCount = 5,
-                    ),
-                ),
-            )
-        }
-
-        composeTestRule.onNodeWithTextAfterScroll("5")
-        composeTestRule.onNodeWithText("5").performClick()
-
-        verify {
-            viewModel.trySendAction(VaultItemAction.ItemType.Login.PasswordHistoryClick)
         }
     }
 
@@ -1913,16 +2388,16 @@ class VaultItemScreenTest : BaseComposeTest() {
     @Test
     fun `in login state, uris should be displayed according to state`() {
         mutableStateFlow.update { it.copy(viewState = DEFAULT_LOGIN_VIEW_STATE) }
-        composeTestRule.onNodeWithTextAfterScroll("URIS").assertIsDisplayed()
-        composeTestRule.onNodeWithTextAfterScroll("URI").assertIsDisplayed()
+        composeTestRule.onNodeWithTextAfterScroll("AUTOFILL OPTIONS").assertIsDisplayed()
+        composeTestRule.onNodeWithTextAfterScroll("Website (URI)").assertIsDisplayed()
         composeTestRule.onNodeWithTextAfterScroll("www.example.com").assertIsDisplayed()
 
         mutableStateFlow.update { currentState ->
             updateLoginType(currentState) { copy(uris = emptyList()) }
         }
 
-        composeTestRule.assertScrollableNodeDoesNotExist("URIS")
-        composeTestRule.assertScrollableNodeDoesNotExist("URI")
+        composeTestRule.assertScrollableNodeDoesNotExist("AUTOFILL OPTIONS")
+        composeTestRule.assertScrollableNodeDoesNotExist("Website (URI)")
         composeTestRule.assertScrollableNodeDoesNotExist("www.example.com")
     }
 
@@ -1938,20 +2413,6 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule.assertScrollableNodeDoesNotExist("Password updated: ")
         composeTestRule.assertScrollableNodeDoesNotExist("4/14/83 3:56 PM")
-    }
-
-    @Test
-    fun `in login state, password history should be displayed according to state`() {
-        mutableStateFlow.update { it.copy(viewState = DEFAULT_LOGIN_VIEW_STATE) }
-        composeTestRule.onNodeWithTextAfterScroll("Password history: ").assertIsDisplayed()
-        composeTestRule.onNodeWithTextAfterScroll("1").assertIsDisplayed()
-
-        mutableStateFlow.update { currentState ->
-            updateLoginType(currentState) { copy(passwordHistoryCount = null) }
-        }
-
-        composeTestRule.assertScrollableNodeDoesNotExist("Password history: ")
-        composeTestRule.assertScrollableNodeDoesNotExist("1")
     }
     //endregion login
 
@@ -2082,7 +2543,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTag("IdentityCopyNameButton")
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify {
             viewModel.trySendAction(VaultItemAction.ItemType.Identity.CopyIdentityNameClick)
@@ -2091,9 +2552,9 @@ class VaultItemScreenTest : BaseComposeTest() {
 
     @Test
     fun `in identity state, on copy username field click should send CopyUsernameClick`() {
-        val username = "the username"
         mutableStateFlow.update { it.copy(viewState = DEFAULT_IDENTITY_VIEW_STATE) }
-        composeTestRule.onNodeWithTextAfterScroll(username)
+        // We scroll to company, which is right after the username to avoid clicking on the FAB
+        composeTestRule.onNodeWithTextAfterScroll("Company")
 
         composeTestRule
             .onNodeWithTag("IdentityCopyUsernameButton")
@@ -2144,7 +2605,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTag("IdentityCopyPassportNumberButton")
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify {
             viewModel.trySendAction(VaultItemAction.ItemType.Identity.CopyPassportNumberClick)
@@ -2154,13 +2615,11 @@ class VaultItemScreenTest : BaseComposeTest() {
     @Suppress("MaxLineLength")
     @Test
     fun `in identity state, on copy license number field click should send CopyLicenseNumberClick`() {
-        val licenseNumber = "the license number"
         mutableStateFlow.update { it.copy(viewState = DEFAULT_IDENTITY_VIEW_STATE) }
-        composeTestRule.onNodeWithTextAfterScroll(licenseNumber)
-
+        composeTestRule.onNodeWithTextAfterScroll("License number")
         composeTestRule
             .onNodeWithTag("IdentityCopyLicenseNumberButton")
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify {
             viewModel.trySendAction(VaultItemAction.ItemType.Identity.CopyLicenseNumberClick)
@@ -2189,7 +2648,7 @@ class VaultItemScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithTag("IdentityCopyPhoneButton")
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify {
             viewModel.trySendAction(VaultItemAction.ItemType.Identity.CopyPhoneClick)
@@ -2198,9 +2657,9 @@ class VaultItemScreenTest : BaseComposeTest() {
 
     @Test
     fun `in identity state, on copy address field click should send CopyAddressClick`() {
-        val address = "the address"
         mutableStateFlow.update { it.copy(viewState = DEFAULT_IDENTITY_VIEW_STATE) }
-        composeTestRule.onNodeWithTextAfterScroll(address)
+        // We scroll to notes, which is right after the address to avoid clicking on the FAB
+        composeTestRule.onNodeWithTextAfterScroll("Notes")
 
         composeTestRule
             .onNodeWithTag("IdentityCopyAddressButton")
@@ -2478,6 +2937,8 @@ class VaultItemScreenTest : BaseComposeTest() {
             )
         }
 
+        // First scroll past the security code field to avoid clicking the fab
+        composeTestRule.onNodeWithTextAfterScroll("Updated: ")
         composeTestRule
             .onNodeWithContentDescriptionAfterScroll("Copy security code")
             .performClick()
@@ -2503,7 +2964,7 @@ class VaultItemScreenTest : BaseComposeTest() {
         mutableStateFlow.update { it.copy(viewState = DEFAULT_SSH_KEY_VIEW_STATE) }
         composeTestRule
             .onNodeWithContentDescriptionAfterScroll("Copy public key")
-            .performClick()
+            .performSemanticsAction(SemanticsActions.OnClick)
 
         verify(exactly = 1) {
             viewModel.trySendAction(VaultItemAction.ItemType.SshKey.CopyPublicKeyClick)
@@ -2522,7 +2983,7 @@ class VaultItemScreenTest : BaseComposeTest() {
             )
         }
         composeTestRule
-            .onNodeWithText(privateKey)
+            .onNodeWithTextAfterScroll(privateKey)
             .assertIsDisplayed()
     }
 
@@ -2548,8 +3009,10 @@ class VaultItemScreenTest : BaseComposeTest() {
     @Test
     fun `in ssh key state, on copy private key click should send CopyPrivateKeyClick`() {
         mutableStateFlow.update { it.copy(viewState = DEFAULT_SSH_KEY_VIEW_STATE) }
+        // We scroll to fingerprint, which is right after the private to avoid clicking on the FAB
+        composeTestRule.onNodeWithTextAfterScroll("Fingerprint")
         composeTestRule
-            .onNodeWithContentDescriptionAfterScroll("Copy private key")
+            .onNodeWithContentDescription("Copy private key")
             .performClick()
 
         verify(exactly = 1) {
@@ -2567,6 +3030,8 @@ class VaultItemScreenTest : BaseComposeTest() {
     @Test
     fun `in ssh key state, on copy fingerprint click should send CopyFingerprintClick`() {
         mutableStateFlow.update { it.copy(viewState = DEFAULT_SSH_KEY_VIEW_STATE) }
+        // We scroll to notes, which is right after the fingerprint to avoid clicking on the FAB
+        composeTestRule.onNodeWithTextAfterScroll("Notes")
         composeTestRule
             .onNodeWithContentDescription("Copy fingerprint")
             .performClick()
@@ -2670,8 +3135,11 @@ private const val VAULT_ITEM_ID = "vault_item_id"
 
 private val DEFAULT_STATE: VaultItemState = VaultItemState(
     vaultItemId = VAULT_ITEM_ID,
+    cipherType = VaultItemCipherType.LOGIN,
     viewState = VaultItemState.ViewState.Loading,
     dialog = null,
+    baseIconUrl = "https://example.com/",
+    isIconLoadingDisabled = true,
 )
 
 private val DEFAULT_COMMON: VaultItemState.ViewState.Content.Common =
@@ -2711,6 +3179,10 @@ private val DEFAULT_COMMON: VaultItemState.ViewState.Content.Common =
         canDelete = true,
         canAssignToCollections = true,
         canEdit = true,
+        favorite = false,
+        passwordHistoryCount = null,
+        iconData = IconData.Local(iconRes = R.drawable.ic_globe),
+        relatedLocations = persistentListOf(),
     )
 
 private val DEFAULT_PASSKEY = R.string.created_xy.asText(
@@ -2720,7 +3192,6 @@ private val DEFAULT_PASSKEY = R.string.created_xy.asText(
 
 private val DEFAULT_LOGIN: VaultItemState.ViewState.Content.ItemType.Login =
     VaultItemState.ViewState.Content.ItemType.Login(
-        passwordHistoryCount = 1,
         username = "the username",
         passwordData = VaultItemState.ViewState.Content.ItemType.Login.PasswordData(
             password = "the password",
@@ -2772,6 +3243,7 @@ private val DEFAULT_CARD: VaultItemState.ViewState.Content.ItemType.Card =
             code = "the security code",
             isVisible = false,
         ),
+        paymentCardBrandIconData = IconData.Local(R.drawable.ic_payment_card_brand_visa),
     )
 
 private val DEFAULT_SSH_KEY: VaultItemState.ViewState.Content.ItemType.SshKey =
@@ -2795,13 +3267,16 @@ private val EMPTY_COMMON: VaultItemState.ViewState.Content.Common =
         canDelete = true,
         canAssignToCollections = true,
         canEdit = true,
+        favorite = false,
+        passwordHistoryCount = null,
+        iconData = IconData.Local(iconRes = R.drawable.ic_globe),
+        relatedLocations = persistentListOf(),
     )
 
 private val EMPTY_LOGIN_TYPE: VaultItemState.ViewState.Content.ItemType.Login =
     VaultItemState.ViewState.Content.ItemType.Login(
         username = null,
         passwordData = null,
-        passwordHistoryCount = null,
         uris = emptyList(),
         passwordRevisionDate = null,
         totpCodeItemData = null,
@@ -2836,6 +3311,7 @@ private val EMPTY_CARD_TYPE: VaultItemState.ViewState.Content.ItemType.Card =
             code = "",
             isVisible = false,
         ),
+        paymentCardBrandIconData = null,
     )
 
 private val EMPTY_SSH_KEY_TYPE: VaultItemState.ViewState.Content.ItemType.SshKey =
@@ -2855,55 +3331,55 @@ private val EMPTY_LOGIN_VIEW_STATE: VaultItemState.ViewState.Content =
 
 private val EMPTY_IDENTITY_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
-        common = EMPTY_COMMON,
+        common = EMPTY_COMMON.copy(iconData = IconData.Local(R.drawable.ic_id_card)),
         type = EMPTY_IDENTITY_TYPE,
     )
 
 private val EMPTY_CARD_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
-        common = EMPTY_COMMON,
+        common = EMPTY_COMMON.copy(iconData = IconData.Local(R.drawable.ic_payment_card)),
         type = EMPTY_CARD_TYPE,
     )
 
 private val EMPTY_SECURE_NOTE_VIEW_STATE =
     VaultItemState.ViewState.Content(
-        common = EMPTY_COMMON,
+        common = EMPTY_COMMON.copy(iconData = IconData.Local(R.drawable.ic_note)),
         type = VaultItemState.ViewState.Content.ItemType.SecureNote,
     )
 
 private val EMPTY_SSH_KEY_VIEW_STATE =
     VaultItemState.ViewState.Content(
-        common = EMPTY_COMMON,
+        common = EMPTY_COMMON.copy(iconData = IconData.Local(R.drawable.ic_ssh_key)),
         type = EMPTY_SSH_KEY_TYPE,
     )
 
 private val DEFAULT_LOGIN_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
-        type = DEFAULT_LOGIN,
         common = DEFAULT_COMMON,
+        type = DEFAULT_LOGIN,
     )
 
 private val DEFAULT_IDENTITY_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
+        common = DEFAULT_COMMON.copy(iconData = IconData.Local(R.drawable.ic_id_card)),
         type = DEFAULT_IDENTITY,
-        common = DEFAULT_COMMON,
     )
 
 private val DEFAULT_CARD_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
+        common = DEFAULT_COMMON.copy(iconData = IconData.Local(R.drawable.ic_payment_card)),
         type = DEFAULT_CARD,
-        common = DEFAULT_COMMON,
     )
 
 private val DEFAULT_SECURE_NOTE_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
-        common = DEFAULT_COMMON,
+        common = DEFAULT_COMMON.copy(iconData = IconData.Local(R.drawable.ic_note)),
         type = VaultItemState.ViewState.Content.ItemType.SecureNote,
     )
 
 private val DEFAULT_SSH_KEY_VIEW_STATE: VaultItemState.ViewState.Content =
     VaultItemState.ViewState.Content(
-        common = DEFAULT_COMMON,
+        common = DEFAULT_COMMON.copy(iconData = IconData.Local(R.drawable.ic_ssh_key)),
         type = DEFAULT_SSH_KEY,
     )
 

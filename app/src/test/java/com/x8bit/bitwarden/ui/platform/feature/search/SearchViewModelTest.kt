@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import app.cash.turbine.turbineScope
+import com.bitwarden.vault.CipherType
 import com.bitwarden.vault.CipherView
 import com.bitwarden.vault.LoginUriView
 import com.x8bit.bitwarden.R
@@ -45,6 +46,7 @@ import com.x8bit.bitwarden.data.vault.repository.model.RemovePasswordSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.UpdateCipherResult
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
+import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.concat
 import com.x8bit.bitwarden.ui.platform.feature.search.util.createMockDisplayItemForCipher
@@ -53,6 +55,7 @@ import com.x8bit.bitwarden.ui.platform.feature.search.util.toViewState
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.model.ListingItemOverflowAction
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterType
 import com.x8bit.bitwarden.ui.vault.feature.vault.util.toFilteredList
+import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
 import io.mockk.awaits
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -88,7 +91,7 @@ class SearchViewModelTest : BaseViewModelTest() {
         ZoneOffset.UTC,
     )
     private val clipboardManager: BitwardenClipboardManager = mockk {
-        every { setText(any<String>()) } just runs
+        every { setText(text = any<String>(), toastDescriptorOverride = any<Text>()) } just runs
     }
     private val policyManager: PolicyManager = mockk<PolicyManager> {
         every {
@@ -195,8 +198,19 @@ class SearchViewModelTest : BaseViewModelTest() {
     fun `ItemClick for vault item without totp should emit NavigateToViewCipher`() = runTest {
         val viewModel = createViewModel()
         viewModel.eventFlow.test {
-            viewModel.trySendAction(SearchAction.ItemClick(itemId = "mock"))
-            assertEquals(SearchEvent.NavigateToViewCipher(cipherId = "mock"), awaitItem())
+            viewModel.trySendAction(
+                SearchAction.ItemClick(
+                    itemId = "mock",
+                    cipherType = CipherType.LOGIN,
+                ),
+            )
+            assertEquals(
+                SearchEvent.NavigateToViewCipher(
+                    cipherId = "mock",
+                    cipherType = VaultItemCipherType.LOGIN,
+                ),
+                awaitItem(),
+            )
         }
     }
 
@@ -206,8 +220,16 @@ class SearchViewModelTest : BaseViewModelTest() {
             SpecialCircumstance.AddTotpLoginItem(mockk())
         val viewModel = createViewModel()
         viewModel.eventFlow.test {
-            viewModel.trySendAction(SearchAction.ItemClick(itemId = "mock"))
-            assertEquals(SearchEvent.NavigateToEditCipher(cipherId = "mock"), awaitItem())
+            viewModel.trySendAction(
+                SearchAction.ItemClick(itemId = "mock", cipherType = CipherType.LOGIN),
+            )
+            assertEquals(
+                SearchEvent.NavigateToEditCipher(
+                    cipherId = "mock",
+                    cipherType = VaultItemCipherType.LOGIN,
+                ),
+                awaitItem(),
+            )
         }
     }
 
@@ -215,7 +237,7 @@ class SearchViewModelTest : BaseViewModelTest() {
     fun `ItemClick for send item should emit NavigateToEditSend`() = runTest {
         val viewModel = createViewModel(DEFAULT_STATE.copy(searchType = SearchTypeData.Sends.All))
         viewModel.eventFlow.test {
-            viewModel.trySendAction(SearchAction.ItemClick(itemId = "mock"))
+            viewModel.trySendAction(SearchAction.ItemClick(itemId = "mock", cipherType = null))
             assertEquals(SearchEvent.NavigateToEditSend(sendId = "mock"), awaitItem())
         }
     }
@@ -613,7 +635,13 @@ class SearchViewModelTest : BaseViewModelTest() {
                         ),
                     ),
                 )
-                assertEquals(SearchEvent.NavigateToEditCipher(cipherId), awaitItem())
+                assertEquals(
+                    SearchEvent.NavigateToEditCipher(
+                        cipherId = cipherId,
+                        cipherType = VaultItemCipherType.LOGIN,
+                    ),
+                    awaitItem(),
+                )
             }
         }
 
@@ -635,13 +663,20 @@ class SearchViewModelTest : BaseViewModelTest() {
                         masterPasswordRepromptData = MasterPasswordRepromptData.OverflowItem(
                             action = ListingItemOverflowAction.VaultAction.EditClick(
                                 cipherId = cipherId,
+                                cipherType = CipherType.LOGIN,
                                 requiresPasswordReprompt = true,
                             ),
                         ),
                     ),
                 )
                 // Edit actions should navigate to the Edit screen
-                assertEquals(SearchEvent.NavigateToEditCipher(cipherId), awaitItem())
+                assertEquals(
+                    SearchEvent.NavigateToEditCipher(
+                        cipherId = cipherId,
+                        cipherType = VaultItemCipherType.LOGIN,
+                    ),
+                    awaitItem(),
+                )
             }
         }
 
@@ -660,19 +695,22 @@ class SearchViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `OverflowOptionClick Send CopyUrlClick should call setText on clipboardManager`() {
-        val sendUrl = "www.test.com"
-        every { clipboardManager.setText(sendUrl) } just runs
-        val viewModel = createViewModel()
-        viewModel.trySendAction(
-            SearchAction.OverflowOptionClick(
-                ListingItemOverflowAction.SendAction.CopyUrlClick(sendUrl = sendUrl),
-            ),
-        )
-        verify(exactly = 1) {
-            clipboardManager.setText(text = sendUrl)
+    fun `OverflowOptionClick Send CopyUrlClick should call setText on clipboardManager`() =
+        runTest {
+            val sendUrl = "www.test.com"
+            val viewModel = createViewModel()
+            viewModel.trySendAction(
+                SearchAction.OverflowOptionClick(
+                    ListingItemOverflowAction.SendAction.CopyUrlClick(sendUrl = sendUrl),
+                ),
+            )
+            verify(exactly = 1) {
+                clipboardManager.setText(
+                    text = sendUrl,
+                    toastDescriptorOverride = R.string.link.asText(),
+                )
+            }
         }
-    }
 
     @Test
     fun `OverflowOptionClick Send DeleteClick with deleteSend error should display error dialog`() =
@@ -813,7 +851,10 @@ class SearchViewModelTest : BaseViewModelTest() {
                 ),
             )
             verify(exactly = 1) {
-                clipboardManager.setText(notes)
+                clipboardManager.setText(
+                    text = notes,
+                    toastDescriptorOverride = R.string.notes.asText(),
+                )
             }
         }
 
@@ -831,7 +872,10 @@ class SearchViewModelTest : BaseViewModelTest() {
                 ),
             )
             verify(exactly = 1) {
-                clipboardManager.setText(number)
+                clipboardManager.setText(
+                    text = number,
+                    toastDescriptorOverride = R.string.number.asText(),
+                )
             }
         }
 
@@ -854,7 +898,10 @@ class SearchViewModelTest : BaseViewModelTest() {
             )
 
             verify(exactly = 1) {
-                clipboardManager.setText(code)
+                clipboardManager.setText(
+                    text = code,
+                    toastDescriptorOverride = R.string.totp.asText(),
+                )
             }
         }
 
@@ -876,7 +923,10 @@ class SearchViewModelTest : BaseViewModelTest() {
             )
 
             verify(exactly = 0) {
-                clipboardManager.setText(text = any<String>())
+                clipboardManager.setText(
+                    text = any<String>(),
+                    toastDescriptorOverride = any<Text>(),
+                )
             }
         }
 
@@ -897,7 +947,10 @@ class SearchViewModelTest : BaseViewModelTest() {
                 ),
             )
             verify(exactly = 1) {
-                clipboardManager.setText(password)
+                clipboardManager.setText(
+                    text = password,
+                    toastDescriptorOverride = R.string.password.asText(),
+                )
                 organizationEventManager.trackEvent(
                     event = OrganizationEvent.CipherClientCopiedPassword(cipherId = cipherId),
                 )
@@ -921,7 +974,10 @@ class SearchViewModelTest : BaseViewModelTest() {
                 ),
             )
             verify(exactly = 1) {
-                clipboardManager.setText(securityCode)
+                clipboardManager.setText(
+                    text = securityCode,
+                    toastDescriptorOverride = R.string.security_code.asText(),
+                )
                 organizationEventManager.trackEvent(
                     event = OrganizationEvent.CipherClientCopiedCardCode(cipherId = cipherId),
                 )
@@ -942,7 +998,10 @@ class SearchViewModelTest : BaseViewModelTest() {
                 ),
             )
             verify(exactly = 1) {
-                clipboardManager.setText(username)
+                clipboardManager.setText(
+                    text = username,
+                    toastDescriptorOverride = R.string.username.asText(),
+                )
             }
         }
 
@@ -955,11 +1014,18 @@ class SearchViewModelTest : BaseViewModelTest() {
                 SearchAction.OverflowOptionClick(
                     ListingItemOverflowAction.VaultAction.EditClick(
                         cipherId = cipherId,
+                        cipherType = CipherType.LOGIN,
                         requiresPasswordReprompt = true,
                     ),
                 ),
             )
-            assertEquals(SearchEvent.NavigateToEditCipher(cipherId), awaitItem())
+            assertEquals(
+                SearchEvent.NavigateToEditCipher(
+                    cipherId = cipherId,
+                    cipherType = VaultItemCipherType.LOGIN,
+                ),
+                awaitItem(),
+            )
         }
     }
 
@@ -978,16 +1044,25 @@ class SearchViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `OverflowOptionClick Vault ViewClick should emit NavigateToUrl`() = runTest {
+    fun `OverflowOptionClick Vault ViewClick should emit NavigateToViewCipher`() = runTest {
         val cipherId = "cipherId-9876"
         val viewModel = createViewModel()
         viewModel.eventFlow.test {
             viewModel.trySendAction(
                 SearchAction.OverflowOptionClick(
-                    ListingItemOverflowAction.VaultAction.ViewClick(cipherId = cipherId),
+                    ListingItemOverflowAction.VaultAction.ViewClick(
+                        cipherId = cipherId,
+                        cipherType = CipherType.LOGIN,
+                    ),
                 ),
             )
-            assertEquals(SearchEvent.NavigateToViewCipher(cipherId), awaitItem())
+            assertEquals(
+                SearchEvent.NavigateToViewCipher(
+                    cipherId = cipherId,
+                    cipherType = VaultItemCipherType.LOGIN,
+                ),
+                awaitItem(),
+            )
         }
     }
 
@@ -1016,7 +1091,6 @@ class SearchViewModelTest : BaseViewModelTest() {
                 hasMasterPassword = true,
                 isPremiumUser = true,
                 isTotp = false,
-                organizationPremiumStatusMap = emptyMap(),
             )
         } returns expectedViewState
         val dataState = DataState.Loaded(
@@ -1120,7 +1194,6 @@ class SearchViewModelTest : BaseViewModelTest() {
                 hasMasterPassword = true,
                 isPremiumUser = true,
                 isTotp = false,
-                organizationPremiumStatusMap = emptyMap(),
             )
         } returns expectedViewState
         mutableVaultDataStateFlow.tryEmit(
@@ -1234,7 +1307,6 @@ class SearchViewModelTest : BaseViewModelTest() {
                 hasMasterPassword = true,
                 isPremiumUser = true,
                 isTotp = false,
-                organizationPremiumStatusMap = emptyMap(),
             )
         } returns expectedViewState
         val dataState = DataState.Error(
@@ -1351,7 +1423,6 @@ class SearchViewModelTest : BaseViewModelTest() {
                 hasMasterPassword = true,
                 isPremiumUser = true,
                 isTotp = false,
-                organizationPremiumStatusMap = emptyMap(),
             )
         } returns expectedViewState
         val dataState = DataState.NoNetwork(
@@ -1530,7 +1601,6 @@ class SearchViewModelTest : BaseViewModelTest() {
                 hasMasterPassword = true,
                 isPremiumUser = true,
                 isTotp = false,
-                organizationPremiumStatusMap = emptyMap(),
             )
         } returns expectedViewState
         val dataState = DataState.Loaded(
@@ -1566,7 +1636,6 @@ private val DEFAULT_STATE: SearchState = SearchState(
     totpData = null,
     autofillSelectionData = null,
     isPremium = true,
-    organizationPremiumStatusMap = emptyMap(),
 )
 
 private val DEFAULT_USER_STATE = UserState(

@@ -1574,7 +1574,6 @@ class AuthRepositoryTest {
                 errorModel = GetTokenResponseJson.Invalid.ErrorModel(
                     errorMessage = "mock_error_message",
                 ),
-                legacyErrorModel = null,
             )
             .asSuccess()
 
@@ -1594,6 +1593,39 @@ class AuthRepositoryTest {
             )
         }
     }
+
+    @Test
+    @Suppress("MaxLineLength")
+    fun `login get token should return InvalidType NewDeviceVerification when message is new device verification needed`() =
+        runTest {
+            coEvery {
+                identityService.preLogin(email = EMAIL)
+            } returns PRE_LOGIN_SUCCESS.asSuccess()
+            coEvery {
+                identityService.getToken(
+                    email = EMAIL,
+                    authModel = IdentityTokenAuthModel.MasterPassword(
+                        username = EMAIL,
+                        password = PASSWORD_HASH,
+                    ),
+                    captchaToken = null,
+                    uniqueAppId = UNIQUE_APP_ID,
+                )
+            } returns GetTokenResponseJson
+                .Invalid(
+                    errorModel = GetTokenResponseJson.Invalid.ErrorModel(
+                        errorMessage = "new device verification required",
+                    ),
+                )
+                .asSuccess()
+
+            val result = repository.login(email = EMAIL, password = PASSWORD, captchaToken = null)
+            assertEquals(
+                LoginResult.NewDeviceVerification(errorMessage = "new device verification required"),
+                result,
+            )
+            assertEquals(AuthState.Unauthenticated, repository.authStateFlow.value)
+        }
 
     @Test
     @Suppress("MaxLineLength")
@@ -2367,7 +2399,6 @@ class AuthRepositoryTest {
                     errorModel = GetTokenResponseJson.Invalid.ErrorModel(
                         errorMessage = "mock_error_message",
                     ),
-                    legacyErrorModel = null,
                 )
                 .asSuccess()
 
@@ -2836,7 +2867,6 @@ class AuthRepositoryTest {
                 errorModel = GetTokenResponseJson.Invalid.ErrorModel(
                     errorMessage = "mock_error_message",
                 ),
-                legacyErrorModel = null,
             )
             .asSuccess()
 
@@ -4424,7 +4454,6 @@ class AuthRepositoryTest {
                 every { shouldUseKeyConnector } returns true
                 every { type } returns OrganizationType.USER
                 every { keyConnectorUrl } returns null
-                every { shouldUsersGetPremium } returns false
             },
         )
         fakeAuthDiskSource.storeOrganizations(userId = USER_ID_1, organizations = organizations)
@@ -4450,7 +4479,6 @@ class AuthRepositoryTest {
                     every { shouldUseKeyConnector } returns true
                     every { type } returns OrganizationType.USER
                     every { keyConnectorUrl } returns url
-                    every { shouldUsersGetPremium } returns false
                 },
             )
             fakeAuthDiskSource.storeOrganizations(userId = USER_ID_1, organizations = organizations)
@@ -4487,7 +4515,6 @@ class AuthRepositoryTest {
                     every { shouldUseKeyConnector } returns true
                     every { type } returns OrganizationType.USER
                     every { keyConnectorUrl } returns url
-                    every { shouldUsersGetPremium } returns false
                 },
             )
             fakeAuthDiskSource.storeOrganizations(userId = USER_ID_1, organizations = organizations)
@@ -5325,14 +5352,24 @@ class AuthRepositoryTest {
     }
 
     @Test
-    fun `prevalidateSso Failure should return Failure `() = runTest {
+    fun `prevalidateSso Failure should return Failure`() = runTest {
         val organizationId = "organizationid"
         val throwable = Throwable()
         coEvery {
             identityService.prevalidateSso(organizationId)
         } returns throwable.asFailure()
         val result = repository.prevalidateSso(organizationId)
-        assertEquals(PrevalidateSsoResult.Failure, result)
+        assertEquals(PrevalidateSsoResult.Failure(), result)
+    }
+
+    @Test
+    fun `prevalidateSso Failure response should return Failure with message`() = runTest {
+        val organizationId = "organizationid"
+        coEvery {
+            identityService.prevalidateSso(organizationId)
+        } returns PrevalidateSsoResponseJson.Error(message = "Fail").asSuccess()
+        val result = repository.prevalidateSso(organizationId)
+        assertEquals(PrevalidateSsoResult.Failure(message = "Fail"), result)
     }
 
     @Test
@@ -5340,9 +5377,9 @@ class AuthRepositoryTest {
         val organizationId = "organizationid"
         coEvery {
             identityService.prevalidateSso(organizationId)
-        } returns PrevalidateSsoResponseJson(token = "").asSuccess()
+        } returns PrevalidateSsoResponseJson.Success(token = "").asSuccess()
         val result = repository.prevalidateSso(organizationId)
-        assertEquals(PrevalidateSsoResult.Failure, result)
+        assertEquals(PrevalidateSsoResult.Failure(), result)
     }
 
     @Test
@@ -5350,7 +5387,7 @@ class AuthRepositoryTest {
         val organizationId = "organizationid"
         coEvery {
             identityService.prevalidateSso(organizationId)
-        } returns PrevalidateSsoResponseJson(token = "token").asSuccess()
+        } returns PrevalidateSsoResponseJson.Success(token = "token").asSuccess()
         val result = repository.prevalidateSso(organizationId)
         assertEquals(PrevalidateSsoResult.Success(token = "token"), result)
     }
@@ -5633,16 +5670,17 @@ class AuthRepositoryTest {
     @Test
     fun `getPasswordBreachCount should return failure when service returns failure`() = runTest {
         val password = "password"
+        val error = Throwable("Fail")
         coEvery {
             haveIBeenPwnedService.getPasswordBreachCount(password)
-        } returns Throwable("Fail").asFailure()
+        } returns error.asFailure()
 
         val result = repository.getPasswordBreachCount(password)
 
         coVerify(exactly = 1) {
             haveIBeenPwnedService.getPasswordBreachCount(password)
         }
-        assertEquals(BreachCountResult.Error, result)
+        assertEquals(BreachCountResult.Error(error = error), result)
     }
 
     @Test
@@ -6285,9 +6323,29 @@ class AuthRepositoryTest {
 
     @Test
     fun `setOnboardingStatus should save the onboarding status to disk`() {
-        val userId = "userId"
-        repository.setOnboardingStatus(userId = userId, status = OnboardingStatus.NOT_STARTED)
-        assertEquals(OnboardingStatus.NOT_STARTED, fakeAuthDiskSource.getOnboardingStatus(userId))
+        fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
+        repository.setOnboardingStatus(status = OnboardingStatus.NOT_STARTED)
+        assertEquals(
+            OnboardingStatus.NOT_STARTED,
+            fakeAuthDiskSource.getOnboardingStatus(USER_ID_1),
+        )
+    }
+
+    @Test
+    fun `setOnboardingStatus with no userId does not change the onboarding state`() {
+        fakeAuthDiskSource.userState = SINGLE_USER_STATE_1
+        repository.setOnboardingStatus(status = OnboardingStatus.NOT_STARTED)
+        assertEquals(
+            OnboardingStatus.NOT_STARTED,
+            fakeAuthDiskSource.getOnboardingStatus(USER_ID_1),
+        )
+
+        fakeAuthDiskSource.userState = null
+        repository.setOnboardingStatus(status = OnboardingStatus.COMPLETE)
+        val activeUserId = SINGLE_USER_STATE_1.activeUserId
+        assertFalse(
+            fakeAuthDiskSource.getOnboardingStatus(activeUserId) == OnboardingStatus.COMPLETE,
+        )
     }
 
     @Test
@@ -6347,10 +6405,8 @@ class AuthRepositoryTest {
                 userId = USER_ID_1,
                 passwordHash = PASSWORD_HASH,
             )
-            assertEquals(
-                OnboardingStatus.NOT_STARTED,
-                fakeAuthDiskSource.getOnboardingStatus(USER_ID_1),
-            )
+            // This should only be set after they complete a registration and not based on login.
+            assertNull(fakeAuthDiskSource.getOnboardingStatus(USER_ID_1))
         }
 
     @Suppress("MaxLineLength")
@@ -6816,7 +6872,6 @@ class AuthRepositoryTest {
                     ),
                 ),
             )
-
             assertFalse(repository.checkUserNeedsNewDeviceTwoFactorNotice())
         }
 
@@ -6999,16 +7054,6 @@ class AuthRepositoryTest {
             ),
         )
 
-        private val SINGLE_USER_STATE_1_NEW_ACCOUNT = UserStateJson(
-            activeUserId = USER_ID_1,
-            accounts = mapOf(
-                USER_ID_1 to ACCOUNT_1.copy(
-                    profile = ACCOUNT_1.profile.copy(
-                        creationDate = ZonedDateTime.parse("2024-09-14T01:00:00.00Z"),
-                    ),
-                ),
-            ),
-        )
         private val SINGLE_USER_STATE_2 = UserStateJson(
             activeUserId = USER_ID_2,
             accounts = mapOf(

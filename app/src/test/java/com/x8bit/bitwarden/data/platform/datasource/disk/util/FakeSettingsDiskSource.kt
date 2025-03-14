@@ -1,14 +1,17 @@
 package com.x8bit.bitwarden.data.platform.datasource.disk.util
 
 import com.x8bit.bitwarden.data.platform.datasource.disk.SettingsDiskSource
+import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
 import com.x8bit.bitwarden.data.platform.repository.model.UriMatchType
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
+import com.x8bit.bitwarden.data.platform.util.decodeFromStringOrNull
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppLanguage
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
 /**
@@ -16,8 +19,9 @@ import java.time.Instant
  */
 class FakeSettingsDiskSource : SettingsDiskSource {
 
-    private val mutableAppThemeFlow =
-        bufferedMutableSharedFlow<AppTheme>(replay = 1)
+    private val mutableAppLanguageFlow = bufferedMutableSharedFlow<AppLanguage?>(replay = 1)
+
+    private val mutableAppThemeFlow = bufferedMutableSharedFlow<AppTheme>(replay = 1)
 
     private val mutableLastSyncCallFlowMap = mutableMapOf<String, MutableSharedFlow<Instant?>>()
 
@@ -39,9 +43,15 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private val mutableHasUserLoggedInOrCreatedAccount =
         bufferedMutableSharedFlow<Boolean?>()
 
+    private val mutableShouldShowAddLoginCoachMarkFlow = bufferedMutableSharedFlow<Boolean?>()
+
     private val mutableScreenCaptureAllowedFlowMap =
         mutableMapOf<String, MutableSharedFlow<Boolean?>>()
 
+    private val mutableShouldShowGeneratorCoachMarkFlow =
+        bufferedMutableSharedFlow<Boolean?>()
+
+    private var storedAppLanguage: AppLanguage? = null
     private var storedAppTheme: AppTheme = AppTheme.DEFAULT
     private val storedLastSyncTime = mutableMapOf<String, Instant?>()
     private val storedVaultTimeoutActions = mutableMapOf<String, VaultTimeoutAction?>()
@@ -60,6 +70,7 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private val storedScreenCaptureAllowed = mutableMapOf<String, Boolean?>()
     private var storedSystemBiometricIntegritySource: String? = null
     private val storedAccountBiometricIntegrityValidity = mutableMapOf<String, Boolean?>()
+    private val storedAppResumeScreenData = mutableMapOf<String, String?>()
     private val userSignIns = mutableMapOf<String, Boolean>()
     private val userShowAutoFillBadge = mutableMapOf<String, Boolean?>()
     private val userShowUnlockBadge = mutableMapOf<String, Boolean?>()
@@ -68,6 +79,8 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private var addCipherActionCount: Int? = null
     private var generatedActionCount: Int? = null
     private var createSendActionCount: Int? = null
+    private var hasSeenAddLoginCoachMark: Boolean? = null
+    private var hasSeenGeneratorCoachMark: Boolean? = null
 
     private val mutableShowAutoFillSettingBadgeFlowMap =
         mutableMapOf<String, MutableSharedFlow<Boolean?>>()
@@ -81,7 +94,15 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private val mutableVaultRegisteredForExportFlowMap =
         mutableMapOf<String, MutableSharedFlow<Boolean?>>()
 
-    override var appLanguage: AppLanguage? = null
+    override var appLanguage: AppLanguage?
+        get() = storedAppLanguage
+        set(value) {
+            storedAppLanguage = value
+            mutableAppLanguageFlow.tryEmit(value)
+        }
+
+    override val appLanguageFlow: Flow<AppLanguage?>
+        get() = mutableAppLanguageFlow.onSubscription { emit(appLanguage) }
 
     override var appTheme: AppTheme
         get() = storedAppTheme
@@ -378,6 +399,41 @@ class FakeSettingsDiskSource : SettingsDiskSource {
 
     override fun storeCreateSendActionCount(count: Int?) {
         createSendActionCount = count
+    }
+
+    override fun getShouldShowAddLoginCoachMark(): Boolean? {
+        return hasSeenAddLoginCoachMark
+    }
+
+    override fun storeShouldShowAddLoginCoachMark(shouldShow: Boolean?) {
+        hasSeenAddLoginCoachMark = shouldShow
+        mutableShouldShowAddLoginCoachMarkFlow.tryEmit(shouldShow)
+    }
+
+    override fun getShouldShowAddLoginCoachMarkFlow(): Flow<Boolean?> =
+        mutableShouldShowAddLoginCoachMarkFlow.onSubscription {
+            emit(getShouldShowAddLoginCoachMark())
+        }
+
+    override fun getShouldShowGeneratorCoachMark(): Boolean? =
+        hasSeenGeneratorCoachMark
+
+    override fun storeShouldShowGeneratorCoachMark(shouldShow: Boolean?) {
+        hasSeenGeneratorCoachMark = shouldShow
+        mutableShouldShowGeneratorCoachMarkFlow.tryEmit(shouldShow)
+    }
+
+    override fun getShouldShowGeneratorCoachMarkFlow(): Flow<Boolean?> =
+        mutableShouldShowGeneratorCoachMarkFlow.onSubscription {
+            emit(hasSeenGeneratorCoachMark)
+        }
+
+    override fun storeAppResumeScreen(userId: String, screenData: AppResumeScreenData?) {
+        storedAppResumeScreenData[userId] = screenData.let { Json.encodeToString(it) }
+    }
+
+    override fun getAppResumeScreen(userId: String): AppResumeScreenData? {
+        return storedAppResumeScreenData[userId]?.let { Json.decodeFromStringOrNull(it) }
     }
 
     //region Private helper functions

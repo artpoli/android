@@ -8,6 +8,7 @@ import com.bitwarden.fido.Origin
 import com.bitwarden.fido.PublicKeyCredentialAuthenticatorAssertionResponse
 import com.bitwarden.fido.UnverifiedAssetLink
 import com.bitwarden.sdk.Fido2CredentialStore
+import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2AttestationResponse
 import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialAssertionRequest
 import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialAssertionResult
@@ -16,7 +17,7 @@ import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2RegisterCredentialResu
 import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2ValidateOriginResult
 import com.x8bit.bitwarden.data.autofill.fido2.model.PasskeyAssertionOptions
 import com.x8bit.bitwarden.data.autofill.fido2.model.PasskeyAttestationOptions
-import com.x8bit.bitwarden.data.autofill.fido2.model.createMockFido2CredentialRequest
+import com.x8bit.bitwarden.data.autofill.fido2.model.createMockFido2CreateCredentialRequest
 import com.x8bit.bitwarden.data.platform.util.asSuccess
 import com.x8bit.bitwarden.data.platform.util.decodeFromStringOrNull
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
@@ -26,6 +27,7 @@ import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockPublicKeyAssertionResponse
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockPublicKeyAttestationResponse
 import com.x8bit.bitwarden.data.vault.datasource.sdk.util.toAndroidFido2PublicKeyCredential
+import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.vault.feature.addedit.util.createMockPasskeyAssertionOptions
 import com.x8bit.bitwarden.ui.vault.feature.addedit.util.createMockPasskeyAttestationOptions
 import io.mockk.coEvery
@@ -37,7 +39,6 @@ import io.mockk.slot
 import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -170,7 +171,7 @@ class Fido2CredentialManagerTest {
     @Test
     fun `registerFido2Credential should construct ClientData DefaultWithCustomHash when callingAppInfo origin is populated`() =
         runTest {
-            val mockFido2CreateCredentialRequest = createMockFido2CredentialRequest(
+            val mockFido2CreateCredentialRequest = createMockFido2CreateCredentialRequest(
                 number = 1,
                 origin = "origin",
                 signingInfo = mockSigningInfo,
@@ -210,7 +211,7 @@ class Fido2CredentialManagerTest {
                 every { apkContentsSigners } returns arrayOf(Signature(DEFAULT_APP_SIGNATURE))
                 every { hasMultipleSigners() } returns false
             }
-            val mockFido2Request = createMockFido2CredentialRequest(
+            val mockFido2Request = createMockFido2CreateCredentialRequest(
                 number = 1,
                 signingInfo = mockSigningInfo,
             )
@@ -243,7 +244,7 @@ class Fido2CredentialManagerTest {
                 every { apkContentsSigners } returns arrayOf(Signature(DEFAULT_APP_SIGNATURE))
                 every { hasMultipleSigners() } returns false
             }
-            val mockFido2CreateCredentialRequest = createMockFido2CredentialRequest(
+            val mockFido2CreateCredentialRequest = createMockFido2CreateCredentialRequest(
                 number = 1,
                 origin = "origin",
                 signingInfo = mockSigningInfo,
@@ -283,7 +284,7 @@ class Fido2CredentialManagerTest {
                 every { apkContentsSigners } returns arrayOf(Signature(DEFAULT_APP_SIGNATURE))
                 every { hasMultipleSigners() } returns false
             }
-            val mockFido2CreateCredentialRequest = createMockFido2CredentialRequest(
+            val mockFido2CreateCredentialRequest = createMockFido2CreateCredentialRequest(
                 number = 1,
                 origin = "origin",
                 signingInfo = mockSigningInfo,
@@ -328,7 +329,7 @@ class Fido2CredentialManagerTest {
             val mockSigningInfo = mockk<SigningInfo> {
                 every { hasMultipleSigners() } returns true
             }
-            val mockFido2CredentialRequest = createMockFido2CredentialRequest(
+            val mockFido2CredentialRequest = createMockFido2CreateCredentialRequest(
                 number = 1,
                 origin = "origin",
                 signingInfo = mockSigningInfo,
@@ -341,7 +342,10 @@ class Fido2CredentialManagerTest {
             )
 
             assertEquals(
-                Fido2RegisterCredentialResult.Error,
+                Fido2RegisterCredentialResult.Error(
+                    R.string.passkey_operation_failed_because_app_is_signed_incorrectly
+                        .asText(),
+                ),
                 result,
             )
         }
@@ -353,7 +357,7 @@ class Fido2CredentialManagerTest {
             val mockSigningInfo = mockk<SigningInfo> {
                 every { hasMultipleSigners() } returns true
             }
-            val mockFido2CredentialRequest = createMockFido2CredentialRequest(
+            val mockFido2CredentialRequest = createMockFido2CreateCredentialRequest(
                 number = 1,
                 signingInfo = mockSigningInfo,
             )
@@ -365,32 +369,10 @@ class Fido2CredentialManagerTest {
             )
 
             assertEquals(
-                Fido2RegisterCredentialResult.Error,
-                result,
-            )
-        }
-
-    @Test
-    fun `registerFido2Credential should return Error when toHostOrPathOrNull is null`() =
-        runTest {
-            val mockSigningInfo = mockk<SigningInfo> {
-                every { apkContentsSigners } returns arrayOf(Signature(DEFAULT_APP_SIGNATURE))
-                every { hasMultipleSigners() } returns false
-            }
-            val mockFido2CredentialRequest = createMockFido2CredentialRequest(
-                number = 1,
-                origin = "illegal empty spaces",
-                signingInfo = mockSigningInfo,
-            )
-
-            val result = fido2CredentialManager.registerFido2Credential(
-                userId = "mockUserId",
-                fido2CreateCredentialRequest = mockFido2CredentialRequest,
-                selectedCipherView = createMockCipherView(number = 1),
-            )
-
-            assertEquals(
-                Fido2RegisterCredentialResult.Error,
+                Fido2RegisterCredentialResult.Error(
+                    R.string.passkey_operation_failed_because_app_signature_is_invalid
+                        .asText(),
+                ),
                 result,
             )
         }
@@ -402,7 +384,7 @@ class Fido2CredentialManagerTest {
                 every { apkContentsSigners } returns arrayOf(Signature(DEFAULT_APP_SIGNATURE))
                 every { hasMultipleSigners() } returns false
             }
-            val mockFido2CredentialRequest = createMockFido2CredentialRequest(
+            val mockFido2CredentialRequest = createMockFido2CreateCredentialRequest(
                 number = 1,
                 origin = "origin",
                 signingInfo = mockSigningInfo,
@@ -433,14 +415,17 @@ class Fido2CredentialManagerTest {
             )
 
             assertEquals(
-                Fido2RegisterCredentialResult.Error,
+                Fido2RegisterCredentialResult.Error(
+                    R.string.passkey_registration_failed_due_to_an_internal_error
+                        .asText(),
+                ),
                 result,
             )
         }
 
     @Test
     fun `registerFido2Credential should return Error when origin is null`() = runTest {
-        val mockAssertionRequest = createMockFido2CredentialRequest(
+        val mockAssertionRequest = createMockFido2CreateCredentialRequest(
             number = 1,
             origin = null,
             signingInfo = mockSigningInfo,
@@ -466,7 +451,10 @@ class Fido2CredentialManagerTest {
         }
 
         assertEquals(
-            Fido2RegisterCredentialResult.Error,
+            Fido2RegisterCredentialResult.Error(
+                R.string.passkey_operation_failed_because_host_url_is_not_present_in_request
+                    .asText(),
+            ),
             result,
         )
     }
@@ -519,7 +507,7 @@ class Fido2CredentialManagerTest {
             assertEquals(
                 AuthenticateFido2CredentialRequest(
                     userId = "activeUserId",
-                    origin = DEFAULT_ORIGIN,
+                    origin = DEFAULT_WEB_ORIGIN,
                     requestJson = """{"publicKey": ${mockRequest.requestJson}}""",
                     clientData = ClientData.DefaultWithCustomHash(mockRequest.clientDataHash!!),
                     selectedCipherView = mockCipherView,
@@ -569,14 +557,7 @@ class Fido2CredentialManagerTest {
             assertEquals(
                 AuthenticateFido2CredentialRequest(
                     userId = "activeUserId",
-                    origin = Origin.Android(
-                        UnverifiedAssetLink(
-                            packageName = DEFAULT_PACKAGE_NAME,
-                            sha256CertFingerprint = DEFAULT_CERT_FINGERPRINT,
-                            host = DEFAULT_HOST,
-                            assetLinkUrl = mockRequest.origin!!,
-                        ),
-                    ),
+                    origin = DEFAULT_WEB_ORIGIN,
                     requestJson = """{"publicKey": ${mockRequest.requestJson}}""",
                     clientData = ClientData.DefaultWithExtraData(
                         androidPackageName = "android:apk-key-hash:$DEFAULT_APP_SIGNATURE",
@@ -627,7 +608,7 @@ class Fido2CredentialManagerTest {
                     UnverifiedAssetLink(
                         DEFAULT_PACKAGE_NAME,
                         DEFAULT_CERT_FINGERPRINT,
-                        mockAssertionOptions.relyingPartyId!!,
+                        "https://${mockAssertionOptions.relyingPartyId!!}",
                         "https://${mockAssertionOptions.relyingPartyId}",
                     ),
                 ),
@@ -665,7 +646,10 @@ class Fido2CredentialManagerTest {
         }
 
         assertEquals(
-            Fido2CredentialAssertionResult.Error,
+            Fido2CredentialAssertionResult.Error(
+                R.string.passkey_operation_failed_because_host_url_is_not_present_in_request
+                    .asText(),
+            ),
             result,
         )
     }
@@ -750,7 +734,10 @@ class Fido2CredentialManagerTest {
             }
 
             assertEquals(
-                Fido2CredentialAssertionResult.Error,
+                Fido2CredentialAssertionResult.Error(
+                    R.string.passkey_authentication_failed_due_to_an_internal_error
+                        .asText(),
+                ),
                 authResult,
             )
         }
@@ -780,7 +767,10 @@ class Fido2CredentialManagerTest {
         }
 
         assertEquals(
-            Fido2CredentialAssertionResult.Error,
+            Fido2CredentialAssertionResult.Error(
+                R.string.passkey_operation_failed_because_relying_party_cannot_be_identified
+                    .asText(),
+            ),
             result,
         )
     }
@@ -804,7 +794,7 @@ class Fido2CredentialManagerTest {
         )
 
         assertEquals(
-            Fido2CredentialAssertionResult.Error,
+            Fido2CredentialAssertionResult.Error(R.string.generic_error_message.asText()),
             result,
         )
 
@@ -818,7 +808,7 @@ private const val DEFAULT_PACKAGE_NAME = "com.x8bit.bitwarden"
 private const val DEFAULT_APP_SIGNATURE = "0987654321ABCDEF"
 private const val DEFAULT_CERT_FINGERPRINT = "30:39:38:37:36:35:34:33:32:31:41:42:43:44:45:46"
 private const val DEFAULT_HOST = "bitwarden.com"
-private val DEFAULT_ORIGIN = Origin.Android(
+private val DEFAULT_ANDROID_ORIGIN = Origin.Android(
     UnverifiedAssetLink(
         packageName = DEFAULT_PACKAGE_NAME,
         sha256CertFingerprint = DEFAULT_CERT_FINGERPRINT,
@@ -826,6 +816,7 @@ private val DEFAULT_ORIGIN = Origin.Android(
         assetLinkUrl = "bitwarden.com",
     ),
 )
+private val DEFAULT_WEB_ORIGIN = Origin.Web("bitwarden.com")
 private const val DEFAULT_ALLOW_LIST = """
 {
   "apps": [

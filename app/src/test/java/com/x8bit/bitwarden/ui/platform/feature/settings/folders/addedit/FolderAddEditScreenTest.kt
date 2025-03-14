@@ -15,6 +15,7 @@ import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFl
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.feature.settings.folders.model.FolderAddEditType
+import com.x8bit.bitwarden.ui.util.assertNoPopupExists
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -37,7 +38,7 @@ class FolderAddEditScreenTest : BaseComposeTest() {
 
     @Before
     fun setup() {
-        composeTestRule.setContent {
+        setContent {
             FolderAddEditScreen(
                 viewModel = viewModel,
                 onNavigateBack = { onNavigateBackCalled = true },
@@ -203,7 +204,7 @@ class FolderAddEditScreenTest : BaseComposeTest() {
 
     @Test
     fun `loading dialog should display according to state`() {
-        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+        composeTestRule.assertNoPopupExists()
 
         mutableStateFlow.update {
             it.copy(
@@ -215,10 +216,10 @@ class FolderAddEditScreenTest : BaseComposeTest() {
 
         composeTestRule
             .onNodeWithText("Loading")
-            .assert(hasAnyAncestor(isDialog()))
+            .assert(hasAnyAncestor(isPopup()))
             .assertIsDisplayed()
 
-        composeTestRule.onNode(isDialog()).assertIsDisplayed()
+        composeTestRule.onNode(isPopup()).assertIsDisplayed()
     }
 
     @Test
@@ -245,9 +246,11 @@ private val DEFAULT_STATE_ADD = FolderAddEditState(
     folderAddEditType = FolderAddEditType.AddItem,
     viewState = FolderAddEditState.ViewState.Loading,
     dialog = null,
+    parentFolderName = null,
 )
 private val DEFAULT_STATE_EDIT = FolderAddEditState(
     folderAddEditType = FolderAddEditType.EditItem("1"),
     viewState = FolderAddEditState.ViewState.Loading,
     dialog = null,
+    parentFolderName = null,
 )

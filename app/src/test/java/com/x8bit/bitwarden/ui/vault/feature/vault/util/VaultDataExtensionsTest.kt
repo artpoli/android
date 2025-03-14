@@ -61,8 +61,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -99,8 +97,8 @@ class VaultDataExtensionsTest {
                 ),
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
-                totpItemsCount = 0,
-                itemTypesCount = 4,
+                totpItemsCount = 1,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -126,8 +124,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.MyVault,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -148,7 +144,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 1,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -183,8 +179,6 @@ class VaultDataExtensionsTest {
                 organizationName = "Mock Organization 1",
             ),
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -210,8 +204,8 @@ class VaultDataExtensionsTest {
                 ),
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
-                totpItemsCount = 0,
-                itemTypesCount = 4,
+                totpItemsCount = 1,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -233,8 +227,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -258,8 +250,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -270,9 +260,9 @@ class VaultDataExtensionsTest {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `toViewState should return 1 for totpItemsCount if user has premium and has one totp item and item is owned by user`() {
+    fun `toViewState should return 1 for totpItemsCount if user has premium and has one totp item`() {
         val vaultData = VaultData(
-            cipherViewList = listOf(createMockCipherView(number = 1, organizationId = null)),
+            cipherViewList = listOf(createMockCipherView(number = 1)),
             collectionViewList = listOf(),
             folderViewList = listOf(),
             sendViewList = listOf(),
@@ -284,8 +274,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -300,7 +288,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 1,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -323,8 +311,6 @@ class VaultDataExtensionsTest {
             isIconLoadingDisabled = false,
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -339,7 +325,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 0,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -362,8 +348,6 @@ class VaultDataExtensionsTest {
             isIconLoadingDisabled = false,
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -378,7 +362,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 1,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -403,8 +387,6 @@ class VaultDataExtensionsTest {
             isIconLoadingDisabled = false,
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -419,7 +401,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 1,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -628,8 +610,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -643,8 +623,8 @@ class VaultDataExtensionsTest {
                 collectionItems = listOf(),
                 noFolderItems = listOf(),
                 trashItemsCount = 2,
-                totpItemsCount = 0,
-                itemTypesCount = 4,
+                totpItemsCount = 1,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -669,8 +649,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -685,7 +663,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 2,
                 totpItemsCount = 0,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -700,7 +678,7 @@ class VaultDataExtensionsTest {
         every { uriMock.host } returns "www.mockuri1.com"
         val vaultData = VaultData(
             cipherViewList = List(100) {
-                createMockCipherView(number = it, folderId = null, organizationUsesTotp = true)
+                createMockCipherView(number = it, folderId = null)
             },
             collectionViewList = listOf(),
             folderViewList = listOf(),
@@ -713,8 +691,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -735,7 +711,7 @@ class VaultDataExtensionsTest {
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 100,
-                itemTypesCount = 4,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -770,8 +746,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -813,8 +787,8 @@ class VaultDataExtensionsTest {
                     ),
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
-                totpItemsCount = 0,
-                itemTypesCount = 4,
+                totpItemsCount = 1,
+                itemTypesCount = 5,
                 sshKeyItemsCount = 0,
             ),
             actual,
@@ -822,7 +796,7 @@ class VaultDataExtensionsTest {
     }
 
     @Test
-    fun `toViewState should exclude SSH keys if showSshKeys is false`() {
+    fun `toViewState should include SSH key vault items and type count`() {
         val vaultData = VaultData(
             cipherViewList = listOf(
                 createMockCipherView(number = 1),
@@ -840,52 +814,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = false,
-            organizationPremiumStatusMap = emptyMap(),
-        )
-
-        assertEquals(
-            VaultState.ViewState.Content(
-                loginItemsCount = 1,
-                cardItemsCount = 0,
-                identityItemsCount = 0,
-                secureNoteItemsCount = 0,
-                // Verify SSH key vault items are not counted when showSshKeys is false.
-                sshKeyItemsCount = 0,
-                favoriteItems = listOf(),
-                collectionItems = listOf(),
-                folderItems = listOf(),
-                noFolderItems = listOf(),
-                trashItemsCount = 0,
-                totpItemsCount = 0,
-                // Verify item types count excludes CipherType.SSH_KEY when showSshKeys is false.
-                itemTypesCount = 4,
-            ),
-            actual,
-        )
-    }
-
-    @Test
-    fun `toViewState should include SSH key vault items and type count if showSshKeys is true`() {
-        val vaultData = VaultData(
-            cipherViewList = listOf(
-                createMockCipherView(number = 1, organizationId = null),
-                createMockCipherView(number = 2, cipherType = CipherType.SSH_KEY),
-            ),
-            collectionViewList = listOf(),
-            folderViewList = listOf(),
-            sendViewList = listOf(),
-            fido2CredentialAutofillViewList = null,
-        )
-
-        val actual = vaultData.toViewState(
-            isPremium = true,
-            isIconLoadingDisabled = false,
-            baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
-            vaultFilterType = VaultFilterType.AllVaults,
-            hasMasterPassword = true,
-            showSshKeys = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -943,8 +871,6 @@ class VaultDataExtensionsTest {
             baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
             vaultFilterType = VaultFilterType.AllVaults,
             hasMasterPassword = true,
-            showSshKeys = true,
-            organizationPremiumStatusMap = emptyMap(),
         )
 
         assertEquals(
@@ -990,8 +916,15 @@ private fun createMockSshKeyVaultItem(number: Int): VaultState.ViewState.VaultIt
         privateKey = "mockPrivateKey-$number".asText(),
         fingerprint = "mockKeyFingerprint-$number".asText(),
         overflowOptions = listOf(
-            ListingItemOverflowAction.VaultAction.ViewClick("mockId-$number"),
-            ListingItemOverflowAction.VaultAction.EditClick("mockId-$number", true),
+            ListingItemOverflowAction.VaultAction.ViewClick(
+                cipherId = "mockId-$number",
+                cipherType = CipherType.SSH_KEY,
+            ),
+            ListingItemOverflowAction.VaultAction.EditClick(
+                cipherId = "mockId-$number",
+                cipherType = CipherType.SSH_KEY,
+                requiresPasswordReprompt = true,
+            ),
         ),
         startIcon = IconData.Local(iconRes = R.drawable.ic_ssh_key),
         startIconTestTag = "SshKeyCipherIcon",

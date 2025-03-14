@@ -1,5 +1,6 @@
 package com.x8bit.bitwarden.data.platform.datasource.disk
 
+import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
 import com.x8bit.bitwarden.data.platform.repository.model.UriMatchType
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppLanguage
@@ -17,6 +18,11 @@ interface SettingsDiskSource {
      * The currently persisted app language (or `null` if not set).
      */
     var appLanguage: AppLanguage?
+
+    /**
+     * Emits updates that track [AppLanguage].
+     */
+    val appLanguageFlow: Flow<AppLanguage?>
 
     /**
      * Has the initial autofill dialog been shown to the user.
@@ -356,4 +362,44 @@ interface SettingsDiskSource {
      * Stores the given [count] completed create send actions for the device.
      */
     fun storeCreateSendActionCount(count: Int?)
+
+    /**
+     * Gets the Boolean value of if the Add Login CoachMark tour has been interacted with.
+     */
+    fun getShouldShowAddLoginCoachMark(): Boolean?
+
+    /**
+     * Stores a value for if the Add Login CoachMark tour has been interacted with
+     */
+    fun storeShouldShowAddLoginCoachMark(shouldShow: Boolean?)
+
+    /**
+     * Returns an [Flow] to observe updates to the "ShouldShowAddLoginCoachMark" value.
+     */
+    fun getShouldShowAddLoginCoachMarkFlow(): Flow<Boolean?>
+
+    /**
+     * Gets the Boolean value of if the Generator CoachMark tour has been interacted with.
+     */
+    fun getShouldShowGeneratorCoachMark(): Boolean?
+
+    /**
+     * Stores a value for if the Generator CoachMark tour has been interacted with
+     */
+    fun storeShouldShowGeneratorCoachMark(shouldShow: Boolean?)
+
+    /**
+     * Returns an [Flow] to observe updates to the "ShouldShowGeneratorCoachMark" value.
+     */
+    fun getShouldShowGeneratorCoachMarkFlow(): Flow<Boolean?>
+
+    /**
+     * Stores the given [screenData] as the screen to resume to identified by [userId].
+     */
+    fun storeAppResumeScreen(userId: String, screenData: AppResumeScreenData?)
+
+    /**
+     * Gets the screen data to resume to for the device identified by [userId] or null if no screen
+     */
+    fun getAppResumeScreen(userId: String): AppResumeScreenData?
 }

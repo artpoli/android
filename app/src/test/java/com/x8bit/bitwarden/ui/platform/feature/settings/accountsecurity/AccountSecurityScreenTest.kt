@@ -5,13 +5,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTextExactly
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -30,6 +29,8 @@ import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricSupportStatus
 import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricsManager
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.util.assertNoDialogExists
+import com.x8bit.bitwarden.ui.util.assertNoPopupExists
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -82,15 +83,16 @@ class AccountSecurityScreenTest : BaseComposeTest() {
 
     @Before
     fun setUp() {
-        composeTestRule.setContent {
+        setContent(
+            biometricsManager = biometricsManager,
+            intentManager = intentManager,
+        ) {
             AccountSecurityScreen(
                 onNavigateBack = { onNavigateBackCalled = true },
                 onNavigateToDeleteAccount = { onNavigateToDeleteAccountCalled = true },
                 onNavigateToPendingRequests = { onNavigateToPendingRequestsCalled = true },
                 onNavigateToSetupUnlockScreen = { onNavigateToUnlockSetupScreenCalled = true },
                 viewModel = viewModel,
-                biometricsManager = biometricsManager,
-                intentManager = intentManager,
             )
         }
     }
@@ -134,7 +136,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     }
 
     @Test
-    fun `on unlock with biometrics toggle should send UnlockWithBiometricToggle`() {
+    fun `on unlock with biometrics toggle should send UnlockWithBiometricToggleDisabled`() {
         mutableStateFlow.update { it.copy(isUnlockWithBiometricsEnabled = true) }
         composeTestRule
             .onNodeWithText("Unlock with Biometrics")
@@ -145,7 +147,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
             .performScrollTo()
             .performClick()
         verify(exactly = 1) {
-            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggle(false))
+            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggleDisabled)
         }
     }
 
@@ -212,8 +214,9 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         }
     }
 
+    @Suppress("MaxLineLength")
     @Test
-    fun `on unlock with biometrics toggle should send UnlockWithBiometricToggle on success`() {
+    fun `on unlock with biometrics toggle should send UnlockWithBiometricToggleEnabled on success`() {
         composeTestRule
             .onNodeWithText("Unlock with Biometrics")
             .performScrollTo()
@@ -229,7 +232,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
             .performScrollTo()
             .assertIsOff()
         verify(exactly = 1) {
-            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggle(true))
+            viewModel.trySendAction(AccountSecurityAction.UnlockWithBiometricToggleEnabled(CIPHER))
         }
     }
 
@@ -238,6 +241,77 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.onNodeWithText("Unlock with Biometrics").assertIsOff()
         mutableStateFlow.update { it.copy(isUnlockWithBiometricsEnabled = true) }
         composeTestRule.onNodeWithText("Unlock with Biometrics").assertIsOn()
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `unlock option section should be displayed according to state if biometrics is available`() {
+        val section = "UNLOCK OPTIONS"
+        composeTestRule.onNodeWithText(section).performScrollTo().assertIsDisplayed()
+
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                removeUnlockWithPinPolicyEnabled = true,
+                isUnlockWithPinEnabled = true,
+            )
+        }
+        composeTestRule.onNodeWithText(section).performScrollTo().assertIsDisplayed()
+
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                removeUnlockWithPinPolicyEnabled = true,
+                isUnlockWithPinEnabled = false,
+            )
+        }
+        composeTestRule.onNodeWithText(section).performScrollTo().assertIsDisplayed()
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `unlock option section should be displayed according to state if biometrics is not available`() {
+        coEvery {
+            biometricsManager.biometricSupportStatus
+        } returns BiometricSupportStatus.NOT_SUPPORTED
+        val section = "UNLOCK OPTIONS"
+
+        composeTestRule.onNodeWithText(section).performScrollTo().assertIsDisplayed()
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                removeUnlockWithPinPolicyEnabled = true,
+                isUnlockWithPinEnabled = true,
+            )
+        }
+        composeTestRule.onNodeWithText(section).performScrollTo().assertIsDisplayed()
+
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                removeUnlockWithPinPolicyEnabled = true,
+                isUnlockWithPinEnabled = false,
+            )
+        }
+        composeTestRule.onNodeWithText(section).assertDoesNotExist()
+    }
+
+    @Test
+    fun `unlock with pin toggle should be displayed according to state`() {
+        val toggleText = "Unlock with PIN code"
+        composeTestRule.onNodeWithText(toggleText).performScrollTo().assertIsDisplayed()
+
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                removeUnlockWithPinPolicyEnabled = true,
+                isUnlockWithPinEnabled = true,
+            )
+        }
+        composeTestRule.onNodeWithText(toggleText).performScrollTo().assertIsDisplayed()
+
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                removeUnlockWithPinPolicyEnabled = true,
+                isUnlockWithPinEnabled = false,
+            )
+        }
+        composeTestRule.onNodeWithText(toggleText).assertDoesNotExist()
     }
 
     @Test
@@ -549,16 +623,14 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     @Test
     fun `session timeout should be updated on or off according to state`() {
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
-            .assertTextEquals("Session timeout", "30 minutes")
+            .assertIsDisplayed()
         mutableStateFlow.update { it.copy(vaultTimeout = VaultTimeout.FourHours) }
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "4 hours. Session timeout")
             .performScrollTo()
-            .assertTextEquals("Session timeout", "4 hours")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -566,8 +638,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -631,8 +702,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         }
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -685,8 +755,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -704,8 +773,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -728,8 +796,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -766,8 +833,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -796,8 +862,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onAllNodesWithText("Session timeout")
-            .filterToOne(hasClickAction())
+            .onNodeWithContentDescription(label = "30 minutes. Session timeout")
             .performScrollTo()
             .performClick()
 
@@ -978,12 +1043,12 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText("Vault timeout action")
+            .onAllNodesWithText("Session timeout action")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -1006,12 +1071,12 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText("Vault timeout action")
+            .onAllNodesWithText("Session timeout action")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -1030,12 +1095,11 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule.assertNoDialogExists()
     }
 
-    @Suppress("MaxLineLength")
     @Test
     fun `on session timeout action dialog Logout click should open a confirmation dialog`() {
         composeTestRule.assertNoDialogExists()
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
             .performClick()
 
@@ -1074,7 +1138,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     fun `on session timeout action Logout confirmation dialog cancel click should dismiss the dialog`() {
         composeTestRule.assertNoDialogExists()
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
             .performClick()
 
@@ -1103,7 +1167,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     fun `on session timeout action Logout confirmation dialog Yes click should dismiss the dialog and send VaultTimeoutActionSelect`() {
         composeTestRule.assertNoDialogExists()
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
             .performClick()
 
@@ -1133,18 +1197,17 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         }
     }
 
-    @Suppress("MaxLineLength")
     @Test
     fun `on session timeout action dialog cancel click should close the dialog`() {
         composeTestRule.assertNoDialogExists()
 
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
             .performClick()
 
         composeTestRule
-            .onAllNodesWithText("Vault timeout action")
+            .onAllNodesWithText("Session timeout action")
             .filterToOne(hasAnyAncestor(isDialog()))
             .assertIsDisplayed()
         composeTestRule
@@ -1160,14 +1223,14 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     @Test
     fun `session timeout action should be updated according to state`() {
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Lock. Session timeout action")
             .performScrollTo()
-            .assertTextEquals("Session timeout action", "Lock")
+            .assertIsDisplayed()
         mutableStateFlow.update { it.copy(vaultTimeoutAction = VaultTimeoutAction.LOGOUT) }
         composeTestRule
-            .onNodeWithText("Session timeout action")
+            .onNodeWithContentDescription(label = "Log out. Session timeout action")
             .performScrollTo()
-            .assertTextEquals("Session timeout action", "Log out")
+            .assertIsDisplayed()
     }
 
     @Suppress("MaxLineLength")
@@ -1394,7 +1457,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
     @Test
     fun `loading dialog should be displayed according to state`() {
         val loadingMessage = "Loading"
-        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+        composeTestRule.assertNoPopupExists()
         composeTestRule.onNodeWithText(loadingMessage).assertDoesNotExist()
 
         mutableStateFlow.update {
@@ -1404,7 +1467,7 @@ class AccountSecurityScreenTest : BaseComposeTest() {
         composeTestRule
             .onNodeWithText("Loading")
             .assertIsDisplayed()
-            .assert(hasAnyAncestor(isDialog()))
+            .assert(hasAnyAncestor(isPopup()))
     }
 
     @Test
@@ -1551,4 +1614,5 @@ private val DEFAULT_STATE = AccountSecurityState(
     vaultTimeoutPolicyMinutes = null,
     vaultTimeoutPolicyAction = null,
     shouldShowUnlockActionCard = false,
+    removeUnlockWithPinPolicyEnabled = false,
 )

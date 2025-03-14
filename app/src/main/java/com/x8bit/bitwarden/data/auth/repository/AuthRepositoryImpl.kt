@@ -17,11 +17,13 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.DeviceDataModel
 import com.x8bit.bitwarden.data.auth.datasource.network.model.GetTokenResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.IdentityTokenAuthModel
 import com.x8bit.bitwarden.data.auth.datasource.network.model.PasswordHintResponseJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.PrevalidateSsoResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.RefreshTokenResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterFinishRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendEmailRequestJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendNewDeviceOtpRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailResponseJson
@@ -223,6 +225,11 @@ class AuthRepositoryImpl(
      * The information necessary to resend the verification code email for two-factor login.
      */
     private var resendEmailRequestJson: ResendEmailRequestJson? = null
+
+    /**
+     * The information necessary to resend the verification code email for new devices.
+     */
+    private var resendNewDeviceOtpRequestJson: ResendNewDeviceOtpRequestJson? = null
 
     private var organizationIdentifier: String? = null
 
@@ -685,6 +692,26 @@ class AuthRepositoryImpl(
 
     override suspend fun login(
         email: String,
+        password: String?,
+        newDeviceOtp: String,
+        captchaToken: String?,
+        orgIdentifier: String?,
+    ): LoginResult = identityTokenAuthModel
+        ?.let {
+            loginCommon(
+                email = email,
+                password = password,
+                authModel = it,
+                newDeviceOtp = newDeviceOtp,
+                captchaToken = captchaToken ?: twoFactorResponse?.captchaToken,
+                deviceData = twoFactorDeviceData,
+                orgIdentifier = orgIdentifier,
+            )
+        }
+        ?: LoginResult.Error(errorMessage = null)
+
+    override suspend fun login(
+        email: String,
         ssoCode: String,
         ssoCodeVerifier: String,
         ssoRedirectUri: String,
@@ -758,6 +785,16 @@ class AuthRepositoryImpl(
         resendEmailRequestJson
             ?.let { jsonRequest ->
                 accountsService.resendVerificationCodeEmail(body = jsonRequest).fold(
+                    onFailure = { ResendEmailResult.Error(message = it.message) },
+                    onSuccess = { ResendEmailResult.Success },
+                )
+            }
+            ?: ResendEmailResult.Error(message = null)
+
+    override suspend fun resendNewDeviceOtp(): ResendEmailResult =
+        resendNewDeviceOtpRequestJson
+            ?.let { jsonRequest ->
+                accountsService.resendNewDeviceOtp(body = jsonRequest).fold(
                     onFailure = { ResendEmailResult.Error(message = it.message) },
                     onSuccess = { ResendEmailResult.Success },
                 )
@@ -873,14 +910,7 @@ class AuthRepositoryImpl(
                         }
 
                         is RegisterResponseJson.Invalid -> {
-                            RegisterResult.Error(
-                                errorMessage = it
-                                    .validationErrors
-                                    ?.values
-                                    ?.firstOrNull()
-                                    ?.firstOrNull()
-                                    ?: it.message,
-                            )
+                            RegisterResult.Error(errorMessage = it.message)
                         }
                     }
                 },
@@ -1088,6 +1118,7 @@ class AuthRepositoryImpl(
                     }
 
                     is VaultUnlockResult.AuthenticationError,
+                    VaultUnlockResult.BiometricDecodingError,
                     VaultUnlockResult.InvalidStateError,
                     VaultUnlockResult.GenericError,
                         -> {
@@ -1162,13 +1193,21 @@ class AuthRepositoryImpl(
         )
         .fold(
             onSuccess = {
-                if (it.token.isNullOrBlank()) {
-                    PrevalidateSsoResult.Failure
-                } else {
-                    PrevalidateSsoResult.Success(it.token)
+                when (it) {
+                    is PrevalidateSsoResponseJson.Error -> {
+                        PrevalidateSsoResult.Failure(message = it.message)
+                    }
+
+                    is PrevalidateSsoResponseJson.Success -> {
+                        if (it.token.isNullOrBlank()) {
+                            PrevalidateSsoResult.Failure()
+                        } else {
+                            PrevalidateSsoResult.Success(token = it.token)
+                        }
+                    }
                 }
             },
-            onFailure = { PrevalidateSsoResult.Failure },
+            onFailure = { PrevalidateSsoResult.Failure() },
         )
 
     override fun setSsoCallbackResult(result: SsoCallbackResult) {
@@ -1190,17 +1229,22 @@ class AuthRepositoryImpl(
         haveIBeenPwnedService
             .getPasswordBreachCount(password)
             .fold(
-                onFailure = { BreachCountResult.Error },
+                onFailure = { BreachCountResult.Error(error = it) },
                 onSuccess = { BreachCountResult.Success(it) },
             )
 
     override suspend fun getPasswordStrength(
-        email: String,
+        email: String?,
         password: String,
     ): PasswordStrengthResult =
         authSdkSource
             .passwordStrength(
-                email = email,
+                email = email
+                    ?: userStateFlow
+                        .value
+                        ?.activeAccount
+                        ?.email
+                        .orEmpty(),
                 password = password,
             )
             .fold(
@@ -1333,8 +1377,13 @@ class AuthRepositoryImpl(
             )
     }
 
-    override fun setOnboardingStatus(userId: String, status: OnboardingStatus?) {
-        authDiskSource.storeOnboardingStatus(userId = userId, onboardingStatus = status)
+    override fun setOnboardingStatus(status: OnboardingStatus) {
+        activeUserId?.let { userId ->
+            authDiskSource.storeOnboardingStatus(
+                userId = userId,
+                onboardingStatus = status,
+            )
+        }
     }
 
     override fun getNewDeviceNoticeState(): NewDeviceNoticeState? {
@@ -1372,6 +1421,7 @@ class AuthRepositoryImpl(
                 // the notice needs to appear again
                 NewDeviceNoticeDisplayStatus.HAS_SEEN ->
                     newDeviceNoticeState.shouldDisplayNoticeIfSeen
+
                 NewDeviceNoticeDisplayStatus.HAS_NOT_SEEN -> true
                 // the user never needs to see the notice again
                 NewDeviceNoticeDisplayStatus.CAN_ACCESS_EMAIL_PERMANENT -> false
@@ -1577,6 +1627,7 @@ class AuthRepositoryImpl(
         deviceData: DeviceDataModel? = null,
         orgIdentifier: String? = null,
         captchaToken: String?,
+        newDeviceOtp: String? = null,
     ): LoginResult = identityService
         .getToken(
             uniqueAppId = authDiskSource.uniqueAppId,
@@ -1584,6 +1635,7 @@ class AuthRepositoryImpl(
             authModel = authModel,
             twoFactorData = twoFactorData ?: getRememberedTwoFactorData(email),
             captchaToken = captchaToken,
+            newDeviceOtp = newDeviceOtp,
         )
         .fold(
             onFailure = { throwable ->
@@ -1592,6 +1644,7 @@ class AuthRepositoryImpl(
                     configDiskSource.serverConfig?.isOfficialBitwardenServer == false -> {
                         LoginResult.UnofficialServerError
                     }
+
                     else -> LoginResult.Error(errorMessage = null)
                 }
             },
@@ -1616,9 +1669,22 @@ class AuthRepositoryImpl(
                         orgIdentifier = orgIdentifier,
                     )
 
-                    is GetTokenResponseJson.Invalid -> LoginResult.Error(
-                        errorMessage = loginResponse.errorMessage,
-                    )
+                    is GetTokenResponseJson.Invalid -> {
+                        when (loginResponse.invalidType) {
+                            is GetTokenResponseJson.Invalid.InvalidType.NewDeviceVerification ->
+                                handleLoginCommonNewDeviceVerification(
+                                    email = email,
+                                    authModel = authModel,
+                                    error = loginResponse.errorMessage,
+                                )
+
+                            is GetTokenResponseJson.Invalid.InvalidType.GenericInvalid -> {
+                                LoginResult.Error(
+                                    errorMessage = loginResponse.errorMessage,
+                                )
+                            }
+                        }
+                    }
                 }
             },
         )
@@ -1706,15 +1772,6 @@ class AuthRepositoryImpl(
         )
         settingsRepository.hasUserLoggedInOrCreatedAccount = true
 
-        val shouldSetOnboardingStatus = featureFlagManager.getFeatureFlag(FlagKey.OnboardingFlow) &&
-            !settingsRepository.getUserHasLoggedInValue(userId = userId)
-        if (shouldSetOnboardingStatus) {
-            setOnboardingStatus(
-                userId = userId,
-                status = OnboardingStatus.NOT_STARTED,
-            )
-        }
-
         authDiskSource.userState = userStateJson
         loginResponse.key?.let {
             // Only set the value if it's present, since we may have set it already
@@ -1743,6 +1800,7 @@ class AuthRepositoryImpl(
         twoFactorResponse = null
         resendEmailRequestJson = null
         twoFactorDeviceData = null
+        resendNewDeviceOtpRequestJson = null
         settingsRepository.setDefaultsIfNecessary(userId = userId)
         settingsRepository.storeUserHasLoggedInValue(userId)
         vaultRepository.syncIfNecessary()
@@ -1773,6 +1831,24 @@ class AuthRepositoryImpl(
         // If this error was received, it also means any cached two-factor token is invalid.
         authDiskSource.storeTwoFactorToken(email = email, twoFactorToken = null)
         return LoginResult.TwoFactorRequired
+    }
+
+    /**
+     * A helper method that processes the
+     * [GetTokenResponseJson.Invalid.InvalidType.NewDeviceVerification] when logging in.
+     */
+    private fun handleLoginCommonNewDeviceVerification(
+        email: String,
+        authModel: IdentityTokenAuthModel,
+        error: String?,
+    ): LoginResult {
+        identityTokenAuthModel = authModel
+        resendNewDeviceOtpRequestJson = ResendNewDeviceOtpRequestJson(
+            email = email,
+            passwordHash = authModel.password,
+        )
+
+        return LoginResult.NewDeviceVerification(error)
     }
 
     /**

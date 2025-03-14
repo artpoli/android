@@ -45,12 +45,11 @@ fun createMockCipherView(
     cipherType: CipherType = CipherType.LOGIN,
     repromptType: CipherRepromptType = CipherRepromptType.NONE,
     totp: String? = "mockTotp-$number",
+    organizationId: String? = "mockOrganizationId-$number",
     folderId: String? = "mockId-$number",
     clock: Clock = FIXED_CLOCK,
     fido2Credentials: List<Fido2Credential>? = null,
     sshKey: SshKeyView? = createMockSshKeyView(number = number),
-    organizationUsesTotp: Boolean = false,
-    organizationId: String? = "mockOrganizationId-$number",
 ): CipherView =
     CipherView(
         id = "mockId-$number",
@@ -87,7 +86,7 @@ fun createMockCipherView(
         reprompt = repromptType,
         secureNote = createMockSecureNoteView().takeIf { cipherType == CipherType.SECURE_NOTE },
         edit = true,
-        organizationUseTotp = organizationUsesTotp,
+        organizationUseTotp = false,
         viewPassword = true,
         localData = null,
     )
@@ -182,14 +181,14 @@ fun createMockAttachmentView(number: Int, key: String? = "mockKey-$number"): Att
 /**
  * Create a mock [CardView] with a given [number].
  */
-fun createMockCardView(number: Int): CardView =
+fun createMockCardView(number: Int, brand: String = "mockBrand-$number"): CardView =
     CardView(
         number = "mockNumber-$number",
         expMonth = "mockExpMonth-$number",
         code = "mockCode-$number",
         expYear = "mockExpirationYear-$number",
         cardholderName = "mockCardholderName-$number",
-        brand = "mockBrand-$number",
+        brand = brand,
     )
 
 /**

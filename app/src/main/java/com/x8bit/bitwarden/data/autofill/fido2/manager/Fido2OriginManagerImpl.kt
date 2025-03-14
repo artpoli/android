@@ -32,13 +32,6 @@ class Fido2OriginManagerImpl(
         }
     }
 
-    override suspend fun getPrivilegedAppOriginOrNull(callingAppInfo: CallingAppInfo): String? {
-        if (!callingAppInfo.isOriginPopulated()) return null
-        return callingAppInfo.getOrigin(getGoogleAllowListOrNull().orEmpty())
-            ?: callingAppInfo.getOrigin(getCommunityAllowListOrNull().orEmpty())
-                ?.takeUnless { !callingAppInfo.isOriginPopulated() }
-    }
-
     private suspend fun validateCallingApplicationAssetLinks(
         callingAppInfo: CallingAppInfo,
         relyingPartyId: String,
@@ -123,7 +116,10 @@ class Fido2OriginManagerImpl(
             }
             .fold(
                 onSuccess = { it },
-                onFailure = { Fido2ValidateOriginResult.Error.Unknown },
+                onFailure = {
+                    Timber.e(it, "Failed to validate privileged app: ${callingAppInfo.packageName}")
+                    Fido2ValidateOriginResult.Error.Unknown
+                },
             )
 
     /**
@@ -138,7 +134,6 @@ class Fido2OriginManagerImpl(
                 target.packageName == rpPackageName &&
                 statement.relation.containsAll(
                     listOf(
-                        "delegate_permission/common.get_login_creds",
                         "delegate_permission/common.handle_all_urls",
                     ),
                 )
@@ -157,16 +152,4 @@ class Fido2OriginManagerImpl(
                 ?: false
         }
             .takeUnless { it.isEmpty() }
-
-    private suspend fun getGoogleAllowListOrNull(): String? =
-        assetManager
-            .readAsset(GOOGLE_ALLOW_LIST_FILE_NAME)
-            .onFailure { Timber.e(it, "Failed to read Google allow list.") }
-            .getOrNull()
-
-    private suspend fun getCommunityAllowListOrNull(): String? =
-        assetManager
-            .readAsset(COMMUNITY_ALLOW_LIST_FILE_NAME)
-            .onFailure { Timber.e(it, "Failed to read Community allow list.") }
-            .getOrNull()
 }

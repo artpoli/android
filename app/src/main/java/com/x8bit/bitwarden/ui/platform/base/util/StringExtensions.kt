@@ -204,3 +204,21 @@ fun String.removeDiacritics(): String =
             Normalizer.normalize(this, Normalizer.Form.NFKD),
             "",
         )
+
+/**
+ * If the given [String] is a valid URI, "https://" will be appended if it is not already present.
+ * Otherwise `null` will be returned.
+ */
+fun String.prefixHttpsIfNecessaryOrNull(): String? =
+    when {
+        this.isBlank() || !this.isValidUri() -> null
+        "http://" in this || "https://" in this -> this
+        else -> "https://$this"
+    }
+
+/**
+ * If the given [String] is a valid URI, "https://" will be appended if it is not already present.
+ * Otherwise the original [String] will be returned.
+ */
+fun String.prefixHttpsIfNecessary(): String =
+    prefixHttpsIfNecessaryOrNull() ?: this

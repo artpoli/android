@@ -5,10 +5,14 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.core.net.toUri
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
+import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import io.mockk.verify
 import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,9 +31,15 @@ class NewDeviceNoticeEmailAccessScreenTest : BaseComposeTest() {
         every { eventFlow } returns mutableEventFlow
     }
 
+    private val intentManager: IntentManager = mockk {
+        every { launchUri(any()) } just runs
+    }
+
     @Before
     fun setUp() {
-        composeTestRule.setContent {
+        setContent(
+            intentManager = intentManager,
+        ) {
             NewDeviceNoticeEmailAccessScreen(
                 onNavigateBackToVault = { onNavigateBackToVaultCalled = true },
                 onNavigateToTwoFactorOptions = { onNavigateToTwoFactorOptionsCalled = true },
@@ -90,6 +100,14 @@ class NewDeviceNoticeEmailAccessScreenTest : BaseComposeTest() {
         mutableStateFlow.update { it.copy(isEmailAccessEnabled = true) }
         mutableEventFlow.tryEmit(NewDeviceNoticeEmailAccessEvent.NavigateToTwoFactorOptions)
         assertTrue(onNavigateToTwoFactorOptionsCalled)
+    }
+
+    @Test
+    fun `on NavigateToLearnMore should call launchUri on IntentManager`() {
+        mutableEventFlow.tryEmit(NewDeviceNoticeEmailAccessEvent.NavigateToLearnMore)
+        verify {
+            intentManager.launchUri("https://bitwarden.com/help/new-device-verification/".toUri())
+        }
     }
 }
 

@@ -41,7 +41,7 @@ class PasswordHistoryScreenTest : BaseComposeTest() {
 
     @Before
     fun setup() {
-        composeTestRule.setContent {
+        setContent {
             PasswordHistoryScreen(
                 viewModel = viewModel,
                 onNavigateBack = { onNavigateBackCalled = true },
@@ -72,7 +72,7 @@ class PasswordHistoryScreenTest : BaseComposeTest() {
 
     @Test
     fun `navigation icon click should trigger navigate back`() {
-        composeTestRule.onNodeWithContentDescription("Close").performClick()
+        composeTestRule.onNodeWithContentDescription("Back").performClick()
 
         verify {
             viewModel.trySendAction(

@@ -64,15 +64,16 @@ class LoginScreenTest : BaseComposeTest() {
 
     @Before
     fun setUp() {
-        composeTestRule.setContent {
+        setContent(
+            intentManager = intentManager,
+        ) {
             LoginScreen(
                 onNavigateBack = { onNavigateBackCalled = true },
                 onNavigateToMasterPasswordHint = { onNavigateToMasterPasswordHintCalled = true },
                 onNavigateToEnterpriseSignOn = { onNavigateToEnterpriseSignOnCalled = true },
                 onNavigateToLoginWithDevice = { onNavigateToLoginWithDeviceCalled = true },
-                onNavigateToTwoFactorLogin = { _, _ -> onNavigateToTwoFactorLoginCalled = true },
+                onNavigateToTwoFactorLogin = { _, _, _ -> onNavigateToTwoFactorLoginCalled = true },
                 viewModel = viewModel,
-                intentManager = intentManager,
                 keyboardController = keyboardController,
             )
         }

@@ -20,6 +20,9 @@ import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.x8bit.bitwarden.R
+import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
+import com.x8bit.bitwarden.data.platform.manager.util.AppResumeStateManager
+import com.x8bit.bitwarden.data.platform.manager.util.RegisterScreenDataOnLifecycleEffect
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenSearchTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.appbar.NavigationIcon
@@ -29,10 +32,14 @@ import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenBasicDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenLoadingDialog
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
 import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
+import com.x8bit.bitwarden.ui.platform.composition.LocalAppResumeStateManager
 import com.x8bit.bitwarden.ui.platform.composition.LocalIntentManager
 import com.x8bit.bitwarden.ui.platform.feature.search.handlers.SearchHandlers
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
+import com.x8bit.bitwarden.ui.vault.feature.addedit.VaultAddEditArgs
+import com.x8bit.bitwarden.ui.vault.feature.item.VaultItemArgs
 import com.x8bit.bitwarden.ui.vault.feature.vault.VaultFilter
+import com.x8bit.bitwarden.ui.vault.model.VaultAddEditType
 import kotlinx.collections.immutable.toImmutableList
 
 /**
@@ -44,20 +51,46 @@ import kotlinx.collections.immutable.toImmutableList
 fun SearchScreen(
     onNavigateBack: () -> Unit,
     onNavigateToEditSend: (sendId: String) -> Unit,
-    onNavigateToEditCipher: (cipherId: String) -> Unit,
-    onNavigateToViewCipher: (cipherId: String) -> Unit,
+    onNavigateToEditCipher: (args: VaultAddEditArgs) -> Unit,
+    onNavigateToViewCipher: (args: VaultItemArgs) -> Unit,
     intentManager: IntentManager = LocalIntentManager.current,
     viewModel: SearchViewModel = hiltViewModel(),
+    appResumeStateManager: AppResumeStateManager = LocalAppResumeStateManager.current,
 ) {
     val state by viewModel.stateFlow.collectAsStateWithLifecycle()
     val searchHandlers = remember(viewModel) { SearchHandlers.create(viewModel) }
     val context = LocalContext.current
+
+    RegisterScreenDataOnLifecycleEffect(
+        appResumeStateManager = appResumeStateManager,
+    ) {
+        AppResumeScreenData.SearchScreen(
+            searchTerm = state.searchTerm,
+        )
+    }
+
     EventsEffect(viewModel = viewModel) { event ->
         when (event) {
             SearchEvent.NavigateBack -> onNavigateBack()
             is SearchEvent.NavigateToEditSend -> onNavigateToEditSend(event.sendId)
-            is SearchEvent.NavigateToEditCipher -> onNavigateToEditCipher(event.cipherId)
-            is SearchEvent.NavigateToViewCipher -> onNavigateToViewCipher(event.cipherId)
+            is SearchEvent.NavigateToEditCipher -> {
+                onNavigateToEditCipher(
+                    VaultAddEditArgs(
+                        vaultAddEditType = VaultAddEditType.EditItem(vaultItemId = event.cipherId),
+                        vaultItemCipherType = event.cipherType,
+                    ),
+                )
+            }
+
+            is SearchEvent.NavigateToViewCipher -> {
+                onNavigateToViewCipher(
+                    VaultItemArgs(
+                        vaultItemId = event.cipherId,
+                        cipherType = event.cipherType,
+                    ),
+                )
+            }
+
             is SearchEvent.NavigateToUrl -> intentManager.launchUri(event.url.toUri())
             is SearchEvent.ShowShareSheet -> intentManager.shareText(event.content)
             is SearchEvent.ShowToast -> {

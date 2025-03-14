@@ -9,10 +9,10 @@ import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
-import com.x8bit.bitwarden.data.platform.manager.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
+import com.x8bit.bitwarden.data.platform.manager.network.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.manager.util.getActivePolicies
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.model.DataState
@@ -153,8 +153,6 @@ class AddSendViewModel @Inject constructor(
         AddSendAction.ShareLinkClick -> handleShareLinkClick()
         is AddSendAction.CloseClick -> handleCloseClick()
         is AddSendAction.DeletionDateChange -> handleDeletionDateChange(action)
-        is AddSendAction.ExpirationDateChange -> handleExpirationDateChange(action)
-        AddSendAction.ClearExpirationDate -> handleClearExpirationDate()
         AddSendAction.DismissDialogClick -> handleDismissDialogClick()
         is AddSendAction.SaveClick -> handleSaveClick()
         is AddSendAction.FileTypeClick -> handleFileTypeClick()
@@ -201,17 +199,12 @@ class AddSendViewModel @Inject constructor(
 
             is CreateSendResult.Success -> {
                 mutableStateFlow.update { it.copy(dialogState = null) }
-                if (state.isShared) {
-                    navigateBack()
-                    clipboardManager.setText(result.sendView.toSendUrl(state.baseWebSendUrl))
-                } else {
-                    navigateBack()
-                    sendEvent(
-                        AddSendEvent.ShowShareSheet(
-                            message = result.sendView.toSendUrl(state.baseWebSendUrl),
-                        ),
-                    )
-                }
+                navigateBack()
+                sendEvent(
+                    AddSendEvent.ShowShareSheet(
+                        message = result.sendView.toSendUrl(state.baseWebSendUrl),
+                    ),
+                )
             }
         }
     }
@@ -379,7 +372,12 @@ class AddSendViewModel @Inject constructor(
 
     private fun handleCopyLinkClick() {
         onContent {
-            it.common.sendUrl?.let { sendUrl -> clipboardManager.setText(text = sendUrl) }
+            it.common.sendUrl?.let { sendUrl ->
+                clipboardManager.setText(
+                    text = sendUrl,
+                    toastDescriptorOverride = R.string.send_link.asText(),
+                )
+            }
         }
     }
 
@@ -459,16 +457,6 @@ class AddSendViewModel @Inject constructor(
         updateCommonContent {
             it.copy(deletionDate = action.deletionDate)
         }
-    }
-
-    private fun handleExpirationDateChange(action: AddSendAction.ExpirationDateChange) {
-        updateCommonContent {
-            it.copy(expirationDate = action.expirationDate)
-        }
-    }
-
-    private fun handleClearExpirationDate() {
-        updateCommonContent { it.copy(expirationDate = null) }
     }
 
     @Suppress("LongMethod")
@@ -998,16 +986,6 @@ sealed class AddSendAction {
      * The user changed the deletion date.
      */
     data class DeletionDateChange(val deletionDate: ZonedDateTime) : AddSendAction()
-
-    /**
-     * The user changed the expiration date.
-     */
-    data class ExpirationDateChange(val expirationDate: ZonedDateTime?) : AddSendAction()
-
-    /**
-     * The user has cleared the expiration date.
-     */
-    data object ClearExpirationDate : AddSendAction()
 
     /**
      * Models actions that the [AddSendViewModel] itself might send.

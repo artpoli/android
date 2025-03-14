@@ -153,6 +153,7 @@ class LoginWithDeviceViewModel @Inject constructor(
                         dialogState = LoginWithDeviceState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.generic_error_message.asText(),
+                            error = result.error,
                         ),
                     )
                 }
@@ -203,7 +204,7 @@ class LoginWithDeviceViewModel @Inject constructor(
         }
     }
 
-    @Suppress("MaxLineLength")
+    @Suppress("MaxLineLength", "LongMethod")
     private fun handleReceiveLoginResult(
         action: LoginWithDeviceAction.Internal.ReceiveLoginResult,
     ) {
@@ -263,6 +264,20 @@ class LoginWithDeviceViewModel @Inject constructor(
                         dialogState = LoginWithDeviceState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.we_couldnt_verify_the_servers_certificate.asText(),
+                        ),
+                    )
+                }
+            }
+
+            is LoginResult.NewDeviceVerification -> {
+                mutableStateFlow.update {
+                    it.copy(
+                        dialogState = LoginWithDeviceState.DialogState.Error(
+                            title = R.string.an_error_has_occurred.asText(),
+                            message = loginResult
+                                .errorMessage
+                                ?.asText()
+                                ?: R.string.generic_error_message.asText(),
                         ),
                     )
                 }
@@ -464,6 +479,7 @@ data class LoginWithDeviceState(
         @Parcelize
         data class Error(
             val title: Text? = null,
+            val error: Throwable? = null,
             val message: Text,
         ) : DialogState()
     }

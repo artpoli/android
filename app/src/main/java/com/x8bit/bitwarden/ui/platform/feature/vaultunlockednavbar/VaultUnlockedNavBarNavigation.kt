@@ -6,7 +6,8 @@ import androidx.navigation.NavOptions
 import com.x8bit.bitwarden.ui.platform.base.util.composableWithStayTransitions
 import com.x8bit.bitwarden.ui.platform.feature.search.model.SearchType
 import com.x8bit.bitwarden.ui.platform.manager.snackbar.SnackbarRelay
-import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
+import com.x8bit.bitwarden.ui.vault.feature.addedit.VaultAddEditArgs
+import com.x8bit.bitwarden.ui.vault.feature.item.VaultItemArgs
 
 /**
  * The functions below pertain to entry into the [VaultUnlockedNavBarScreen].
@@ -25,9 +26,9 @@ fun NavController.navigateToVaultUnlockedNavBar(navOptions: NavOptions? = null) 
  */
 @Suppress("LongParameterList")
 fun NavGraphBuilder.vaultUnlockedNavBarDestination(
-    onNavigateToVaultAddItem: (VaultItemCipherType, String?, String?) -> Unit,
-    onNavigateToVaultItem: (vaultItemId: String) -> Unit,
-    onNavigateToVaultEditItem: (vaultItemId: String) -> Unit,
+    onNavigateToVaultAddItem: (args: VaultAddEditArgs) -> Unit,
+    onNavigateToVaultItem: (args: VaultItemArgs) -> Unit,
+    onNavigateToVaultEditItem: (args: VaultAddEditArgs) -> Unit,
     onNavigateToSearchSend: (searchType: SearchType.Sends) -> Unit,
     onNavigateToSearchVault: (searchType: SearchType.Vault) -> Unit,
     onNavigateToAddSend: () -> Unit,
@@ -40,6 +41,7 @@ fun NavGraphBuilder.vaultUnlockedNavBarDestination(
     onNavigateToSetupUnlockScreen: () -> Unit,
     onNavigateToSetupAutoFillScreen: () -> Unit,
     onNavigateToImportLogins: (SnackbarRelay) -> Unit,
+    onNavigateToAddFolderScreen: (selectedFolderName: String?) -> Unit,
 ) {
     composableWithStayTransitions(
         route = VAULT_UNLOCKED_NAV_BAR_ROUTE,
@@ -60,6 +62,7 @@ fun NavGraphBuilder.vaultUnlockedNavBarDestination(
             onNavigateToSetupUnlockScreen = onNavigateToSetupUnlockScreen,
             onNavigateToSetupAutoFillScreen = onNavigateToSetupAutoFillScreen,
             onNavigateToImportLogins = onNavigateToImportLogins,
+            onNavigateToAddFolderScreen = onNavigateToAddFolderScreen,
         )
     }
 }

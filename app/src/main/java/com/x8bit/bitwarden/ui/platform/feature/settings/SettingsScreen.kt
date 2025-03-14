@@ -1,8 +1,7 @@
 package com.x8bit.bitwarden.ui.platform.feature.settings
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,7 +20,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,10 +35,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.bottomDivider
+import com.x8bit.bitwarden.ui.platform.base.util.cardStyle
 import com.x8bit.bitwarden.ui.platform.base.util.mirrorIfRtl
+import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
+import com.x8bit.bitwarden.ui.platform.base.util.toListItemCardStyle
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenMediumTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.badge.NotificationBadge
+import com.x8bit.bitwarden.ui.platform.components.model.CardStyle
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
 import com.x8bit.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
@@ -86,20 +88,27 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .verticalScroll(state = rememberScrollState()),
         ) {
-            Settings.entries.forEach { settingEntry ->
+            Spacer(modifier = Modifier.height(height = 12.dp))
+            Settings.entries.forEachIndexed { index, settingEntry ->
                 SettingsRow(
                     text = settingEntry.text,
                     onClick = remember(viewModel) {
                         { viewModel.trySendAction(SettingsAction.SettingsClick(settingEntry)) }
                     },
-                    modifier = Modifier
-                        .testTag(settingEntry.testTag)
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
                     notificationCount = state.notificationBadgeCountMap.getOrDefault(
                         key = settingEntry,
                         defaultValue = 0,
                     ),
+                    cardStyle = Settings.entries.toListItemCardStyle(
+                        index = index,
+                        // Start padding, plus icon, plus spacing between text.
+                        dividerPadding = 48.dp,
+                    ),
+                    iconVectorResource = settingEntry.vectorIconRes,
+                    modifier = Modifier
+                        .testTag(tag = settingEntry.testTag)
+                        .standardHorizontalMargin()
+                        .fillMaxWidth(),
                 )
             }
         }
@@ -110,33 +119,42 @@ fun SettingsScreen(
 private fun SettingsRow(
     text: Text,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
     notificationCount: Int,
+    cardStyle: CardStyle?,
+    @DrawableRes iconVectorResource: Int,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(
-                    color = BitwardenTheme.colorScheme.background.pressed,
-                ),
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 60.dp)
+            .cardStyle(
+                cardStyle = cardStyle,
                 onClick = onClick,
-            )
-            .bottomDivider(paddingStart = 16.dp)
-            .defaultMinSize(minHeight = 56.dp)
-            .padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
-            .then(modifier),
+                paddingStart = 12.dp,
+                paddingEnd = 12.dp,
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            modifier = Modifier
-                .padding(end = 16.dp)
-                .weight(1f),
-            text = text(),
-            style = BitwardenTheme.typography.bodyLarge,
-            color = BitwardenTheme.colorScheme.text.primary,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painter = rememberVectorPainter(iconVectorResource),
+                contentDescription = null,
+                tint = BitwardenTheme.colorScheme.icon.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                modifier = Modifier
+                    .padding(end = 16.dp),
+                text = text(),
+                style = BitwardenTheme.typography.bodyLarge,
+                color = BitwardenTheme.colorScheme.text.primary,
+            )
+        }
         TrailingContent(notificationCount = notificationCount)
     }
 }
@@ -164,7 +182,7 @@ private fun TrailingContent(
             tint = BitwardenTheme.colorScheme.icon.primary,
             modifier = Modifier
                 .mirrorIfRtl()
-                .size(24.dp),
+                .size(size = 16.dp),
         )
     }
 }
@@ -185,6 +203,11 @@ private fun SettingsRows_preview() {
                     text = it.text,
                     onClick = { },
                     notificationCount = index % 3,
+                    iconVectorResource = it.vectorIconRes,
+                    cardStyle = Settings.entries.toListItemCardStyle(
+                        index = index,
+                        dividerPadding = 48.dp,
+                    ),
                 )
             }
         }

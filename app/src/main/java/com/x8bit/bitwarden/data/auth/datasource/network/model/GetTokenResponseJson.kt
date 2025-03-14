@@ -1,7 +1,9 @@
 package com.x8bit.bitwarden.data.auth.datasource.network.model
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -92,39 +94,54 @@ sealed class GetTokenResponseJson {
 
     /**
      * Models json body of an invalid request.
+     *
+     * This model supports older versions of the error response model that used lower-case keys.
      */
+    @OptIn(ExperimentalSerializationApi::class)
     @Serializable
     data class Invalid(
+        @JsonNames("errorModel")
         @SerialName("ErrorModel")
-        val errorModel: ErrorModel?,
-        @SerialName("errorModel")
-        val legacyErrorModel: LegacyErrorModel?,
+        private val errorModel: ErrorModel?,
     ) : GetTokenResponseJson() {
 
         /**
          * The error message returned from the server, or null.
          */
-        val errorMessage: String?
-            get() = errorModel?.errorMessage ?: legacyErrorModel?.errorMessage
+        val errorMessage: String? get() = errorModel?.errorMessage
+
+        /**
+         * The type of invalid responses that can be received.
+         */
+        sealed class InvalidType {
+            /**
+             * Represents an invalid response indicating that a new device verification is required.
+             */
+            data object NewDeviceVerification : InvalidType()
+
+            /**
+             * Represents generic invalid response
+             */
+            data object GenericInvalid : InvalidType()
+        }
+
+        val invalidType: InvalidType
+            get() = if (errorMessage?.lowercase() == "new device verification required") {
+                InvalidType.NewDeviceVerification
+            } else {
+                InvalidType.GenericInvalid
+            }
 
         /**
          * The error body of an invalid request containing a message.
+         *
+         * This model supports older versions of the error response model that used lower-case
+         * keys.
          */
         @Serializable
         data class ErrorModel(
+            @JsonNames("message")
             @SerialName("Message")
-            val errorMessage: String,
-        )
-
-        /**
-         * The legacy error body of an invalid request containing a message.
-         *
-         * This model is used to support older versions of the error response model that used
-         * lower-case keys.
-         */
-        @Serializable
-        data class LegacyErrorModel(
-            @SerialName("message")
             val errorMessage: String,
         )
     }

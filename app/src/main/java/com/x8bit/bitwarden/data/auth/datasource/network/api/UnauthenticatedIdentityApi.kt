@@ -47,12 +47,13 @@ interface UnauthenticatedIdentityApi {
         @Field(value = "twoFactorProvider") twoFactorMethod: String?,
         @Field(value = "twoFactorRemember") twoFactorRemember: String?,
         @Field(value = "authRequest") authRequestId: String?,
+        @Field(value = "newDeviceOtp") newDeviceOtp: String?,
     ): NetworkResult<GetTokenResponseJson.Success>
 
     @GET("/sso/prevalidate")
     suspend fun prevalidateSso(
         @Query("domainHint") organizationIdentifier: String,
-    ): NetworkResult<PrevalidateSsoResponseJson>
+    ): NetworkResult<PrevalidateSsoResponseJson.Success>
 
     /**
      * This call needs to be synchronous so we need it to return a [Call] directly. The identity

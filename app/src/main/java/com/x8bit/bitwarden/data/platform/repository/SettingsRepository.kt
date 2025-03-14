@@ -11,6 +11,7 @@ import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppThem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.Instant
+import javax.crypto.Cipher
 
 /**
  * Provides an API for observing and modifying settings state.
@@ -21,6 +22,11 @@ interface SettingsRepository {
      * The [AppLanguage] for the current user.
      */
     var appLanguage: AppLanguage
+
+    /**
+     * Tracks changes to the [AppLanguage].
+     */
+    val appLanguageStateFlow: StateFlow<AppLanguage>
 
     /**
      * The currently stored [AppTheme].
@@ -226,15 +232,10 @@ interface SettingsRepository {
     fun storePullToRefreshEnabled(isPullToRefreshEnabled: Boolean)
 
     /**
-     * Clears any previously stored encrypted user key used with biometrics for the current user.
-     */
-    fun clearBiometricsKey()
-
-    /**
      * Stores the encrypted user key for biometrics, allowing it to be used to unlock the current
      * user's vault.
      */
-    suspend fun setupBiometricsKey(): BiometricsKeyResult
+    suspend fun setupBiometricsKey(cipher: Cipher): BiometricsKeyResult
 
     /**
      * Stores the given PIN, allowing it to be used to unlock the current user's vault.

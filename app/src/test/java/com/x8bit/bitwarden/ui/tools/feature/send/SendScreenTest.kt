@@ -22,11 +22,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.core.net.toUri
+import com.x8bit.bitwarden.data.platform.manager.util.AppResumeStateManager
 import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
 import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.util.assertNoDialogExists
+import com.x8bit.bitwarden.ui.util.assertNoPopupExists
 import com.x8bit.bitwarden.ui.util.isProgressBar
 import io.mockk.every
 import io.mockk.just
@@ -59,10 +61,14 @@ class SendScreenTest : BaseComposeTest() {
         every { eventFlow } returns mutableEventFlow
         every { stateFlow } returns mutableStateFlow
     }
+    private val appResumeStateManager: AppResumeStateManager = mockk(relaxed = true)
 
     @Before
     fun setUp() {
-        composeTestRule.setContent {
+        setContent(
+            intentManager = intentManager,
+            appResumeStateManager = appResumeStateManager,
+        ) {
             SendScreen(
                 viewModel = viewModel,
                 onNavigateToAddSend = { onNavigateToNewSendCalled = true },
@@ -70,7 +76,6 @@ class SendScreenTest : BaseComposeTest() {
                 onNavigateToSendFilesList = { onNavigateToSendFilesListCalled = true },
                 onNavigateToSendTextList = { onNavigateToSendTextListCalled = true },
                 onNavigateToSearchSend = { onNavigateToSendSearchCalled = true },
-                intentManager = intentManager,
             )
         }
     }
@@ -749,7 +754,7 @@ class SendScreenTest : BaseComposeTest() {
     @Test
     fun `loading dialog should be displayed according to state`() {
         val loadingMessage = "syncing"
-        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+        composeTestRule.assertNoPopupExists()
         composeTestRule.onNodeWithText(loadingMessage).assertDoesNotExist()
 
         mutableStateFlow.update {
@@ -759,7 +764,7 @@ class SendScreenTest : BaseComposeTest() {
         composeTestRule
             .onNodeWithText(loadingMessage)
             .assertIsDisplayed()
-            .assert(hasAnyAncestor(isDialog()))
+            .assert(hasAnyAncestor(isPopup()))
     }
 }
 

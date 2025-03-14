@@ -13,11 +13,13 @@ import com.x8bit.bitwarden.data.auth.datasource.network.model.KeyConnectorMaster
 import com.x8bit.bitwarden.data.auth.datasource.network.model.PasswordHintRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.PasswordHintResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendEmailRequestJson
+import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendNewDeviceOtpRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.ResetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.SetPasswordRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyOtpRequestJson
 import com.x8bit.bitwarden.data.platform.datasource.network.model.toBitwardenError
 import com.x8bit.bitwarden.data.platform.datasource.network.util.HEADER_VALUE_BEARER_PREFIX
+import com.x8bit.bitwarden.data.platform.datasource.network.util.NetworkErrorCode
 import com.x8bit.bitwarden.data.platform.datasource.network.util.parseErrorBodyOrNull
 import com.x8bit.bitwarden.data.platform.datasource.network.util.toResult
 import kotlinx.serialization.json.Json
@@ -72,7 +74,7 @@ class AccountsServiceImpl(
                 throwable
                     .toBitwardenError()
                     .parseErrorBodyOrNull<DeleteAccountResponseJson.Invalid>(
-                        code = 400,
+                        code = NetworkErrorCode.BAD_REQUEST,
                         json = json,
                     )
                     ?: throw throwable
@@ -103,7 +105,7 @@ class AccountsServiceImpl(
                 throwable
                     .toBitwardenError()
                     .parseErrorBodyOrNull<PasswordHintResponseJson.Error>(
-                        code = 429,
+                        code = NetworkErrorCode.TOO_MANY_REQUESTS,
                         json = json,
                     )
                     ?: throw throwable
@@ -112,6 +114,11 @@ class AccountsServiceImpl(
     override suspend fun resendVerificationCodeEmail(body: ResendEmailRequestJson): Result<Unit> =
         unauthenticatedAccountsApi
             .resendVerificationCodeEmail(body = body)
+            .toResult()
+
+    override suspend fun resendNewDeviceOtp(body: ResendNewDeviceOtpRequestJson): Result<Unit> =
+        unauthenticatedAccountsApi
+            .resendNewDeviceOtp(body = body)
             .toResult()
 
     override suspend fun resetPassword(body: ResetPasswordRequestJson): Result<Unit> =

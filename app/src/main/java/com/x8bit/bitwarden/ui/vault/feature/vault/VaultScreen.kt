@@ -63,8 +63,13 @@ import com.x8bit.bitwarden.ui.platform.manager.exit.ExitManager
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.platform.manager.review.AppReviewManager
 import com.x8bit.bitwarden.ui.platform.manager.snackbar.SnackbarRelay
+import com.x8bit.bitwarden.ui.vault.components.VaultItemSelectionDialog
+import com.x8bit.bitwarden.ui.vault.components.model.CreateVaultItemType
+import com.x8bit.bitwarden.ui.vault.feature.addedit.VaultAddEditArgs
+import com.x8bit.bitwarden.ui.vault.feature.item.VaultItemArgs
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.model.ListingItemOverflowAction
 import com.x8bit.bitwarden.ui.vault.feature.vault.handlers.VaultHandlers
+import com.x8bit.bitwarden.ui.vault.model.VaultAddEditType
 import com.x8bit.bitwarden.ui.vault.model.VaultItemListingType
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -80,14 +85,15 @@ private const val APP_REVIEW_DELAY = 3000L
 @Composable
 fun VaultScreen(
     viewModel: VaultViewModel = hiltViewModel(),
-    onNavigateToVaultAddItemScreen: () -> Unit,
-    onNavigateToVaultItemScreen: (vaultItemId: String) -> Unit,
-    onNavigateToVaultEditItemScreen: (vaultItemId: String) -> Unit,
+    onNavigateToVaultAddItemScreen: (args: VaultAddEditArgs) -> Unit,
+    onNavigateToVaultItemScreen: (args: VaultItemArgs) -> Unit,
+    onNavigateToVaultEditItemScreen: (args: VaultAddEditArgs) -> Unit,
     onNavigateToVerificationCodeScreen: () -> Unit,
     onNavigateToVaultItemListingScreen: (vaultItemType: VaultItemListingType) -> Unit,
     onNavigateToSearchVault: (searchType: SearchType.Vault) -> Unit,
     onDimBottomNavBarRequest: (shouldDim: Boolean) -> Unit,
     onNavigateToImportLogins: (SnackbarRelay) -> Unit,
+    onNavigateToAddFolderScreen: (selectedFolderId: String?) -> Unit,
     exitManager: ExitManager = LocalExitManager.current,
     intentManager: IntentManager = LocalIntentManager.current,
     appReviewManager: AppReviewManager = LocalAppReviewManager.current,
@@ -122,7 +128,14 @@ fun VaultScreen(
     }
     EventsEffect(viewModel = viewModel) { event ->
         when (event) {
-            VaultEvent.NavigateToAddItemScreen -> onNavigateToVaultAddItemScreen()
+            is VaultEvent.NavigateToAddItemScreen -> {
+                onNavigateToVaultAddItemScreen(
+                    VaultAddEditArgs(
+                        vaultAddEditType = VaultAddEditType.AddItem,
+                        vaultItemCipherType = event.type,
+                    ),
+                )
+            }
 
             VaultEvent.NavigateToVaultSearchScreen -> onNavigateToSearchVault(SearchType.Vault.All)
 
@@ -130,9 +143,18 @@ fun VaultScreen(
                 onNavigateToVerificationCodeScreen()
             }
 
-            is VaultEvent.NavigateToVaultItem -> onNavigateToVaultItemScreen(event.itemId)
+            is VaultEvent.NavigateToVaultItem -> {
+                onNavigateToVaultItemScreen(VaultItemArgs(event.itemId, event.type))
+            }
 
-            is VaultEvent.NavigateToEditVaultItem -> onNavigateToVaultEditItemScreen(event.itemId)
+            is VaultEvent.NavigateToEditVaultItem -> {
+                onNavigateToVaultEditItemScreen(
+                    VaultAddEditArgs(
+                        vaultAddEditType = VaultAddEditType.EditItem(vaultItemId = event.itemId),
+                        vaultItemCipherType = event.type,
+                    ),
+                )
+            }
 
             is VaultEvent.NavigateToItemListing -> {
                 onNavigateToVaultItemListingScreen(event.itemListingType)
@@ -154,6 +176,10 @@ fun VaultScreen(
             is VaultEvent.ShowSnackbar -> snackbarHostState.showSnackbar(event.data)
             VaultEvent.PromptForAppReview -> {
                 launchPrompt.invoke()
+            }
+
+            VaultEvent.NavigateToAddFolder -> {
+                onNavigateToAddFolderScreen(null)
             }
         }
     }
@@ -297,7 +323,7 @@ private fun VaultScreenScaffold(
                 exit = scaleOut(),
             ) {
                 BitwardenFloatingActionButton(
-                    onClick = vaultHandlers.addItemClickAction,
+                    onClick = vaultHandlers.selectAddItemTypeClickAction,
                     painter = rememberVectorPainter(id = R.drawable.ic_plus_large),
                     contentDescription = stringResource(id = R.string.add_item),
                     modifier = Modifier.testTag(tag = "AddItemButton"),
@@ -326,7 +352,6 @@ private fun VaultScreenScaffold(
             when (val viewState = state.viewState) {
                 is VaultState.ViewState.Content -> VaultContent(
                     state = viewState,
-                    showSshKeys = state.showSshKeys,
                     vaultHandlers = vaultHandlers,
                     onOverflowOptionClick = { masterPasswordRepromptAction = it },
                     modifier = Modifier.fillMaxSize(),
@@ -357,8 +382,16 @@ private fun VaultScreenScaffold(
                         )
                     }
                     VaultNoItems(
+                        vectorRes = R.drawable.img_vault_items,
+                        headerText = stringResource(id = R.string.save_and_protect_your_data),
+                        message = stringResource(
+                            R.string.the_vault_protects_more_than_just_passwords,
+                        ),
+                        buttonText = stringResource(R.string.new_login),
                         policyDisablesSend = false,
-                        addItemClickAction = vaultHandlers.addItemClickAction,
+                        addItemClickAction = {
+                            vaultHandlers.addItemClickAction(CreateVaultItemType.LOGIN)
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -386,6 +419,13 @@ private fun VaultDialogs(
         is VaultState.DialogState.Error -> BitwardenBasicDialog(
             title = dialogState.title(),
             message = dialogState.message(),
+            onDismissRequest = vaultHandlers.dialogDismiss,
+        )
+
+        VaultState.DialogState.SelectVaultAddItemType -> VaultItemSelectionDialog(
+            onOptionSelected = {
+                vaultHandlers.addItemClickAction(it)
+            },
             onDismissRequest = vaultHandlers.dialogDismiss,
         )
 

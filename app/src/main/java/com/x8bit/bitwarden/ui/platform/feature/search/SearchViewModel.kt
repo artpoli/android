@@ -3,6 +3,7 @@ package com.x8bit.bitwarden.ui.platform.feature.search
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.vault.CipherType
 import com.bitwarden.vault.CipherView
 import com.bitwarden.vault.LoginUriView
 import com.x8bit.bitwarden.R
@@ -17,6 +18,7 @@ import com.x8bit.bitwarden.data.platform.manager.SpecialCircumstanceManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
 import com.x8bit.bitwarden.data.platform.manager.event.OrganizationEventManager
 import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
+import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.data.platform.manager.util.toAutofillSelectionDataOrNull
 import com.x8bit.bitwarden.data.platform.manager.util.toTotpDataOrNull
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
@@ -46,10 +48,11 @@ import com.x8bit.bitwarden.ui.platform.feature.search.util.updateWithAdditionalD
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.model.ListingItemOverflowAction
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterData
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterType
-import com.x8bit.bitwarden.ui.vault.feature.vault.util.getOrganizationPremiumStatusMap
 import com.x8bit.bitwarden.ui.vault.feature.vault.util.toFilteredList
 import com.x8bit.bitwarden.ui.vault.feature.vault.util.toVaultFilterData
 import com.x8bit.bitwarden.ui.vault.model.TotpData
+import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
+import com.x8bit.bitwarden.ui.vault.util.toVaultItemCipherType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -65,7 +68,7 @@ private const val KEY_STATE = "state"
 /**
  * View model for the search screen.
  */
-@Suppress("LongParameterList", "TooManyFunctions")
+@Suppress("LongParameterList", "TooManyFunctions", "LargeClass")
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -87,9 +90,15 @@ class SearchViewModel @Inject constructor(
             val searchType = SearchArgs(savedStateHandle).type
             val userState = requireNotNull(authRepo.userStateFlow.value)
             val specialCircumstance = specialCircumstanceManager.specialCircumstance
+            val searchTerm = (specialCircumstance as? SpecialCircumstance.SearchShortcut)
+                ?.searchTerm
+                ?.also {
+                    specialCircumstanceManager.specialCircumstance = null
+                }
+                .orEmpty()
 
             SearchState(
-                searchTerm = "",
+                searchTerm = searchTerm,
                 searchType = searchType.toSearchTypeData(),
                 viewState = SearchState.ViewState.Loading,
                 dialogState = null,
@@ -108,9 +117,6 @@ class SearchViewModel @Inject constructor(
                 totpData = specialCircumstance?.toTotpDataOrNull(),
                 hasMasterPassword = userState.activeAccount.hasMasterPassword,
                 isPremium = userState.activeAccount.isPremium,
-                organizationPremiumStatusMap = userState
-                    .activeAccount
-                    .getOrganizationPremiumStatusMap(),
             )
         },
 ) {
@@ -158,9 +164,15 @@ class SearchViewModel @Inject constructor(
         val event = when (state.searchType) {
             is SearchTypeData.Vault -> {
                 if (state.isTotp) {
-                    SearchEvent.NavigateToEditCipher(cipherId = action.itemId)
+                    SearchEvent.NavigateToEditCipher(
+                        cipherId = action.itemId,
+                        cipherType = requireNotNull(action.cipherType).toVaultItemCipherType(),
+                    )
                 } else {
-                    SearchEvent.NavigateToViewCipher(cipherId = action.itemId)
+                    SearchEvent.NavigateToViewCipher(
+                        cipherId = action.itemId,
+                        cipherType = requireNotNull(action.cipherType).toVaultItemCipherType(),
+                    )
                 }
             }
 
@@ -300,7 +312,10 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun handleCopyUrlClick(action: ListingItemOverflowAction.SendAction.CopyUrlClick) {
-        clipboardManager.setText(action.sendUrl)
+        clipboardManager.setText(
+            text = action.sendUrl,
+            toastDescriptorOverride = R.string.link.asText(),
+        )
     }
 
     private fun handleDeleteClick(action: ListingItemOverflowAction.SendAction.DeleteClick) {
@@ -347,19 +362,28 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun handleCopyNoteClick(action: ListingItemOverflowAction.VaultAction.CopyNoteClick) {
-        clipboardManager.setText(action.notes)
+        clipboardManager.setText(
+            text = action.notes,
+            toastDescriptorOverride = R.string.notes.asText(),
+        )
     }
 
     private fun handleCopyNumberClick(
         action: ListingItemOverflowAction.VaultAction.CopyNumberClick,
     ) {
-        clipboardManager.setText(action.number)
+        clipboardManager.setText(
+            text = action.number,
+            toastDescriptorOverride = R.string.number.asText(),
+        )
     }
 
     private fun handleCopyPasswordClick(
         action: ListingItemOverflowAction.VaultAction.CopyPasswordClick,
     ) {
-        clipboardManager.setText(action.password)
+        clipboardManager.setText(
+            text = action.password,
+            toastDescriptorOverride = R.string.password.asText(),
+        )
         organizationEventManager.trackEvent(
             event = OrganizationEvent.CipherClientCopiedPassword(cipherId = action.cipherId),
         )
@@ -368,7 +392,10 @@ class SearchViewModel @Inject constructor(
     private fun handleCopySecurityCodeClick(
         action: ListingItemOverflowAction.VaultAction.CopySecurityCodeClick,
     ) {
-        clipboardManager.setText(action.securityCode)
+        clipboardManager.setText(
+            text = action.securityCode,
+            toastDescriptorOverride = R.string.security_code.asText(),
+        )
         organizationEventManager.trackEvent(
             event = OrganizationEvent.CipherClientCopiedCardCode(cipherId = action.cipherId),
         )
@@ -377,11 +404,19 @@ class SearchViewModel @Inject constructor(
     private fun handleCopyUsernameClick(
         action: ListingItemOverflowAction.VaultAction.CopyUsernameClick,
     ) {
-        clipboardManager.setText(action.username)
+        clipboardManager.setText(
+            text = action.username,
+            toastDescriptorOverride = R.string.username.asText(),
+        )
     }
 
     private fun handleEditCipherClick(action: ListingItemOverflowAction.VaultAction.EditClick) {
-        sendEvent(SearchEvent.NavigateToEditCipher(action.cipherId))
+        sendEvent(
+            event = SearchEvent.NavigateToEditCipher(
+                cipherId = action.cipherId,
+                cipherType = action.cipherType.toVaultItemCipherType(),
+            ),
+        )
     }
 
     private fun handleLaunchCipherUrlClick(
@@ -391,7 +426,12 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun handleViewCipherClick(action: ListingItemOverflowAction.VaultAction.ViewClick) {
-        sendEvent(SearchEvent.NavigateToViewCipher(action.cipherId))
+        sendEvent(
+            event = SearchEvent.NavigateToViewCipher(
+                cipherId = action.cipherId,
+                cipherType = action.cipherType.toVaultItemCipherType(),
+            ),
+        )
     }
 
     private fun handleInternalAction(action: SearchAction.Internal) {
@@ -459,7 +499,10 @@ class SearchViewModel @Inject constructor(
         when (val result = action.result) {
             is GenerateTotpResult.Error -> Unit
             is GenerateTotpResult.Success -> {
-                clipboardManager.setText(result.code)
+                clipboardManager.setText(
+                    text = result.code,
+                    toastDescriptorOverride = R.string.totp.asText(),
+                )
             }
         }
     }
@@ -577,7 +620,12 @@ class SearchViewModel @Inject constructor(
             }
 
             is MasterPasswordRepromptData.Totp -> {
-                trySendAction(SearchAction.ItemClick(itemId = data.cipherId))
+                trySendAction(
+                    action = SearchAction.ItemClick(
+                        itemId = data.cipherId,
+                        cipherType = CipherType.LOGIN,
+                    ),
+                )
             }
         }
     }
@@ -691,7 +739,6 @@ class SearchViewModel @Inject constructor(
                                 isAutofill = state.isAutofill,
                                 isTotp = state.isTotp,
                                 isPremiumUser = state.isPremium,
-                                organizationPremiumStatusMap = state.organizationPremiumStatusMap,
                             )
                     }
 
@@ -738,7 +785,6 @@ data class SearchState(
     val totpData: TotpData?,
     val hasMasterPassword: Boolean,
     val isPremium: Boolean,
-    val organizationPremiumStatusMap: Map<String, Boolean>,
 ) : Parcelable {
 
     /**
@@ -840,6 +886,7 @@ data class SearchState(
         val autofillSelectionOptions: List<AutofillSelectionOption>,
         val isTotp: Boolean,
         val shouldDisplayMasterPasswordReprompt: Boolean,
+        val cipherType: CipherType?,
     ) : Parcelable
 }
 
@@ -1019,6 +1066,7 @@ sealed class SearchAction {
      */
     data class ItemClick(
         val itemId: String,
+        val cipherType: CipherType?,
     ) : SearchAction()
 
     /**
@@ -1143,6 +1191,7 @@ sealed class SearchEvent {
      */
     data class NavigateToEditCipher(
         val cipherId: String,
+        val cipherType: VaultItemCipherType,
     ) : SearchEvent()
 
     /**
@@ -1150,6 +1199,7 @@ sealed class SearchEvent {
      */
     data class NavigateToViewCipher(
         val cipherId: String,
+        val cipherType: VaultItemCipherType,
     ) : SearchEvent()
 
     /**
