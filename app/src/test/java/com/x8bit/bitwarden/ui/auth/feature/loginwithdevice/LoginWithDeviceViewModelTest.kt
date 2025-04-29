@@ -2,6 +2,8 @@ package com.x8bit.bitwarden.ui.auth.feature.loginwithdevice
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.manager.model.AuthRequest
 import com.x8bit.bitwarden.data.auth.manager.model.AuthRequestType
@@ -9,10 +11,8 @@ import com.x8bit.bitwarden.data.auth.manager.model.CreateAuthRequestResult
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.util.CaptchaCallbackTokenResult
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.ui.auth.feature.loginwithdevice.model.LoginWithDeviceType
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import io.mockk.awaits
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -323,6 +323,7 @@ class LoginWithDeviceViewModelTest : BaseViewModelTest() {
     @Test
     fun `on createAuthRequestWithUpdates Success and login error should should update the state`() =
         runTest {
+            val error = Throwable("Fail!")
             coEvery {
                 authRepository.login(
                     email = EMAIL,
@@ -333,7 +334,7 @@ class LoginWithDeviceViewModelTest : BaseViewModelTest() {
                     masterPasswordHash = DEFAULT_LOGIN_DATA.masterPasswordHash,
                     captchaToken = null,
                 )
-            } returns LoginResult.Error(null)
+            } returns LoginResult.Error(errorMessage = null, error = error)
             val viewModel = createViewModel()
             viewModel.eventFlow.test {
                 viewModel.stateFlow.test {
@@ -365,6 +366,7 @@ class LoginWithDeviceViewModelTest : BaseViewModelTest() {
                             dialogState = LoginWithDeviceState.DialogState.Error(
                                 title = R.string.an_error_has_occurred.asText(),
                                 message = R.string.generic_error_message.asText(),
+                                error = error,
                             ),
                             loginData = DEFAULT_LOGIN_DATA,
                         ),

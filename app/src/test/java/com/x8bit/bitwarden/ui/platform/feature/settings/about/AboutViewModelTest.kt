@@ -2,20 +2,30 @@ package com.x8bit.bitwarden.ui.platform.feature.settings.about
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.data.repository.util.baseWebVaultUrlOrDefault
+import com.bitwarden.ui.util.asText
+import com.bitwarden.ui.util.concat
+import com.x8bit.bitwarden.data.platform.datasource.disk.model.FlightRecorderDataSet
+import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.LogsManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
+import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
+import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.util.FakeEnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebVaultUrlOrDefault
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
-import com.x8bit.bitwarden.ui.platform.base.util.concat
+import com.x8bit.bitwarden.ui.platform.feature.settings.about.util.getStopsLoggingStringForActiveLog
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.runs
+import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -23,7 +33,7 @@ import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.Year
-import java.time.ZoneId
+import java.time.ZoneOffset
 
 class AboutViewModelTest : BaseViewModelTest() {
 
@@ -32,6 +42,20 @@ class AboutViewModelTest : BaseViewModelTest() {
     private val logsManager: LogsManager = mockk {
         every { isEnabled } returns false
         every { isEnabled = any() } just runs
+    }
+    private val featureFlagManager = mockk<FeatureFlagManager> {
+        every { getFeatureFlag(FlagKey.FlightRecorder) } returns true
+        every { getFeatureFlagFlow(FlagKey.FlightRecorder) } returns flowOf(true)
+    }
+    private val mutableFlightRecorderFlow = MutableStateFlow(FlightRecorderDataSet(emptySet()))
+    private val settingsRepository = mockk<SettingsRepository> {
+        every { flightRecorderDataFlow } returns mutableFlightRecorderFlow
+        every { flightRecorderData } returns FlightRecorderDataSet(emptySet())
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(FlightRecorderDataSet::getStopsLoggingStringForActiveLog)
     }
 
     @Test
@@ -44,11 +68,73 @@ class AboutViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `on GiveFeedbackClick should emit NavigateToFeedbackForm`() = runTest {
+    fun `on FlightRecorderTooltipClick should emit NavigateToFlightRecorderHelp`() = runTest {
         val viewModel = createViewModel()
         viewModel.eventFlow.test {
-            viewModel.trySendAction(AboutAction.GiveFeedbackClick)
-            assertEquals(AboutEvent.NavigateToFeedbackForm, awaitItem())
+            viewModel.trySendAction(AboutAction.FlightRecorderTooltipClick)
+            assertEquals(AboutEvent.NavigateToFlightRecorderHelp, awaitItem())
+        }
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `on FlightRecorderCheckedChange with isEnabled true should emit NavigateToFlightRecorder`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.eventFlow.test {
+                viewModel.trySendAction(AboutAction.FlightRecorderCheckedChange(isEnabled = true))
+                assertEquals(AboutEvent.NavigateToFlightRecorder, awaitItem())
+            }
+        }
+
+    @Test
+    fun `on FlightRecorderCheckedChange with isEnabled false should end the logging`() {
+        every { settingsRepository.endFlightRecorder() } just runs
+        val viewModel = createViewModel()
+        viewModel.trySendAction(AboutAction.FlightRecorderCheckedChange(isEnabled = false))
+        verify(exactly = 1) {
+            settingsRepository.endFlightRecorder()
+        }
+    }
+
+    @Test
+    fun `on ViewRecordedLogsClick should emit NavigateToRecordedLogs`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.eventFlow.test {
+            viewModel.trySendAction(AboutAction.ViewRecordedLogsClick)
+            assertEquals(AboutEvent.NavigateToRecordedLogs, awaitItem())
+        }
+    }
+
+    @Test
+    fun `on FlightRecorderDataReceive should update state appropriately`() = runTest {
+        val viewModel = createViewModel(DEFAULT_ABOUT_STATE)
+        mockkStatic(FlightRecorderDataSet::getStopsLoggingStringForActiveLog)
+        val activeData = mockk<FlightRecorderDataSet> {
+            every {
+                getStopsLoggingStringForActiveLog(FIXED_CLOCK)
+            } returns "Stops at 10 PM".asText()
+            every { hasActiveFlightRecorderData } returns true
+        }
+        val inactiveData = mockk<FlightRecorderDataSet> {
+            every { getStopsLoggingStringForActiveLog(FIXED_CLOCK) } returns null
+            every { hasActiveFlightRecorderData } returns false
+        }
+
+        viewModel.stateFlow.test {
+            assertEquals(DEFAULT_ABOUT_STATE, awaitItem())
+
+            mutableFlightRecorderFlow.value = activeData
+            assertEquals(
+                DEFAULT_ABOUT_STATE.copy(
+                    isFlightRecorderEnabled = true,
+                    flightRecorderSubtext = "Stops at 10 PM".asText(),
+                ),
+                awaitItem(),
+            )
+
+            mutableFlightRecorderFlow.value = inactiveData
+            assertEquals(DEFAULT_ABOUT_STATE, awaitItem())
         }
     }
 
@@ -79,15 +165,6 @@ class AboutViewModelTest : BaseViewModelTest() {
                 assertEquals(AboutEvent.NavigateToLearnAboutOrganizations, awaitItem())
             }
         }
-
-    @Test
-    fun `on RateAppClick should emit NavigateToRateApp`() = runTest {
-        val viewModel = createViewModel(DEFAULT_ABOUT_STATE)
-        viewModel.eventFlow.test {
-            viewModel.trySendAction(AboutAction.RateAppClick)
-            assertEquals(AboutEvent.NavigateToRateApp, awaitItem())
-        }
-    }
 
     @Test
     fun `on SubmitCrashLogsClick should update isSubmitCrashLogsEnabled to true`() = runTest {
@@ -148,21 +225,26 @@ class AboutViewModelTest : BaseViewModelTest() {
     ): AboutViewModel = AboutViewModel(
         savedStateHandle = SavedStateHandle().apply { set("state", state) },
         clipboardManager = clipboardManager,
-        clock = fixedClock,
+        clock = FIXED_CLOCK,
         environmentRepository = environmentRepository,
         logsManager = logsManager,
+        featureFlagManager = featureFlagManager,
+        settingsRepository = settingsRepository,
     )
 }
 
-private val fixedClock = Clock.fixed(
+private val FIXED_CLOCK = Clock.fixed(
     Instant.parse("2024-01-25T10:15:30.00Z"),
-    ZoneId.systemDefault(),
+    ZoneOffset.UTC,
 )
 private val DEFAULT_ABOUT_STATE: AboutState = AboutState(
     version = "Version: <version_name> (<version_code>)".asText(),
     deviceData = "<device_data>".asText(),
-    ciData = "\n<ci_info>".asText(),
+    ciData = "<ci_info>".asText(),
+    copyrightInfo = "© Bitwarden Inc. 2015-${Year.now(FIXED_CLOCK).value}".asText(),
     isSubmitCrashLogsEnabled = false,
-    copyrightInfo = "© Bitwarden Inc. 2015-${Year.now(fixedClock).value}".asText(),
     shouldShowCrashLogsButton = true,
+    isFlightRecorderEnabled = false,
+    shouldShowFlightRecorder = true,
+    flightRecorderSubtext = null,
 )

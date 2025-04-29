@@ -12,10 +12,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.ui.auth.feature.environment.EnvironmentState.DialogState
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.platform.manager.keychain.KeyChainManager
 import com.x8bit.bitwarden.ui.platform.manager.keychain.model.PrivateKeyAliasSelectionResult
@@ -124,7 +124,7 @@ class EnvironmentScreenTest : BaseComposeTest() {
             .onAllNodesWithText("Ok")
             .filterToOne(hasAnyAncestor(isDialog()))
             .performClick()
-        verify { viewModel.trySendAction(EnvironmentAction.ErrorDialogDismiss) }
+        verify { viewModel.trySendAction(EnvironmentAction.DialogDismiss) }
     }
 
     @Test
@@ -308,6 +308,111 @@ class EnvironmentScreenTest : BaseComposeTest() {
         verify {
             viewModel.trySendAction(
                 EnvironmentAction.IconsServerUrlChange(iconsServerUrl = "updated-icons-url"),
+            )
+        }
+    }
+
+    @Test
+    fun `ConfirmOverwriteCertificate dialog should display based on state`() {
+        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+
+        mutableStateFlow.update {
+            it.copy(
+                dialog = DialogState.ConfirmOverwriteAlias(
+                    title = "Confirm overwrite".asText(),
+                    message = "Overwrite existing certificate?".asText(),
+                    triggeringAction = EnvironmentAction.SetCertificateInfoResultReceive(
+                        certificateFileData = mockk(),
+                        alias = "mockAlias",
+                        password = "mockPassword",
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule.onNode(isDialog()).assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Confirm overwrite")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Overwrite existing certificate?")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Cancel")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Replace certificate")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+    }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `ConfirmOverwriteCertificate dialog Replace certificate click should send ConfirmOverwriteCertificate action`() {
+        val mockFileData = mockk<IntentManager.FileData>()
+        mutableStateFlow.update {
+            it.copy(
+                dialog = DialogState.ConfirmOverwriteAlias(
+                    title = "Confirm overwrite".asText(),
+                    message = "Overwrite existing certificate?".asText(),
+                    triggeringAction = EnvironmentAction.SetCertificateInfoResultReceive(
+                        certificateFileData = mockFileData,
+                        alias = "mockAlias",
+                        password = "mockPassword",
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onAllNodesWithText("Replace certificate")
+            .filterToOne(hasAnyAncestor(isDialog()))
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(
+                EnvironmentAction.ConfirmOverwriteCertificateClick(
+                    EnvironmentAction.SetCertificateInfoResultReceive(
+                        certificateFileData = mockFileData,
+                        alias = "mockAlias",
+                        password = "mockPassword",
+                    ),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `ConfirmOverwriteCertificate dialog Cancel click should send DismissDialog action`() {
+        mutableStateFlow.update {
+            it.copy(
+                dialog = DialogState.ConfirmOverwriteAlias(
+                    title = "Confirm overwrite".asText(),
+                    message = "Overwrite existing certificate?".asText(),
+                    triggeringAction = EnvironmentAction.SetCertificateInfoResultReceive(
+                        certificateFileData = mockk(),
+                        alias = "mockAlias",
+                        password = "mockPassword",
+                    ),
+                ),
+            )
+        }
+
+        composeTestRule
+            .onAllNodesWithText("Cancel")
+            .filterToOne(hasAnyAncestor(isDialog()))
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(
+                EnvironmentAction.DialogDismiss,
             )
         }
     }

@@ -15,24 +15,23 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.core.net.toUri
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseIconUrl
+import com.bitwarden.data.repository.util.baseWebSendUrl
+import com.bitwarden.ui.util.asText
 import com.bitwarden.vault.CipherType
 import com.x8bit.bitwarden.R
-import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialAssertionResult
-import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2GetCredentialsResult
-import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2RegisterCredentialResult
 import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.baseIconUrl
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebSendUrl
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.ui.autofill.fido2.manager.Fido2CompletionManager
+import com.x8bit.bitwarden.ui.autofill.fido2.manager.model.AssertFido2CredentialResult
+import com.x8bit.bitwarden.ui.autofill.fido2.manager.model.GetFido2CredentialsResult
+import com.x8bit.bitwarden.ui.autofill.fido2.manager.model.RegisterFido2CredentialResult
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.toHostOrPathOrNull
 import com.x8bit.bitwarden.ui.platform.components.model.AccountSummary
 import com.x8bit.bitwarden.ui.platform.components.model.IconData
-import com.x8bit.bitwarden.ui.platform.components.model.IconRes
 import com.x8bit.bitwarden.ui.platform.feature.search.model.SearchType
 import com.x8bit.bitwarden.ui.platform.manager.biometrics.BiometricsManager
 import com.x8bit.bitwarden.ui.platform.manager.exit.ExitManager
@@ -103,7 +102,7 @@ class VaultItemListingScreenTest : BaseComposeTest() {
     private val fido2CompletionManager: Fido2CompletionManager = mockk {
         every { completeFido2Registration(any()) } just runs
         every { completeFido2Assertion(any()) } just runs
-        every { completeFido2GetCredentialRequest(any()) } just runs
+        every { completeFido2GetCredentialsRequest(any()) } just runs
     }
     private val biometricsManager: BiometricsManager = mockk()
     private val mutableEventFlow = bufferedMutableSharedFlow<VaultItemListingEvent>()
@@ -1906,7 +1905,7 @@ class VaultItemListingScreenTest : BaseComposeTest() {
 
     @Test
     fun `CompleteFido2Registration event should call Fido2CompletionManager with result`() {
-        val result = Fido2RegisterCredentialResult.Success("mockResponse")
+        val result = RegisterFido2CredentialResult.Success("mockResponse")
         mutableEventFlow.tryEmit(VaultItemListingEvent.CompleteFido2Registration(result))
         verify {
             fido2CompletionManager.completeFido2Registration(result)
@@ -1915,7 +1914,7 @@ class VaultItemListingScreenTest : BaseComposeTest() {
 
     @Test
     fun `CompleteFido2Assertion event should call Fido2CompletionManager with result`() {
-        val result = Fido2CredentialAssertionResult.Success("mockResponse")
+        val result = AssertFido2CredentialResult.Success("mockResponse")
         mutableEventFlow.tryEmit(VaultItemListingEvent.CompleteFido2Assertion(result))
         verify {
             fido2CompletionManager.completeFido2Assertion(result)
@@ -1924,14 +1923,14 @@ class VaultItemListingScreenTest : BaseComposeTest() {
 
     @Test
     fun `CompleteFido2GetCredentials event should call Fido2CompletionManager with result`() {
-        val result = Fido2GetCredentialsResult.Success(
+        val result = GetFido2CredentialsResult.Success(
             userId = "mockUserId",
-            options = mockk(),
+            option = mockk(),
             credentials = mockk(),
         )
         mutableEventFlow.tryEmit(VaultItemListingEvent.CompleteFido2GetCredentialsRequest(result))
         verify {
-            fido2CompletionManager.completeFido2GetCredentialRequest(result)
+            fido2CompletionManager.completeFido2GetCredentialsRequest(result)
         }
     }
 
@@ -2275,24 +2274,24 @@ private fun createDisplayItem(number: Int): VaultItemListingState.DisplayItem =
         subtitle = "mockSubtitle-$number",
         subtitleTestTag = "SendDateLabel",
         iconData = IconData.Local(R.drawable.ic_payment_card),
-        extraIconList = listOf(
-            IconRes(
+        extraIconList = persistentListOf(
+            IconData.Local(
                 iconRes = R.drawable.ic_send_disabled,
                 contentDescription = R.string.disabled.asText(),
             ),
-            IconRes(
+            IconData.Local(
                 iconRes = R.drawable.ic_key,
                 contentDescription = R.string.password.asText(),
             ),
-            IconRes(
+            IconData.Local(
                 iconRes = R.drawable.ic_send_max_access_count_reached,
                 contentDescription = R.string.maximum_access_count_reached.asText(),
             ),
-            IconRes(
+            IconData.Local(
                 iconRes = R.drawable.ic_send_expired,
                 contentDescription = R.string.expired.asText(),
             ),
-            IconRes(
+            IconData.Local(
                 iconRes = R.drawable.ic_send_pending_delete,
                 contentDescription = R.string.pending_delete.asText(),
             ),
@@ -2323,7 +2322,7 @@ private fun createCipherDisplayItem(number: Int): VaultItemListingState.DisplayI
         subtitle = "mockSubtitle-$number",
         subtitleTestTag = "CipherSubTitleLabel",
         iconData = IconData.Local(R.drawable.ic_vault),
-        extraIconList = emptyList(),
+        extraIconList = persistentListOf(),
         overflowOptions = listOf(
             ListingItemOverflowAction.VaultAction.EditClick(
                 cipherId = "mockId-$number",

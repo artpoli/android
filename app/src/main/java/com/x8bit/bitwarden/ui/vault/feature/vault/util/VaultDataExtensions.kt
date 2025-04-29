@@ -1,6 +1,7 @@
 package com.x8bit.bitwarden.ui.vault.feature.vault.util
 
 import android.net.Uri
+import com.bitwarden.ui.util.asText
 import com.bitwarden.vault.CipherRepromptType
 import com.bitwarden.vault.CipherType
 import com.bitwarden.vault.CipherView
@@ -9,7 +10,6 @@ import com.bitwarden.vault.FolderView
 import com.bitwarden.vault.LoginUriView
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.orNullIfBlank
 import com.x8bit.bitwarden.ui.platform.components.model.IconData
 import com.x8bit.bitwarden.ui.vault.feature.util.getFilteredCollections
@@ -67,6 +67,8 @@ fun VaultData.toViewState(
         VaultState.ViewState.NoItems
     } else {
         val totpItems = filteredCipherViewList.filter { it.login?.totp != null }
+        val shouldShowUnGroupedItems = filteredCollectionViewList.isEmpty() &&
+            noFolderItems.size < NO_FOLDER_ITEM_THRESHOLD
         VaultState.ViewState.Content(
             itemTypesCount = itemTypesCount,
             totpItemsCount = if (isPremium) {
@@ -103,7 +105,7 @@ fun VaultData.toViewState(
                     )
                 }
                 .let { folderItems ->
-                    if (noFolderItems.size < NO_FOLDER_ITEM_THRESHOLD) {
+                    if (shouldShowUnGroupedItems) {
                         folderItems
                     } else {
                         folderItems.plus(
@@ -124,7 +126,7 @@ fun VaultData.toViewState(
                         isPremiumUser = isPremium,
                     )
                 }
-                .takeIf { it.size < NO_FOLDER_ITEM_THRESHOLD }
+                .takeIf { shouldShowUnGroupedItems }
                 .orEmpty(),
             collectionItems = filteredCollectionViewList
                 .filter { it.id != null }

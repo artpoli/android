@@ -620,6 +620,10 @@
   <string name="deletion_date_info">הסֵנְד יימחק לצמיתות בתאריך ובשעה שצוינו.</string>
   <string name="pending_delete">ממתין למחיקה</string>
   <string name="expired">פג תוקף</string>
+  <string name="expires_at">Expires at %s</string>
+  <string name="expires_tomorrow">Expires tomorrow</string>
+  <string name="expires_on">Expires on %s</string>
+  <string name="stops_logging_on">Stops logging on %1$s at %2$s</string>
   <string name="maximum_access_count">מספר גישות מרבי</string>
   <string name="maximum_access_count_info">אם מוגדר, משתמשים לא יוכלו עוד לגשת לסֵנְד זה ברגע שמספר הגישות המרבי הושג.</string>
   <string name="maximum_access_count_reached">מספר הגישות המרבי הושג</string>
@@ -641,7 +645,7 @@
   <string name="add_send">סֵנְד חדש</string>
   <string name="are_you_sure_delete_send">האם אתה בטוח שברצונך למחוק סֵנְד זה?</string>
   <string name="send_deleted">הסֵנְד נמחק</string>
-  <string name="send_updated">הסֵנְד נשמר</string>
+  <string name="send_updated">סֵנְד נשמר</string>
   <string name="new_send_created">סֵנְד נוצר</string>
   <string name="one_day">יום 1</string>
   <string name="two_days">2 ימים</string>
@@ -773,7 +777,9 @@
   <string name="forwarded_email_alias">כינוי דוא\"ל מועבר</string>
   <string name="random_word">מילה אקראית</string>
   <string name="email_required_parenthesis">דוא\"ל (נדרש)</string>
+  <string name="domain_name">domain name</string>
   <string name="domain_name_required_parenthesis">שם דומיין (נדרש)</string>
+  <string name="api_key">API key</string>
   <string name="api_key_required_parenthesis">מפתח API (נדרש)</string>
   <string name="service">שירות</string>
   <string name="addy_io">addy.io</string>
@@ -782,6 +788,7 @@
   <string name="duck_duck_go">DuckDuckGo</string>
   <string name="fastmail">Fastmail</string>
   <string name="forward_email">ForwardEmail</string>
+  <string name="api_access_token_required_parenthesis">API access token (required)</string>
   <string name="api_access_token">אסימון גישה ל־API</string>
   <string name="are_you_sure_you_want_to_overwrite_the_current_username">האם אתה בטוח שברצונך לדרוס את שם המשתמש הנוכחי?</string>
   <string name="generate_username">צור שם משתמש</string>
@@ -815,7 +822,7 @@
   <string name="view_all_login_options">הצג את כל אפשרויות הכניסה</string>
   <string name="this_request_is_no_longer_valid">בקשה זו אינה תקפה עוד</string>
   <string name="pending_log_in_requests">בקשות כניסה ממתינות</string>
-  <string name="decline_all_requests">דחה את כל הבקשות</string>
+  <string name="decline_all_requests">סרב לכל הבקשות</string>
   <string name="are_you_sure_you_want_to_decline_all_pending_log_in_requests">האם אתה בטוח שברצונך לדחות את כל בקשות הכניסה הממתינות?</string>
   <string name="requests_declined">הבקשות נדחו</string>
   <string name="no_pending_requests">אין בקשות ממתינות</string>
@@ -963,7 +970,6 @@
   <string name="your_passkey_will_be_saved_to_your_bitwarden_vault_for_x">מפתח הגישה שלך יישמר בכספת ה־Bitwarden שלך עבור %1$s</string>
   <string name="organization_unassigned_items_message_useu_description_long">פריטי ארגון שלא הוקצו כבר לא יהיו גלויים בתצוגת כל הכספות והם יהיו נגישים רק דרך מסוף המנהל. הקצה פריטים אלה לאוסף ממסוף המנהל כדי להפוך אותם לגלויים.</string>
   <string name="organization_unassigned_items_message_self_host_041624_description_long">בתאריך 16 במאי 2024, פריטי ארגון שלא הוקצו כבר לא יהיו גלויים בתצוגת כל הכספות והם יהיו נגישים רק דרך מסוף המנהל. הקצה פריטים אלה לאוסף ממסוף המנהל כדי להפוך אותם לגלויים.</string>
-  <string name="remind_me_later">הזכר לי מאוחר יותר</string>
   <string name="notice">הודעה</string>
   <string name="passkeys_not_supported_for_this_app">מפתחות גישה אינן נתמכות עבור יישום זה</string>
   <string name="passkey_operation_failed_because_browser_is_not_privileged">פעולת מפתח גישה נכשלה בגלל שהדפדפן אינו בעל הרשאות</string>
@@ -972,10 +978,7 @@
   <string name="passkey_operation_failed_because_app_not_found_in_asset_links">פעולת מפתח גישה נכשלה בגלל שהיישום לא נמצא בקישורי נכסים</string>
   <string name="passkey_operation_failed_because_app_could_not_be_verified">פעולת מפתח גישה נכשלה בגלל שלא היה ניתן לאמת את היישום</string>
   <string name="confirm_file_password">אשר סיסמת קובץ</string>
-  <string name="continue_to_give_feedback">להמשיך אל תן משוב?</string>
-  <string name="continue_to_provide_feedback">בחר המשך כדי לתת משוב על היישום החדש!</string>
   <string name="file_password">סיסמת קובץ</string>
-  <string name="give_feedback">תן משוב</string>
   <string name="password_protected">מוגן סיסמה</string>
   <string name="password_used_to_export">סיסמה זו תשמש כדי לייצא ולייבא קובץ זה</string>
   <string name="autofill_suggestion">הצעות למילוי אוטומטי</string>
@@ -1139,17 +1142,10 @@
   <string name="copy_email">העתק דוא\"ל</string>
   <string name="copy_phone">העתק מספר טלפון</string>
   <string name="copy_address">העתק כתובת</string>
-  <string name="important_notice">הודעה חשובה</string>
-  <string name="bitwarden_will_soon_send_a_code_to_your_account_email_to_verify_logins_from_new_devices_in_february">Bitwarden ישלח קוד לדוא\"ל החשבון שלך כדי לאמת כניסות ממכשירים חדשים החל מפברואר 2025.</string>
-  <string name="do_you_have_reliable_access_to_your_email">יש לך גישה מהימנה לדוא\"ל שלך, <annotation emphasis="bold"><annotation arg="0">%1$s?</annotation></annotation>?</string>
-  <string name="yes_i_can_reliably_access_my_email">כן, אני יכול לגשת לדוא\"ל שלי באופן מהימן</string>
   <string name="biometrics_no_longer_supported_title">זיהוי ביומטרי אינו נתמך יותר במכשיר זה</string>
   <string name="biometrics_no_longer_supported">יצאת מהחשבון שלך בגלל שהזיהוי הביומטרי של המכשיר שלך לא עומד בדרישות האבטחה האחרונות. כדי לעדכן הגדרות, היכנס פעם נוספת או פנה אל המנהל שלך עבור גישה.</string>
   <string name="cxp_import">ייבוא CXP</string>
   <string name="cxp_export">ייצוא CXP</string>
-  <string name="set_up_two_step_login">הגדר כניסה דו־שלבית</string>
-  <string name="you_can_set_up_two_step_login_as_an_alternative_way_to_protect_your_account_or_change_your_email_to_one_you_can_access">אתה יכול להגדיר כניסה דו־שלבית כדרך חלופית להגן על החשבון שלך או לשנות את הדוא\"ל שלך לאחד שאתה יכול לגשת אליו.</string>
-  <string name="turn_on_two_step_login">הפעל כניסה דו־שלבית</string>
   <string name="change_account_email">שנה את דוא\"ל החשבון</string>
   <string name="choose_three_or_four_random_words">בחר שלוש או ארבע מילים אקראיות</string>
   <string name="pick_three_or_four_random_unrelated_words">בחר שלוש או ארבע מילים אקראיות ולא קשורות שאתה יכול לזכור בקלות. חשוב על <annotation emphasis="bold">חפצים, מקומות, או דברים</annotation> שאתה אוהב.</string>
@@ -1163,7 +1159,6 @@
   <string name="we_couldnt_verify_the_servers_certificate">לא יכולנו לאמת את תעודת השרת. ייתכן ששרשרת התעודה או הגדרות הפרוקסי במכשיר שלך או בשרת ה־Bitwarden שלך אינן מוגדרות כראוי.</string>
   <string name="review_flow_launched">סקירת זרימה נפתחה!</string>
   <string name="copy_private_key">העתק מפתח פרטי</string>
-  <string name="you_can_change_your_account_email_on_the_bitwarden_web_app">אתה יכול לשנות את דוא\"ל החשבון שלך ביישום הרשת של Bitwarden.</string>
   <string name="login_credentials">אישורי כניסה</string>
   <string name="autofill_options">אפשרויות מילוי אוטומטי</string>
   <string name="use_this_button_to_generate_a_new_unique_password">השתמש בלחצן זה כדי ליצור סיסמה ייחודית חדשה.</string>
@@ -1207,18 +1202,17 @@
   <string name="system_certificates_are_not_as_secure_as_importing_certificates_to_bitwarden">שימוש בתעודת מערכת הוא פחות מאובטח מאשר אחסון התעודה עם Bitwarden. בהמשך תוצג רשימה של תעודות מערכת זמינות אם אחת כבר מותקנת.</string>
   <string name="certificate_alias_already_exists">כינוי אישור כבר קיים</string>
   <string name="link">קישור</string>
-  <string name="passkey_operation_failed_because_app_is_signed_incorrectly">פעולת מפתח גישה נכשלה בגלל שהיישום אינו חתום כראוי.</string>
   <string name="passkey_operation_failed_because_host_url_is_not_present_in_request">פעולת מפתח גישה נכשלה בגלל שכתובת ה־URL של המארח אינה נמצאת בבקשה.</string>
   <string name="passkey_operation_failed_because_app_signature_is_invalid">פעולת מפתח גישה נכשלה בגלל שחתימת היישום אינה חוקית.</string>
   <string name="passkey_registration_failed_due_to_an_internal_error">רישום מפתח גישה נכשל עקב שגיאה פנימית.</string>
   <string name="passkey_operation_failed_because_relying_party_cannot_be_identified">פעולת מפתח גישה נכשלה בגלל שהצד המסתמך אינו ניתן לזיהוי.</string>
-  <string name="passkey_authentication_failed_due_to_an_internal_error">אימות מפתח גישה נכשל עקב שגיאה פנימית.</string>
   <string name="passkey_operation_failed_because_the_selected_item_does_not_exist">פעולת מפתח גישה נכשלה בגלל שהפריט שנבחר אינו קיים.</string>
   <string name="passkey_operation_failed_because_user_is_locked_out">פעולת מפתח גישה נכשלה בגלל שהמשתמש נעול.</string>
   <string name="passkey_operation_failed_because_user_verification_was_cancelled">פעולת מפתח גישה נכשלה בגלל שאימות המשתמש בוטל.</string>
   <string name="passkey_operation_failed_because_the_request_is_invalid">פעולת מפתח גישה נכשלה בגלל שהבקשה אינה חוקית.</string>
   <string name="passkey_operation_failed_because_user_verification_attempts_exceeded">פעולת מפתח גישה נכשלה בגלל שניסיונות אימות משתמש חרגו.</string>
   <string name="passkey_operation_failed_because_no_item_was_selected">פעולת מפתח גישה נכשלה בגלל שלא נבחר פריט.</string>
+  <string name="passkey_operation_failed_because_the_request_is_unsupported">Passkey operation failed because the request is unsupported.</string>
   <string name="self_host_server_url">URL של שרת אירוח עצמי</string>
   <string name="use_chrome_autofill_integration">השתמש בשילוב מילוי אוטומטי של Chrome</string>
   <string name="use_chrome_beta_autofill_integration">השתמש בשילוב מילוי אוטומטי של Chrome (בטא)</string>
@@ -1226,7 +1220,43 @@
   <string name="show_more">הצג עוד</string>
   <string name="no_folder">ללא תיקייה</string>
   <string name="show_less">הצג פחות</string>
-  <string name="add_field">Add field</string>
+  <string name="add_field">הוסף שדה</string>
   <string name="x_ellipses">%s...</string>
-  <string name="share_error_details">Share error details</string>
+  <string name="share_error_details">שתף פרטי שגיאה</string>
+  <string name="flight_recorder">Flight recorder</string>
+  <string name="flight_recorder_help">Flight recorder help</string>
+  <string name="view_recorded_logs">View recorded logs</string>
+  <string name="enable_flight_recorder_title">Enable flight recorder</string>
+  <string name="recorded_logs_title">Recorded logs</string>
+  <string name="no_logs_recorded">No logs recorded</string>
+  <string name="experiencing_an_issue">Experiencing an issue?</string>
+  <string name="enable_temporary_logging_to_collect_and_inspect_logs_locally">Enable temporary logging to collect and inspect logs locally. When enabled, application states and network calls may be logged—never sensitive vault information.</string>
+  <string name="to_get_started_set_a_logging_duration">To get started, set a logging duration. Logging  will automatically turn off after this period, giving you time to capture activity while reproducing  any issues.</string>
+  <string name="logs_will_be_automatically_deleted_after_30_days">Logs will be automatically deleted after 30 days. Bitwarden is only able to access your log data when you share it.</string>
+  <string name="for_details_on_what_is_and_isnt_logged">For details on what is and isn’t logged, visit the\n<annotation link="helpCenter">Bitwarden help center.</annotation></string>
+  <string name="logging_duration">Logging duration</string>
+  <string name="flight_recorder_one_hour">1 hour</string>
+  <string name="flight_recorder_eight_hours">8 hours</string>
+  <string name="flight_recorder_twenty_four_hours">24 hours</string>
+  <string name="flight_recorder_one_week">1 week</string>
+  <string name="delete_all">Delete all</string>
+  <string name="share_all">Share all</string>
+  <string name="unable_to_share">Unable to share</string>
+  <string name="please_try_again_or_select_a_different_log">Please try again or select a different log.</string>
+  <string name="the_log_file_you_are_trying_to_share_has_been_removed">The log file you are trying to share has been removed.</string>
+  <string name="delete_log">Delete log</string>
+  <string name="do_you_really_want_to_delete_this_log">Do you really want to delete this log?</string>
+  <string name="delete_logs">Delete logs</string>
+  <string name="do_you_really_want_to_delete_all_recorded_logs">Do you really want to delete all recorded logs?</string>
+  <string name="confirm_key_connector_domain">Confirm Key Connector domain</string>
+  <string name="key_connector_domain">Key Connector domain:</string>
+  <string name="key_connector_organization">Organization:</string>
+  <string name="password_no_longer_required_confirm_domain">A master password is no longer required for members of the following organization. Please confirm the domain below with your organization administrator.</string>
+  <string name="please_confirm_domain_with_admin">Please confirm the domain below with your organization administrator.\n\nKey Connector domain:\n%1$s</string>
+  <string name="flight_recorder_banner_title">Flight recorder on</string>
+  <string name="flight_recorder_banner_message">Flight recorder will be active until %1$s at %2$s. Return to settings to deactivate now.</string>
+  <string name="go_to_settings">Go to settings</string>
+  <string name="all_logs_deleted">All logs deleted</string>
+  <string name="log_deleted">Log deleted</string>
+  <string name="app_settings">App settings</string>
 </resources>

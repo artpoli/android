@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -33,11 +35,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
-import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
-import androidx.compose.ui.node.currentValueOf
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -47,10 +46,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
-import com.x8bit.bitwarden.data.platform.annotation.OmitFromCoverage
+import com.bitwarden.core.annotation.OmitFromCoverage
 import com.x8bit.bitwarden.ui.platform.components.model.CardStyle
+import com.x8bit.bitwarden.ui.platform.model.WindowSize
 import com.x8bit.bitwarden.ui.platform.theme.BitwardenTheme
-import com.x8bit.bitwarden.ui.platform.util.isPortrait
+import com.x8bit.bitwarden.ui.platform.util.getWindowSize
 
 /**
  * Adds a performance-optimized background color specified by the given [topAppBarScrollBehavior]
@@ -128,6 +128,38 @@ fun Modifier.nullableTestTag(
 ): Modifier = this.run { tag?.let { testTag(tag = it) } ?: this }
 
 /**
+ * This is a [Modifier] extension for drawing a divider at the top of the composable.
+ */
+@OmitFromCoverage
+@Stable
+@Composable
+fun Modifier.topDivider(
+    paddingStart: Dp = 0.dp,
+    paddingEnd: Dp = 0.dp,
+    thickness: Dp = (0.5).dp,
+    color: Color = BitwardenTheme.colorScheme.stroke.divider,
+    enabled: Boolean = true,
+    alpha: Float = 1f,
+): Modifier = drawWithCache {
+    onDrawWithContent {
+        drawContent()
+        if (enabled) {
+            val (startX, endX) = when (layoutDirection) {
+                LayoutDirection.Ltr -> paddingStart.toPx() to (size.width - paddingEnd.toPx())
+                LayoutDirection.Rtl -> (size.width - paddingEnd.toPx()) to paddingStart.toPx()
+            }
+            drawLine(
+                alpha = alpha,
+                color = color,
+                strokeWidth = thickness.toPx(),
+                start = Offset(x = startX, y = thickness.toPx() / 2),
+                end = Offset(x = endX, y = thickness.toPx() / 2),
+            )
+        }
+    }
+}
+
+/**
  * This is a [Modifier] extension for drawing a divider at the bottom of the composable.
  */
 @OmitFromCoverage
@@ -142,29 +174,50 @@ fun Modifier.bottomDivider(
     alpha: Float = 1f,
 ): Modifier = drawWithCache {
     onDrawWithContent {
-        val (startX, endX) = when (layoutDirection) {
-            LayoutDirection.Ltr -> {
-                paddingStart.toPx() to (size.width - paddingEnd.toPx())
-            }
-
-            LayoutDirection.Rtl -> {
-                (size.width - paddingEnd.toPx()) to paddingStart.toPx()
-            }
-        }
         drawContent()
         if (enabled) {
+            val (startX, endX) = when (layoutDirection) {
+                LayoutDirection.Ltr -> paddingStart.toPx() to (size.width - paddingEnd.toPx())
+                LayoutDirection.Rtl -> (size.width - paddingEnd.toPx()) to paddingStart.toPx()
+            }
             drawLine(
                 alpha = alpha,
                 color = color,
                 strokeWidth = thickness.toPx(),
-                start = Offset(
-                    x = startX,
-                    y = size.height - thickness.toPx() / 2,
-                ),
-                end = Offset(
-                    x = endX,
-                    y = size.height - thickness.toPx() / 2,
-                ),
+                start = Offset(x = startX, y = size.height - thickness.toPx() / 2),
+                end = Offset(x = endX, y = size.height - thickness.toPx() / 2),
+            )
+        }
+    }
+}
+
+/**
+ * This is a [Modifier] extension for drawing a divider at the end of the composable.
+ */
+@OmitFromCoverage
+@Stable
+@Composable
+fun Modifier.endDivider(
+    paddingTop: Dp = 0.dp,
+    paddingBottom: Dp = 0.dp,
+    thickness: Dp = (0.5).dp,
+    color: Color = BitwardenTheme.colorScheme.stroke.divider,
+    enabled: Boolean = true,
+    alpha: Float = 1f,
+): Modifier = drawWithCache {
+    onDrawWithContent {
+        drawContent()
+        if (enabled) {
+            val startX = when (layoutDirection) {
+                LayoutDirection.Ltr -> size.width - thickness.toPx() / 2
+                LayoutDirection.Rtl -> thickness.toPx() / 2
+            }
+            drawLine(
+                alpha = alpha,
+                color = color,
+                strokeWidth = thickness.toPx(),
+                start = Offset(x = startX, y = paddingTop.toPx()),
+                end = Offset(x = startX, y = size.height - paddingBottom.toPx()),
             )
         }
     }
@@ -215,39 +268,65 @@ fun Modifier.tabNavigation(): Modifier {
  */
 @OmitFromCoverage
 @Stable
+@Composable
 fun Modifier.standardHorizontalMargin(
-    portrait: Dp = 16.dp,
-    landscape: Dp = 48.dp,
+    compact: Dp = 16.dp,
+    medium: Dp = 48.dp,
 ): Modifier =
-    this then StandardHorizontalMarginElement(portrait = portrait, landscape = landscape)
+    standardHorizontalMargin(
+        compact = compact,
+        medium = medium,
+        windowAdaptiveInfo = currentWindowAdaptiveInfo(),
+    )
+
+/**
+ * This is a [Modifier] extension for ensuring that the content uses the standard horizontal margin.
+ */
+@OmitFromCoverage
+@Stable
+fun Modifier.standardHorizontalMargin(
+    compact: Dp = 16.dp,
+    medium: Dp = 48.dp,
+    windowAdaptiveInfo: WindowAdaptiveInfo,
+): Modifier =
+    this then StandardHorizontalMarginElement(
+        compact = compact,
+        medium = medium,
+        windowAdaptiveInfo = windowAdaptiveInfo,
+    )
 
 private data class StandardHorizontalMarginElement(
-    private val portrait: Dp,
-    private val landscape: Dp,
+    private val compact: Dp,
+    private val medium: Dp,
+    private val windowAdaptiveInfo: WindowAdaptiveInfo,
 ) : ModifierNodeElement<StandardHorizontalMarginElement.StandardHorizontalMarginConsumerNode>() {
     override fun create(): StandardHorizontalMarginConsumerNode =
         StandardHorizontalMarginConsumerNode(
-            portrait = portrait,
-            landscape = landscape,
+            compact = compact,
+            medium = medium,
+            windowAdaptiveInfo = windowAdaptiveInfo,
         )
 
     override fun update(node: StandardHorizontalMarginConsumerNode) {
-        node.portrait = portrait
-        node.landscape = landscape
+        node.compact = compact
+        node.medium = medium
     }
 
     class StandardHorizontalMarginConsumerNode(
-        var portrait: Dp,
-        var landscape: Dp,
+        var compact: Dp,
+        var medium: Dp,
+        private val windowAdaptiveInfo: WindowAdaptiveInfo,
     ) : Modifier.Node(),
-        LayoutModifierNode,
-        CompositionLocalConsumerModifierNode {
+        LayoutModifierNode {
         override fun MeasureScope.measure(
             measurable: Measurable,
             constraints: Constraints,
         ): MeasureResult {
-            val currentConfig = currentValueOf(LocalConfiguration)
-            val paddingPx = (if (currentConfig.isPortrait) portrait else landscape).roundToPx()
+            val paddingPx = when (windowAdaptiveInfo.getWindowSize()) {
+                WindowSize.Compact -> compact.roundToPx()
+                WindowSize.Medium -> medium.roundToPx()
+            }
+
             // Account for the padding on each side.
             val horizontalPx = paddingPx * 2
             // Measure the placeable within the horizontal space accounting for the padding Px.

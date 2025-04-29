@@ -2,23 +2,23 @@ package com.x8bit.bitwarden.ui.tools.feature.send
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.model.DataState
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseWebSendUrl
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardManager
 import com.x8bit.bitwarden.data.platform.manager.network.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
-import com.x8bit.bitwarden.data.platform.repository.model.DataState
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebSendUrl
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.DeleteSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.RemovePasswordSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.SendData
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.tools.feature.send.util.toViewState
 import io.mockk.coEvery
 import io.mockk.every
@@ -102,12 +102,12 @@ class SendViewModelTest : BaseViewModelTest() {
     @Test
     fun `LockClick should lock the vault`() {
         val viewModel = createViewModel()
-        every { vaultRepo.lockVaultForCurrentUser() } just runs
+        every { vaultRepo.lockVaultForCurrentUser(any()) } just runs
 
         viewModel.trySendAction(SendAction.LockClick)
 
         verify {
-            vaultRepo.lockVaultForCurrentUser()
+            vaultRepo.lockVaultForCurrentUser(isUserInitiated = true)
         }
     }
 
@@ -138,7 +138,8 @@ class SendViewModelTest : BaseViewModelTest() {
         val sendItem = mockk<SendState.ViewState.Content.SendItem> {
             every { id } returns sendId
         }
-        coEvery { vaultRepo.deleteSend(sendId) } returns DeleteSendResult.Error
+        val error = Throwable("Oops")
+        coEvery { vaultRepo.deleteSend(sendId) } returns DeleteSendResult.Error(error = error)
 
         val viewModel = createViewModel()
         viewModel.stateFlow.test {
@@ -155,6 +156,7 @@ class SendViewModelTest : BaseViewModelTest() {
                     dialogState = SendState.DialogState.Error(
                         title = R.string.an_error_has_occurred.asText(),
                         message = R.string.generic_error_message.asText(),
+                        throwable = error,
                     ),
                 ),
                 awaitItem(),
@@ -186,7 +188,7 @@ class SendViewModelTest : BaseViewModelTest() {
             }
             coEvery {
                 vaultRepo.removePasswordSend(sendId)
-            } returns RemovePasswordSendResult.Error(errorMessage = null)
+            } returns RemovePasswordSendResult.Error(errorMessage = null, error = null)
 
             val viewModel = createViewModel()
             viewModel.stateFlow.test {

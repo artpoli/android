@@ -49,8 +49,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bitwarden.authenticator.R
 import com.bitwarden.authenticator.ui.platform.base.util.EventsEffect
-import com.bitwarden.authenticator.ui.platform.base.util.Text
-import com.bitwarden.authenticator.ui.platform.base.util.asText
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.bitwarden.authenticator.ui.platform.base.util.mirrorIfRtl
 import com.bitwarden.authenticator.ui.platform.components.appbar.BitwardenMediumTopAppBar
 import com.bitwarden.authenticator.ui.platform.components.dialog.BitwardenSelectionDialog
@@ -212,8 +212,6 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             AboutSettings(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp),
                 state = state,
                 onSubmitCrashLogsCheckedChange = remember(viewModel) {
                     { viewModel.trySendAction(SettingsAction.AboutClick.SubmitCrashLogsClick(it)) }
@@ -560,11 +558,12 @@ private fun AboutSettings(
     onVersionClick: () -> Unit,
 ) {
     BitwardenListHeaderText(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = 16.dp),
         label = stringResource(id = R.string.about),
     )
     BitwardenWideSwitch(
         modifier = modifier
+            .padding(horizontal = 16.dp)
             .semantics { testTag = "SubmitCrashLogs" },
         label = stringResource(id = R.string.submit_crash_logs),
         isChecked = state.isSubmitCrashLogsEnabled,

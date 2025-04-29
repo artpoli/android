@@ -4,30 +4,32 @@ import android.view.autofill.AutofillManager
 import app.cash.turbine.test
 import com.bitwarden.authenticatorbridge.util.generateSecretKey
 import com.bitwarden.core.DerivePinKeyResponse
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.core.data.util.asFailure
+import com.bitwarden.core.data.util.asSuccess
+import com.bitwarden.data.datasource.disk.base.FakeDispatcherManager
+import com.bitwarden.data.datasource.disk.model.EnvironmentUrlDataJson
+import com.bitwarden.network.model.KdfTypeJson
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.network.model.TrustedDeviceUserDecryptionOptionsJson
+import com.bitwarden.network.model.UserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountJson
-import com.x8bit.bitwarden.data.auth.datasource.disk.model.EnvironmentUrlDataJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.util.FakeAuthDiskSource
-import com.x8bit.bitwarden.data.auth.datasource.network.model.KdfTypeJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserDecryptionOptionsJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.UserDecryptionOptionsJson
 import com.x8bit.bitwarden.data.auth.repository.model.UserFingerprintResult
 import com.x8bit.bitwarden.data.autofill.accessibility.manager.FakeAccessibilityEnabledManager
 import com.x8bit.bitwarden.data.autofill.manager.AutofillEnabledManager
 import com.x8bit.bitwarden.data.autofill.manager.AutofillEnabledManagerImpl
-import com.x8bit.bitwarden.data.platform.base.FakeDispatcherManager
 import com.x8bit.bitwarden.data.platform.datasource.disk.util.FakeSettingsDiskSource
+import com.x8bit.bitwarden.data.platform.error.NoActiveUserException
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
+import com.x8bit.bitwarden.data.platform.manager.flightrecorder.FlightRecorderManager
 import com.x8bit.bitwarden.data.platform.repository.model.BiometricsKeyResult
 import com.x8bit.bitwarden.data.platform.repository.model.ClearClipboardFrequency
 import com.x8bit.bitwarden.data.platform.repository.model.UriMatchType
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeout
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
-import com.x8bit.bitwarden.data.platform.util.asFailure
-import com.x8bit.bitwarden.data.platform.util.asSuccess
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppLanguage
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
@@ -36,14 +38,18 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkConstructor
 import io.mockk.runs
+import io.mockk.unmockkConstructor
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.ZonedDateTime
@@ -65,6 +71,7 @@ class SettingsRepositoryTest {
             getActivePoliciesFlow(type = PolicyTypeJson.MAXIMUM_VAULT_TIMEOUT)
         } returns mutableActivePolicyFlow
     }
+    private val flightRecorderManager = mockk<FlightRecorderManager>()
 
     private val settingsRepository = SettingsRepositoryImpl(
         autofillManager = autofillManager,
@@ -75,7 +82,21 @@ class SettingsRepositoryTest {
         accessibilityEnabledManager = fakeAccessibilityEnabledManager,
         dispatcherManager = FakeDispatcherManager(),
         policyManager = policyManager,
+        flightRecorderManager = flightRecorderManager,
     )
+
+    @BeforeEach
+    fun setup() {
+        mockkConstructor(NoActiveUserException::class)
+        every {
+            anyConstructed<NoActiveUserException>() == any<NoActiveUserException>()
+        } returns true
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkConstructor(NoActiveUserException::class)
+    }
 
     @Test
     fun `setDefaultsIfNecessary should set LOCK default values for the given user if necessary`() {
@@ -743,23 +764,24 @@ class SettingsRepositoryTest {
 
         val result = settingsRepository.getUserFingerprint()
 
-        assertEquals(UserFingerprintResult.Error, result)
+        assertEquals(UserFingerprintResult.Error(error = NoActiveUserException()), result)
     }
 
     @Test
     fun `getUserFingerprint should return failure with active user when source returns failure`() =
         runTest {
+            val error = Throwable("Fail!")
             fakeAuthDiskSource.userState = MOCK_USER_STATE
             coEvery {
                 vaultSdkSource.getUserFingerprint(userId = USER_ID)
-            } returns Throwable().asFailure()
+            } returns error.asFailure()
 
             val result = settingsRepository.getUserFingerprint()
 
             coVerify(exactly = 1) {
                 vaultSdkSource.getUserFingerprint(userId = USER_ID)
             }
-            assertEquals(UserFingerprintResult.Error, result)
+            assertEquals(UserFingerprintResult.Error(error = error), result)
         }
 
     @Test
@@ -814,7 +836,7 @@ class SettingsRepositoryTest {
 
             val result = settingsRepository.setupBiometricsKey(cipher = cipher)
 
-            assertEquals(BiometricsKeyResult.Error, result)
+            assertEquals(BiometricsKeyResult.Error(error = NoActiveUserException()), result)
             coVerify(exactly = 0) {
                 vaultSdkSource.getUserEncryptionKey(userId = any())
             }
@@ -826,13 +848,14 @@ class SettingsRepositoryTest {
         runTest {
             fakeAuthDiskSource.userState = MOCK_USER_STATE
             val cipher = mockk<Cipher>()
+            val error = Throwable("Fail")
             coEvery {
                 vaultSdkSource.getUserEncryptionKey(userId = USER_ID)
-            } returns Throwable("Fail").asFailure()
+            } returns error.asFailure()
 
             val result = settingsRepository.setupBiometricsKey(cipher = cipher)
 
-            assertEquals(BiometricsKeyResult.Error, result)
+            assertEquals(BiometricsKeyResult.Error(error = error), result)
             coVerify(exactly = 1) {
                 vaultSdkSource.getUserEncryptionKey(userId = USER_ID)
             }
@@ -983,22 +1006,19 @@ class SettingsRepositoryTest {
     @Test
     fun `isScreenCaptureAllowed property should update SettingsDiskSource and emit changes`() =
         runTest {
-            fakeAuthDiskSource.userState = MOCK_USER_STATE
-
-            fakeSettingsDiskSource.storeScreenCaptureAllowed(USER_ID, false)
-
+            fakeSettingsDiskSource.screenCaptureAllowed = false
             settingsRepository.isScreenCaptureAllowedStateFlow.test {
                 assertFalse(awaitItem())
 
                 settingsRepository.isScreenCaptureAllowed = true
                 assertTrue(awaitItem())
 
-                assertEquals(true, fakeSettingsDiskSource.getScreenCaptureAllowed(USER_ID))
+                assertEquals(true, fakeSettingsDiskSource.screenCaptureAllowed)
 
                 settingsRepository.isScreenCaptureAllowed = false
                 assertFalse(awaitItem())
 
-                assertEquals(false, fakeSettingsDiskSource.getScreenCaptureAllowed(USER_ID))
+                assertEquals(false, fakeSettingsDiskSource.screenCaptureAllowed)
             }
         }
 

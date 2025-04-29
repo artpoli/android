@@ -1,17 +1,19 @@
 package com.x8bit.bitwarden.data.auth.repository
 
+import com.bitwarden.network.model.GetTokenResponseJson
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.network.model.TwoFactorDataModel
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
-import com.x8bit.bitwarden.data.auth.datasource.disk.model.NewDeviceNoticeState
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
-import com.x8bit.bitwarden.data.auth.datasource.network.model.GetTokenResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorDataModel
 import com.x8bit.bitwarden.data.auth.manager.AuthRequestManager
 import com.x8bit.bitwarden.data.auth.repository.model.AuthState
 import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
 import com.x8bit.bitwarden.data.auth.repository.model.DeleteAccountResult
 import com.x8bit.bitwarden.data.auth.repository.model.EmailTokenResult
 import com.x8bit.bitwarden.data.auth.repository.model.KnownDeviceResult
+import com.x8bit.bitwarden.data.auth.repository.model.LeaveOrganizationResult
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.NewSsoUserResult
 import com.x8bit.bitwarden.data.auth.repository.model.OrganizationDomainSsoDetailsResult
 import com.x8bit.bitwarden.data.auth.repository.model.PasswordHintResult
@@ -37,7 +39,6 @@ import com.x8bit.bitwarden.data.auth.repository.util.SsoCallbackResult
 import com.x8bit.bitwarden.data.auth.repository.util.WebAuthResult
 import com.x8bit.bitwarden.data.auth.util.YubiKeyResult
 import com.x8bit.bitwarden.data.platform.datasource.network.authenticator.AuthenticatorProvider
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -244,9 +245,19 @@ interface AuthRepository : AuthenticatorProvider, AuthRequestManager {
     ): LoginResult
 
     /**
+     * Continue the previously halted login attempt.
+     */
+    suspend fun continueKeyConnectorLogin(): LoginResult
+
+    /**
+     * Cancel the previously halted login attempt.
+     */
+    fun cancelKeyConnectorLogin()
+
+    /**
      * Log out the current user.
      */
-    fun logout()
+    fun logout(reason: LogoutReason)
 
     /**
      * Requests that a one-time passcode be sent to the user's email.
@@ -424,17 +435,9 @@ interface AuthRepository : AuthenticatorProvider, AuthRequestManager {
     fun setOnboardingStatus(status: OnboardingStatus)
 
     /**
-     * Checks if a new device notice should be displayed.
+     * Leaves the organization that matches the given [organizationId]
      */
-    fun checkUserNeedsNewDeviceTwoFactorNotice(): Boolean
-
-    /**
-     * Gets the new device notice state of active user.
-     */
-    fun getNewDeviceNoticeState(): NewDeviceNoticeState?
-
-    /**
-     * Stores the new device notice state for active user.
-     */
-    fun setNewDeviceNoticeState(newState: NewDeviceNoticeState?)
+    suspend fun leaveOrganization(
+        organizationId: String,
+    ): LeaveOrganizationResult
 }

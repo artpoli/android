@@ -4,10 +4,15 @@ import android.net.Uri
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseWebVaultUrlOrDefault
+import com.bitwarden.network.model.GetTokenResponseJson
+import com.bitwarden.network.model.TwoFactorAuthMethod
+import com.bitwarden.network.model.TwoFactorDataModel
+import com.bitwarden.network.util.base64UrlDecodeOrNull
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
-import com.x8bit.bitwarden.data.auth.datasource.network.model.GetTokenResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorAuthMethod
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorDataModel
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResendEmailResult
@@ -17,13 +22,8 @@ import com.x8bit.bitwarden.data.auth.repository.util.WebAuthResult
 import com.x8bit.bitwarden.data.auth.repository.util.generateUriForCaptcha
 import com.x8bit.bitwarden.data.auth.repository.util.generateUriForWebAuth
 import com.x8bit.bitwarden.data.auth.util.YubiKeyResult
-import com.x8bit.bitwarden.data.platform.datasource.network.util.base64UrlDecodeOrNull
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebVaultUrlOrDefault
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.resource.ResourceManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -176,14 +176,30 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `webAuthResultFlow update with failure should display error dialog`() {
+    fun `webAuthResultFlow failure without message should display generic error dialog`() {
         val initialState = DEFAULT_STATE.copy(authMethod = TwoFactorAuthMethod.WEB_AUTH)
         val viewModel = createViewModel(state = initialState)
-        mutableWebAuthResultFlow.tryEmit(WebAuthResult.Failure)
+        mutableWebAuthResultFlow.tryEmit(WebAuthResult.Failure(message = null))
         assertEquals(
             initialState.copy(
                 dialogState = TwoFactorLoginState.DialogState.Error(
                     message = R.string.generic_error_message.asText(),
+                ),
+            ),
+            viewModel.stateFlow.value,
+        )
+    }
+
+    @Test
+    fun `webAuthResultFlow failure with message should display error dialog with message`() {
+        val initialState = DEFAULT_STATE.copy(authMethod = TwoFactorAuthMethod.WEB_AUTH)
+        val viewModel = createViewModel(state = initialState)
+        val errorMessage = "An error"
+        mutableWebAuthResultFlow.tryEmit(WebAuthResult.Failure(message = errorMessage))
+        assertEquals(
+            initialState.copy(
+                dialogState = TwoFactorLoginState.DialogState.Error(
+                    message = errorMessage.asText(),
                 ),
             ),
             viewModel.stateFlow.value,
@@ -581,6 +597,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `ContinueButtonClick login returns Error should update dialogState`() = runTest {
+        val error = Throwable("Fail!")
         coEvery {
             authRepository.login(
                 email = DEFAULT_EMAIL_ADDRESS,
@@ -593,7 +610,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                 captchaToken = null,
                 orgIdentifier = DEFAULT_ORG_IDENTIFIER,
             )
-        } returns LoginResult.Error(errorMessage = null)
+        } returns LoginResult.Error(errorMessage = null, error = error)
 
         val viewModel = createViewModel()
         viewModel.stateFlow.test {
@@ -614,6 +631,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                     dialogState = TwoFactorLoginState.DialogState.Error(
                         title = R.string.an_error_has_occurred.asText(),
                         message = R.string.invalid_verification_code.asText(),
+                        error = error,
                     ),
                 ),
                 awaitItem(),
@@ -640,6 +658,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
     @Test
     fun `ContinueButtonClick login returns Error with message should update dialogState`() =
         runTest {
+            val error = Throwable("Fail!")
             coEvery {
                 authRepository.login(
                     email = DEFAULT_EMAIL_ADDRESS,
@@ -652,7 +671,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                     captchaToken = null,
                     orgIdentifier = DEFAULT_ORG_IDENTIFIER,
                 )
-            } returns LoginResult.Error(errorMessage = "Mock error message")
+            } returns LoginResult.Error(errorMessage = "Mock error message", error = error)
 
             val viewModel = createViewModel()
             viewModel.stateFlow.test {
@@ -673,6 +692,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                         dialogState = TwoFactorLoginState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = "Mock error message".asText(),
+                            error = error,
                         ),
                     ),
                     awaitItem(),
@@ -922,9 +942,10 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `ResendEmailClick returns error should update dialogState`() = runTest {
+        val error = Throwable("Fail!")
         coEvery {
             authRepository.resendVerificationCodeEmail()
-        } returns ResendEmailResult.Error(message = null)
+        } returns ResendEmailResult.Error(message = null, error = error)
 
         val viewModel = createViewModel()
         viewModel.stateFlow.test {
@@ -947,6 +968,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                     dialogState = TwoFactorLoginState.DialogState.Error(
                         title = R.string.an_error_has_occurred.asText(),
                         message = R.string.verification_email_not_sent.asText(),
+                        error = error,
                     ),
                 ),
                 awaitItem(),
@@ -969,6 +991,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                     dialogState = TwoFactorLoginState.DialogState.Error(
                         title = R.string.an_error_has_occurred.asText(),
                         message = R.string.verification_email_not_sent.asText(),
+                        error = error,
                     ),
                 ),
                 awaitItem(),
@@ -1075,12 +1098,13 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
     @Test
     fun `ReceiveResendEmailResult with ResendEmailResult Error should not emit any events`() =
         runTest {
+            val error = Throwable("Fail!")
             val viewModel = createViewModel()
             viewModel.stateFlow.test {
                 assertEquals(DEFAULT_STATE, awaitItem())
                 viewModel.trySendAction(
                     TwoFactorLoginAction.Internal.ReceiveResendEmailResult(
-                        resendEmailResult = ResendEmailResult.Error(message = null),
+                        resendEmailResult = ResendEmailResult.Error(message = null, error = error),
                         isUserInitiated = true,
                     ),
                 )
@@ -1089,6 +1113,7 @@ class TwoFactorLoginViewModelTest : BaseViewModelTest() {
                         dialogState = TwoFactorLoginState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.verification_email_not_sent.asText(),
+                            error = error,
                         ),
                     ),
                     awaitItem(),

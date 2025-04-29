@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +16,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -48,6 +48,7 @@ import com.x8bit.bitwarden.ui.platform.composition.LocalKeyChainManager
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.platform.manager.keychain.KeyChainManager
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.launch
 
 /**
  * Displays the about self-hosted/custom environment screen.
@@ -70,6 +71,7 @@ fun EnvironmentScreen(
             )
         }
     }
+    val scope = rememberCoroutineScope()
     EventsEffect(viewModel = viewModel) { event ->
         when (event) {
             is EnvironmentEvent.NavigateBack -> onNavigateBack.invoke()
@@ -84,13 +86,14 @@ fun EnvironmentScreen(
             }
 
             is EnvironmentEvent.ShowSystemCertificateSelectionDialog -> {
-                viewModel.trySendAction(
-                    EnvironmentAction.SystemCertificateSelectionResultReceive(
-                        keyChainManager.choosePrivateKeyAlias(
-                            currentServerUrl = event.serverUrl?.takeUnless { it.isEmpty() },
-                        ),
-                    ),
-                )
+                scope.launch {
+                    val result = keyChainManager.choosePrivateKeyAlias(
+                        currentServerUrl = event.serverUrl?.takeUnless { it.isEmpty() },
+                    )
+                    viewModel.trySendAction(
+                        action = EnvironmentAction.SystemCertificateSelectionResultReceive(result),
+                    )
+                }
             }
         }
     }
@@ -101,8 +104,9 @@ fun EnvironmentScreen(
                 title = stringResource(id = R.string.an_error_has_occurred),
                 message = dialog.message(),
                 onDismissRequest = remember(viewModel) {
-                    { viewModel.trySendAction(EnvironmentAction.ErrorDialogDismiss) }
+                    { viewModel.trySendAction(EnvironmentAction.DialogDismiss) }
                 },
+                throwable = dialog.throwable,
             )
         }
 
@@ -142,10 +146,34 @@ fun EnvironmentScreen(
                 },
                 dismissButtonText = stringResource(R.string.cancel),
                 onDismissClick = remember(viewModel) {
-                    { viewModel.trySendAction(EnvironmentAction.ErrorDialogDismiss) }
+                    { viewModel.trySendAction(EnvironmentAction.DialogDismiss) }
                 },
                 onDismissRequest = remember(viewModel) {
-                    { viewModel.trySendAction(EnvironmentAction.ErrorDialogDismiss) }
+                    { viewModel.trySendAction(EnvironmentAction.DialogDismiss) }
+                },
+            )
+        }
+
+        is EnvironmentState.DialogState.ConfirmOverwriteAlias -> {
+            BitwardenTwoButtonDialog(
+                title = dialog.title(),
+                message = dialog.message(),
+                confirmButtonText = stringResource(R.string.replace_certificate),
+                dismissButtonText = stringResource(R.string.cancel),
+                onConfirmClick = remember(viewModel) {
+                    {
+                        viewModel.trySendAction(
+                            EnvironmentAction.ConfirmOverwriteCertificateClick(
+                                triggeringAction = dialog.triggeringAction,
+                            ),
+                        )
+                    }
+                },
+                onDismissClick = remember(viewModel) {
+                    { viewModel.trySendAction(EnvironmentAction.DialogDismiss) }
+                },
+                onDismissRequest = remember(viewModel) {
+                    { viewModel.trySendAction(EnvironmentAction.DialogDismiss) }
                 },
             )
         }
@@ -181,7 +209,6 @@ fun EnvironmentScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .imePadding()
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(modifier = Modifier.height(height = 12.dp))

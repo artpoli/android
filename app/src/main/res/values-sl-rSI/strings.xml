@@ -480,7 +480,7 @@ Scanning will happen automatically.</string>
   <string name="unlock">Odkleni</string>
   <string name="unlock_vault">Odkleni trezor</string>
   <string name="thirty_minutes">30 minut</string>
-  <string name="set_pin_description">Set your PIN code for unlocking Bitwarden. Your PIN settings will be reset if you ever fully log out of the application.</string>
+  <string name="set_pin_description">Your PIN must be at least 4 characters. Your PIN settings will be reset if you ever fully log out of the application.</string>
   <string name="logged_in_as_on">Prijavljeni kot %1$s na %2$s.</string>
   <string name="vault_locked_master_password">Vaš trezor je zaklenjen. Vpišite svoje glavno geslo za nadaljevanje.</string>
   <string name="vault_locked_pin">Vaš trezor je zaklenjen. Potrdite PIN kodo za nadaljevanje.</string>
@@ -620,6 +620,10 @@ Scanning will happen automatically.</string>
   <string name="deletion_date_info">The Send will be permanently deleted on the specified date and time.</string>
   <string name="pending_delete">Pending deletion</string>
   <string name="expired">Poteklo</string>
+  <string name="expires_at">Expires at %s</string>
+  <string name="expires_tomorrow">Expires tomorrow</string>
+  <string name="expires_on">Expires on %s</string>
+  <string name="stops_logging_on">Stops logging on %1$s at %2$s</string>
   <string name="maximum_access_count">Maximum access count</string>
   <string name="maximum_access_count_info">If set, users will no longer be able to access this Send once the maximum access count is reached.</string>
   <string name="maximum_access_count_reached">Max access count reached</string>
@@ -773,7 +777,9 @@ select Add TOTP to store the key safely</string>
   <string name="forwarded_email_alias">Posredniški psevdonim</string>
   <string name="random_word">Naključna beseda</string>
   <string name="email_required_parenthesis">E-naslov (obvezno)</string>
+  <string name="domain_name">domain name</string>
   <string name="domain_name_required_parenthesis">Domain name (required)</string>
+  <string name="api_key">API key</string>
   <string name="api_key_required_parenthesis">API key (required)</string>
   <string name="service">Service</string>
   <string name="addy_io">addy.io</string>
@@ -782,6 +788,7 @@ select Add TOTP to store the key safely</string>
   <string name="duck_duck_go">DuckDuckGo</string>
   <string name="fastmail">Fastmail</string>
   <string name="forward_email">ForwardEmail</string>
+  <string name="api_access_token_required_parenthesis">API access token (required)</string>
   <string name="api_access_token">API access token</string>
   <string name="are_you_sure_you_want_to_overwrite_the_current_username">Are you sure you want to overwrite the current username?</string>
   <string name="generate_username">Generiraj uporabniško ime</string>
@@ -963,7 +970,6 @@ Do you want to switch to this account?</string>
   <string name="your_passkey_will_be_saved_to_your_bitwarden_vault_for_x">Your passkey will be saved to your Bitwarden vault for %1$s</string>
   <string name="organization_unassigned_items_message_useu_description_long">Unassigned organization items are no longer visible in the All Vaults view and only accessible via the Admin Console. Assign these items to a collection from the Admin Console to make them visible.</string>
   <string name="organization_unassigned_items_message_self_host_041624_description_long">On May 16, 2024, unassigned organization items will no longer be visible in the All Vaults view and only accessible via the Admin Console. Assign these items to a collection from the Admin Console to make them visible.</string>
-  <string name="remind_me_later">Remind me later</string>
   <string name="notice">Notice</string>
   <string name="passkeys_not_supported_for_this_app">Passkeys not supported for this app</string>
   <string name="passkey_operation_failed_because_browser_is_not_privileged">Passkey operation failed because browser is not privileged</string>
@@ -972,10 +978,7 @@ Do you want to switch to this account?</string>
   <string name="passkey_operation_failed_because_app_not_found_in_asset_links">Passkey operation failed because app not found in asset links</string>
   <string name="passkey_operation_failed_because_app_could_not_be_verified">Passkey operation failed because app could not be verified</string>
   <string name="confirm_file_password">Confirm file password</string>
-  <string name="continue_to_give_feedback">Continue to Give Feedback?</string>
-  <string name="continue_to_provide_feedback">Select continue to give feedback on the new app!</string>
   <string name="file_password">File password</string>
-  <string name="give_feedback">Give Feedback</string>
   <string name="password_protected">Password Protected</string>
   <string name="password_used_to_export">This password will be used to export and import this file</string>
   <string name="autofill_suggestion">Autofill suggestion</string>
@@ -1139,17 +1142,10 @@ Do you want to switch to this account?</string>
   <string name="copy_email">Copy email</string>
   <string name="copy_phone">Copy phone number</string>
   <string name="copy_address">Copy address</string>
-  <string name="important_notice">Important notice</string>
-  <string name="bitwarden_will_soon_send_a_code_to_your_account_email_to_verify_logins_from_new_devices_in_february">Bitwarden will send a code to your account email to verify logins from new devices starting in February 2025.</string>
-  <string name="do_you_have_reliable_access_to_your_email">Do you have reliable access to your email, <annotation emphasis="bold"><annotation arg="0">%1$s?</annotation></annotation>?</string>
-  <string name="yes_i_can_reliably_access_my_email">Yes, I can reliably access my email</string>
   <string name="biometrics_no_longer_supported_title">Biometrics are no longer supported on this device</string>
   <string name="biometrics_no_longer_supported">You’ve been logged out because your device’s biometrics don’t meet the latest security requirements. To update settings, log in once again or contact your administrator for access.</string>
   <string name="cxp_import">CXP Import</string>
   <string name="cxp_export">CXP Export</string>
-  <string name="set_up_two_step_login">Set up two-step login</string>
-  <string name="you_can_set_up_two_step_login_as_an_alternative_way_to_protect_your_account_or_change_your_email_to_one_you_can_access">You can set up two-step login as an alternative way to protect your account or change your email to one you can access.</string>
-  <string name="turn_on_two_step_login">Turn on two-step login</string>
   <string name="change_account_email">Change account email</string>
   <string name="choose_three_or_four_random_words">Choose three or four random words</string>
   <string name="pick_three_or_four_random_unrelated_words">Pick three or four random, unrelated words that you can easily remember. Think of <annotation emphasis="bold">objects, places, or things</annotation> you like.</string>
@@ -1163,7 +1159,6 @@ Do you want to switch to this account?</string>
   <string name="we_couldnt_verify_the_servers_certificate">We couldn’t verify the server’s certificate. The certificate chain or proxy settings on your device or your Bitwarden server may not be set up correctly.</string>
   <string name="review_flow_launched">Review flow launched!</string>
   <string name="copy_private_key">Copy private key</string>
-  <string name="you_can_change_your_account_email_on_the_bitwarden_web_app">You can change your account email on the Bitwarden web app.</string>
   <string name="login_credentials">Login Credentials</string>
   <string name="autofill_options">Autofill Options</string>
   <string name="use_this_button_to_generate_a_new_unique_password">Use this button to generate a new unique password.</string>
@@ -1207,18 +1202,17 @@ Do you want to switch to this account?</string>
   <string name="system_certificates_are_not_as_secure_as_importing_certificates_to_bitwarden">Using a system certificate is less secure than storing the certificate with Bitwarden. Continuing will display a list of available system certificates if one is already installed.</string>
   <string name="certificate_alias_already_exists">Certificate alias already exists</string>
   <string name="link">Link</string>
-  <string name="passkey_operation_failed_because_app_is_signed_incorrectly">Passkey operation failed because app is signed incorrectly.</string>
   <string name="passkey_operation_failed_because_host_url_is_not_present_in_request">Passkey operation failed because host URL is not present in request.</string>
   <string name="passkey_operation_failed_because_app_signature_is_invalid">Passkey operation failed because app signature is invalid.</string>
   <string name="passkey_registration_failed_due_to_an_internal_error">Passkey registration failed due to an internal error.</string>
   <string name="passkey_operation_failed_because_relying_party_cannot_be_identified">Passkey operation failed because relying party cannot be identified.</string>
-  <string name="passkey_authentication_failed_due_to_an_internal_error">Passkey authentication failed due to an internal error.</string>
   <string name="passkey_operation_failed_because_the_selected_item_does_not_exist">Passkey operation failed because the selected item does not exist.</string>
   <string name="passkey_operation_failed_because_user_is_locked_out">Passkey operation failed because user is locked out.</string>
   <string name="passkey_operation_failed_because_user_verification_was_cancelled">Passkey operation failed because user verification was cancelled.</string>
   <string name="passkey_operation_failed_because_the_request_is_invalid">Passkey operation failed because the request is invalid.</string>
   <string name="passkey_operation_failed_because_user_verification_attempts_exceeded">Passkey operation failed because user verification attempts exceeded.</string>
   <string name="passkey_operation_failed_because_no_item_was_selected">Passkey operation failed because no item was selected.</string>
+  <string name="passkey_operation_failed_because_the_request_is_unsupported">Passkey operation failed because the request is unsupported.</string>
   <string name="self_host_server_url">Self-host server URL</string>
   <string name="use_chrome_autofill_integration">Use Chrome autofill integration</string>
   <string name="use_chrome_beta_autofill_integration">Use Chrome autofill integration (Beta)</string>
@@ -1229,4 +1223,40 @@ Do you want to switch to this account?</string>
   <string name="add_field">Add field</string>
   <string name="x_ellipses">%s...</string>
   <string name="share_error_details">Share error details</string>
+  <string name="flight_recorder">Flight recorder</string>
+  <string name="flight_recorder_help">Flight recorder help</string>
+  <string name="view_recorded_logs">View recorded logs</string>
+  <string name="enable_flight_recorder_title">Enable flight recorder</string>
+  <string name="recorded_logs_title">Recorded logs</string>
+  <string name="no_logs_recorded">No logs recorded</string>
+  <string name="experiencing_an_issue">Experiencing an issue?</string>
+  <string name="enable_temporary_logging_to_collect_and_inspect_logs_locally">Enable temporary logging to collect and inspect logs locally. When enabled, application states and network calls may be logged—never sensitive vault information.</string>
+  <string name="to_get_started_set_a_logging_duration">To get started, set a logging duration. Logging  will automatically turn off after this period, giving you time to capture activity while reproducing  any issues.</string>
+  <string name="logs_will_be_automatically_deleted_after_30_days">Logs will be automatically deleted after 30 days. Bitwarden is only able to access your log data when you share it.</string>
+  <string name="for_details_on_what_is_and_isnt_logged">For details on what is and isn’t logged, visit the\n<annotation link="helpCenter">Bitwarden help center.</annotation></string>
+  <string name="logging_duration">Logging duration</string>
+  <string name="flight_recorder_one_hour">1 hour</string>
+  <string name="flight_recorder_eight_hours">8 hours</string>
+  <string name="flight_recorder_twenty_four_hours">24 hours</string>
+  <string name="flight_recorder_one_week">1 week</string>
+  <string name="delete_all">Delete all</string>
+  <string name="share_all">Share all</string>
+  <string name="unable_to_share">Unable to share</string>
+  <string name="please_try_again_or_select_a_different_log">Please try again or select a different log.</string>
+  <string name="the_log_file_you_are_trying_to_share_has_been_removed">The log file you are trying to share has been removed.</string>
+  <string name="delete_log">Delete log</string>
+  <string name="do_you_really_want_to_delete_this_log">Do you really want to delete this log?</string>
+  <string name="delete_logs">Delete logs</string>
+  <string name="do_you_really_want_to_delete_all_recorded_logs">Do you really want to delete all recorded logs?</string>
+  <string name="confirm_key_connector_domain">Confirm Key Connector domain</string>
+  <string name="key_connector_domain">Key Connector domain:</string>
+  <string name="key_connector_organization">Organization:</string>
+  <string name="password_no_longer_required_confirm_domain">A master password is no longer required for members of the following organization. Please confirm the domain below with your organization administrator.</string>
+  <string name="please_confirm_domain_with_admin">Please confirm the domain below with your organization administrator.\n\nKey Connector domain:\n%1$s</string>
+  <string name="flight_recorder_banner_title">Flight recorder on</string>
+  <string name="flight_recorder_banner_message">Flight recorder will be active until %1$s at %2$s. Return to settings to deactivate now.</string>
+  <string name="go_to_settings">Go to settings</string>
+  <string name="all_logs_deleted">All logs deleted</string>
+  <string name="log_deleted">Log deleted</string>
+  <string name="app_settings">App settings</string>
 </resources>

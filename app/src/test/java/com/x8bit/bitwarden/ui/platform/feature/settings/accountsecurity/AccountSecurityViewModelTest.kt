@@ -3,13 +3,22 @@ package com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity
 import android.os.Build
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.network.model.OrganizationType
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.SyncResponseJson.Policy
+import com.bitwarden.network.model.createMockPolicy
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.UserFingerprintResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
+import com.x8bit.bitwarden.data.platform.error.NoActiveUserException
 import com.x8bit.bitwarden.data.platform.manager.BiometricsEncryptionManager
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
@@ -19,19 +28,12 @@ import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.model.BiometricsKeyResult
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeout
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
 import com.x8bit.bitwarden.data.platform.repository.util.FakeEnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.data.platform.util.isBuildVersionBelow
-import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson.Policy
-import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockPolicy
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.toggle.UnlockWithPinState
 import com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity.AccountSecurityAction.AuthenticatorSyncToggle
 import io.mockk.coEvery
@@ -180,7 +182,7 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
                     isEnabled = true,
                     type = PolicyTypeJson.REMOVE_UNLOCK_WITH_PIN,
                     organizationId = "organizationUser",
-                    ),
+                ),
             ),
         )
 
@@ -297,7 +299,7 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         // Clear fingerprint phrase
         viewModel.trySendAction(
             AccountSecurityAction.Internal.FingerprintResultReceive(
-                UserFingerprintResult.Error,
+                fingerprintResult = UserFingerprintResult.Error(error = NoActiveUserException()),
             ),
         )
         assertEquals(
@@ -382,10 +384,10 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `on LockNowClick should call lockVaultForCurrentUser`() {
-        every { vaultRepository.lockVaultForCurrentUser() } just runs
+        every { vaultRepository.lockVaultForCurrentUser(any()) } just runs
         val viewModel = createViewModel()
         viewModel.trySendAction(AccountSecurityAction.LockNowClick)
-        verify { vaultRepository.lockVaultForCurrentUser() }
+        verify { vaultRepository.lockVaultForCurrentUser(any()) }
     }
 
     @Test
@@ -588,7 +590,7 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
         runTest {
             coEvery {
                 settingsRepository.setupBiometricsKey(cipher = CIPHER)
-            } returns BiometricsKeyResult.Error
+            } returns BiometricsKeyResult.Error(error = Throwable("Fail!"))
             val viewModel = createViewModel()
 
             viewModel.stateFlow.test {
@@ -785,11 +787,15 @@ class AccountSecurityViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `on ConfirmLogoutClick should call logout and hide confirm dialog`() = runTest {
-        every { authRepository.logout() } just runs
+        every { authRepository.logout(reason = any()) } just runs
         val viewModel = createViewModel()
         viewModel.trySendAction(AccountSecurityAction.ConfirmLogoutClick)
         assertEquals(DEFAULT_STATE.copy(dialog = null), viewModel.stateFlow.value)
-        verify { authRepository.logout() }
+        verify(exactly = 1) {
+            authRepository.logout(
+                reason = LogoutReason.Click(source = "AccountSecurityViewModel"),
+            )
+        }
     }
 
     @Test
@@ -991,6 +997,7 @@ private val DEFAULT_USER_STATE = UserState(
                     shouldUseKeyConnector = false,
                     shouldManageResetPassword = false,
                     role = OrganizationType.USER,
+                    keyConnectorUrl = null,
                 ),
                 Organization(
                     id = "organizationAdmin",
@@ -998,6 +1005,7 @@ private val DEFAULT_USER_STATE = UserState(
                     shouldUseKeyConnector = false,
                     shouldManageResetPassword = false,
                     role = OrganizationType.ADMIN,
+                    keyConnectorUrl = null,
                 ),
                 Organization(
                     id = "organizationOwner",
@@ -1005,6 +1013,7 @@ private val DEFAULT_USER_STATE = UserState(
                     shouldUseKeyConnector = false,
                     shouldManageResetPassword = false,
                     role = OrganizationType.OWNER,
+                    keyConnectorUrl = null,
                 ),
                 Organization(
                     id = "organizationCustom",
@@ -1012,6 +1021,7 @@ private val DEFAULT_USER_STATE = UserState(
                     shouldUseKeyConnector = false,
                     shouldManageResetPassword = false,
                     role = OrganizationType.CUSTOM,
+                    keyConnectorUrl = null,
                 ),
             ),
             needsMasterPassword = false,

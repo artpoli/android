@@ -4,6 +4,9 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.sdk.model.PasswordStrength
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
@@ -12,14 +15,11 @@ import com.x8bit.bitwarden.data.auth.repository.model.RequestOtpResult
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.VerifyOtpResult
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
 import com.x8bit.bitwarden.data.vault.manager.FileManager
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.ExportVaultDataResult
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.PasswordStrengthState
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.feature.settings.exportvault.model.ExportVaultFormat
 import com.x8bit.bitwarden.ui.platform.feature.settings.exportvault.model.toExportFormat
 import com.x8bit.bitwarden.ui.platform.util.fileExtension
@@ -304,9 +304,12 @@ class ExportVaultViewModel @Inject constructor(
     private fun handleReceiveValidatePasswordResult(
         action: ExportVaultAction.Internal.ReceiveValidatePasswordResult,
     ) {
-        when (action.result) {
-            ValidatePasswordResult.Error -> {
-                updateStateWithError(R.string.generic_error_message.asText())
+        when (val result = action.result) {
+            is ValidatePasswordResult.Error -> {
+                updateStateWithError(
+                    message = R.string.generic_error_message.asText(),
+                    error = result.error,
+                )
             }
 
             is ValidatePasswordResult.Success -> {
@@ -331,6 +334,7 @@ class ExportVaultViewModel @Inject constructor(
             is ExportVaultDataResult.Error -> {
                 updateStateWithError(
                     message = R.string.export_vault_failure.asText(),
+                    error = result.error,
                 )
             }
 
@@ -379,7 +383,7 @@ class ExportVaultViewModel @Inject constructor(
                 }
             }
 
-            PasswordStrengthResult.Error -> {
+            is PasswordStrengthResult.Error -> {
                 // Leave UI the same
             }
         }
@@ -399,11 +403,14 @@ class ExportVaultViewModel @Inject constructor(
     private fun handleReceiveVerifyOneTimePasscodeResult(
         action: ExportVaultAction.Internal.ReceiveVerifyOneTimePasscodeResult,
     ) {
-        when (action.result) {
+        when (val result = action.result) {
             VerifyOtpResult.Verified -> exportVaultData()
 
             is VerifyOtpResult.NotVerified -> {
-                updateStateWithError(R.string.generic_error_message.asText())
+                updateStateWithError(
+                    message = R.string.generic_error_message.asText(),
+                    error = result.error,
+                )
             }
         }
     }
@@ -435,12 +442,13 @@ class ExportVaultViewModel @Inject constructor(
         }
     }
 
-    private fun updateStateWithError(message: Text) {
+    private fun updateStateWithError(message: Text, error: Throwable? = null) {
         mutableStateFlow.update {
             it.copy(
                 dialogState = ExportVaultState.DialogState.Error(
                     title = R.string.an_error_has_occurred.asText(),
                     message = message,
+                    error = error,
                 ),
             )
         }
@@ -475,6 +483,7 @@ data class ExportVaultState(
         data class Error(
             val title: Text? = null,
             val message: Text,
+            val error: Throwable? = null,
         ) : DialogState()
 
         /**

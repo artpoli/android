@@ -1,16 +1,16 @@
+@file:OmitFromCoverage
+
 package com.x8bit.bitwarden.ui.platform.feature.vaultunlocked
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.navigation
+import com.bitwarden.core.annotation.OmitFromCoverage
 import com.x8bit.bitwarden.ui.auth.feature.accountsetup.navigateToSetupAutoFillScreen
 import com.x8bit.bitwarden.ui.auth.feature.accountsetup.navigateToSetupUnlockScreen
 import com.x8bit.bitwarden.ui.auth.feature.accountsetup.setupAutoFillDestination
 import com.x8bit.bitwarden.ui.auth.feature.accountsetup.setupUnlockDestination
-import com.x8bit.bitwarden.ui.auth.feature.newdevicenotice.navigateToNewDeviceNoticeTwoFactor
-import com.x8bit.bitwarden.ui.auth.feature.newdevicenotice.newDeviceNoticeEmailAccessDestination
-import com.x8bit.bitwarden.ui.auth.feature.newdevicenotice.newDeviceNoticeTwoFactorDestination
 import com.x8bit.bitwarden.ui.platform.feature.search.navigateToSearch
 import com.x8bit.bitwarden.ui.platform.feature.search.searchDestination
 import com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity.deleteaccount.deleteAccountDestination
@@ -23,6 +23,10 @@ import com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity.pendingr
 import com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity.pendingrequests.pendingRequestsDestination
 import com.x8bit.bitwarden.ui.platform.feature.settings.exportvault.exportVaultDestination
 import com.x8bit.bitwarden.ui.platform.feature.settings.exportvault.navigateToExportVault
+import com.x8bit.bitwarden.ui.platform.feature.settings.flightrecorder.flightRecorderDestination
+import com.x8bit.bitwarden.ui.platform.feature.settings.flightrecorder.navigateToFlightRecorder
+import com.x8bit.bitwarden.ui.platform.feature.settings.flightrecorder.recordedLogs.navigateToRecordedLogs
+import com.x8bit.bitwarden.ui.platform.feature.settings.flightrecorder.recordedLogs.recordedLogsDestination
 import com.x8bit.bitwarden.ui.platform.feature.settings.folders.addedit.folderAddEditDestination
 import com.x8bit.bitwarden.ui.platform.feature.settings.folders.addedit.navigateToFolderAddEdit
 import com.x8bit.bitwarden.ui.platform.feature.settings.folders.foldersDestination
@@ -115,6 +119,18 @@ fun NavGraphBuilder.vaultUnlockedGraph(
                     parentFolderName = it,
                 )
             },
+            onNavigateToFlightRecorder = {
+                navController.navigateToFlightRecorder(isPreAuth = false)
+            },
+            onNavigateToRecordedLogs = { navController.navigateToRecordedLogs(isPreAuth = false) },
+        )
+        flightRecorderDestination(
+            isPreAuth = false,
+            onNavigateBack = { navController.popBackStack() },
+        )
+        recordedLogsDestination(
+            isPreAuth = false,
+            onNavigateBack = { navController.popBackStack() },
         )
         deleteAccountDestination(
             onNavigateBack = { navController.popBackStack() },
@@ -218,14 +234,6 @@ fun NavGraphBuilder.vaultUnlockedGraph(
             },
         )
         importLoginsScreenDestination(
-            onNavigateBack = { navController.popBackStack() },
-        )
-        newDeviceNoticeEmailAccessDestination(
-            onNavigateBackToVault = { navController.navigateToVaultUnlockedGraph() },
-            onNavigateToTwoFactorOptions = { navController.navigateToNewDeviceNoticeTwoFactor() },
-        )
-        newDeviceNoticeTwoFactorDestination(
-            onNavigateBackToVault = { navController.navigateToVaultUnlockedGraph() },
             onNavigateBack = { navController.popBackStack() },
         )
     }

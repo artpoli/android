@@ -3,6 +3,8 @@ package com.x8bit.bitwarden.ui.auth.feature.accountsetup
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
@@ -11,8 +13,6 @@ import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.model.BiometricsKeyResult
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.toggle.UnlockWithPinState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.update
@@ -164,7 +164,7 @@ class SetupUnlockViewModel @Inject constructor(
                 settingsRepository.storeUnlockPin(
                     pin = state.pin,
                     shouldRequireMasterPasswordOnRestart =
-                    state.shouldRequireMasterPasswordOnRestart,
+                        state.shouldRequireMasterPasswordOnRestart,
                 )
             }
         }
@@ -182,7 +182,7 @@ class SetupUnlockViewModel @Inject constructor(
         action: SetupUnlockAction.Internal.BiometricsKeyResultReceive,
     ) {
         when (action.result) {
-            BiometricsKeyResult.Error -> {
+            is BiometricsKeyResult.Error -> {
                 mutableStateFlow.update {
                     it.copy(
                         dialogState = null,

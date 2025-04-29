@@ -480,7 +480,7 @@ Načtení proběhne automaticky.</string>
   <string name="unlock">Odemknout</string>
   <string name="unlock_vault">Odemknout trezor</string>
   <string name="thirty_minutes">30 minut</string>
-  <string name="set_pin_description">Nastavte svůj PIN kód pro odemknutí trezoru. Pokud se zcela odhlásíte z aplikace bude Váš aktuální PIN resetován.</string>
+  <string name="set_pin_description">Váš PIN musí mít nejméně 4 znaky. Pokud se z aplikace odhlásíte, nastavení PINu bude resetováno.</string>
   <string name="logged_in_as_on">Přihlášen jako %1$s na %2$s.</string>
   <string name="vault_locked_master_password">Váš trezor je uzamčen. Pro pokračování musíte zadat hlavní heslo.</string>
   <string name="vault_locked_pin">Váš trezor je uzamčen. Pro pokračování musíte zadat PIN.</string>
@@ -620,6 +620,10 @@ Načtení proběhne automaticky.</string>
   <string name="deletion_date_info">Tento Send bude trvale smazán v určený datum a čas.</string>
   <string name="pending_delete">Čeká na smazání</string>
   <string name="expired">Vypršela platnost</string>
+  <string name="expires_at">Vyprší v %s</string>
+  <string name="expires_tomorrow">Vyprší zítra</string>
+  <string name="expires_on">Platí do %s</string>
+  <string name="stops_logging_on">Zastaví logování na %1$s v %2$s</string>
   <string name="maximum_access_count">Maximální počet přístupů</string>
   <string name="maximum_access_count_info">Je-li nastaveno, uživatelé již nebudou mít přístup k tomuto Send, jakmile bude dosaženo maximálního počtu přístupů.</string>
   <string name="maximum_access_count_reached">Dosažen maximální počet přístupů</string>
@@ -772,7 +776,9 @@ Načtení proběhne automaticky.</string>
   <string name="forwarded_email_alias">Alias přeposílaného e-mailu</string>
   <string name="random_word">Náhodné slovo</string>
   <string name="email_required_parenthesis">E-mail (vyžadován)</string>
+  <string name="domain_name">název domény</string>
   <string name="domain_name_required_parenthesis">Název domény (vyžadován)</string>
+  <string name="api_key">Klíč API</string>
   <string name="api_key_required_parenthesis">Klíč API (vyžadován)</string>
   <string name="service">Služba</string>
   <string name="addy_io">addy.io</string>
@@ -781,6 +787,7 @@ Načtení proběhne automaticky.</string>
   <string name="duck_duck_go">DuckDuckGo</string>
   <string name="fastmail">Fastmail</string>
   <string name="forward_email">ForwardEmail</string>
+  <string name="api_access_token_required_parenthesis">API přístupového tokenu (povinné)</string>
   <string name="api_access_token">Přístupový token API</string>
   <string name="are_you_sure_you_want_to_overwrite_the_current_username">Opravdu chcete přepsat aktuální uživatelské jméno?</string>
   <string name="generate_username">Vygenerovat uživatelské jméno</string>
@@ -962,7 +969,6 @@ Chcete se přepnout na tento účet?</string>
   <string name="your_passkey_will_be_saved_to_your_bitwarden_vault_for_x">Váš přístupový klíč bude pro %1$s uložen do Vašeho trezoru na Bitwardenu</string>
   <string name="organization_unassigned_items_message_useu_description_long">Nepřiřazené položky organizace již nejsou viditelné ve Vašem zobrazení všech trezorů a jsou nyní přístupné jen v konzoli správce. Přiřaďte tyto položky do kolekce z konzole pro správce, aby byly viditelné.</string>
   <string name="organization_unassigned_items_message_self_host_041624_description_long">Dne 16. května 2024 již nebudou nepřiřazené položky organizace viditelné v zobrazení Všechny trezory a budou přístupné jen prostřednictvím konzoly správce. Přiřaďte tyto položky do kolekce z konzoly pro správce, aby byly viditelné.</string>
-  <string name="remind_me_later">Připomenout později</string>
   <string name="notice">Upozornění</string>
   <string name="passkeys_not_supported_for_this_app">Přístupové klíče nejsou pro tuto aplikaci podporovány</string>
   <string name="passkey_operation_failed_because_browser_is_not_privileged">Operace přístupového klíče se nezdařila, protože prohlížeč nemá oprávnění</string>
@@ -971,10 +977,7 @@ Chcete se přepnout na tento účet?</string>
   <string name="passkey_operation_failed_because_app_not_found_in_asset_links">Operace přístupového klíče se nezdařila, protože v odkazech na aktivum nebyla nalezena aplikace</string>
   <string name="passkey_operation_failed_because_app_could_not_be_verified">Operace přístupového klíče se nezdařila, protože aplikaci nelze ověřit</string>
   <string name="confirm_file_password">Potvrdit heslo souboru</string>
-  <string name="continue_to_give_feedback">Pokračovat pro zanechání zpětné vazby?</string>
-  <string name="continue_to_provide_feedback">Pokračujte v poskytování zpětné vazby na novou aplikaci!</string>
   <string name="file_password">Heslo souboru</string>
-  <string name="give_feedback">Zanechat zpětnou vazbu</string>
   <string name="password_protected">Chráněno heslem</string>
   <string name="password_used_to_export">Toto heslo bude použito pro export a import tohoto souboru</string>
   <string name="autofill_suggestion">Návrh automatického vyplňování</string>
@@ -1138,17 +1141,10 @@ Chcete se přepnout na tento účet?</string>
   <string name="copy_email">Kopírovat e-mail</string>
   <string name="copy_phone">Kopírovat telefonní číslo</string>
   <string name="copy_address">Kopírovat adresu</string>
-  <string name="important_notice">Důležité upozornění</string>
-  <string name="bitwarden_will_soon_send_a_code_to_your_account_email_to_verify_logins_from_new_devices_in_february">Bitwarden odešle kód na e-mail Vašeho účtu pro ověření přihlášení z nových zařízení počínaje únorem 2025.</string>
-  <string name="do_you_have_reliable_access_to_your_email">Máte spolehlivý přístup ke svému e-mailu <annotation emphasis="bold"><annotation arg="0">%1$s</annotation></annotation>?</string>
-  <string name="yes_i_can_reliably_access_my_email">Ano, ke svému e-mailu mám přístup</string>
   <string name="biometrics_no_longer_supported_title">Biometrika již není v tomto zařízení podporována</string>
   <string name="biometrics_no_longer_supported">Byli jste odhlášeni, protože biometrika Vašeho zařízení nesplňuje nejnovější bezpečnostní požadavky. Chcete-li aktualizovat nastavení, přihlaste se znovu nebo kontaktujte správce pro přístup.</string>
   <string name="cxp_import">Import CXP</string>
   <string name="cxp_export">Exportovat CXP</string>
-  <string name="set_up_two_step_login">Nastavit dvoufázové přihlášení</string>
-  <string name="you_can_set_up_two_step_login_as_an_alternative_way_to_protect_your_account_or_change_your_email_to_one_you_can_access">Dvoufázové přihlášení můžete nastavit jako alternativní způsob ochrany Vašeho účtu nebo změnit svůj e-mail na ten, k němuž můžete přistupovat.</string>
-  <string name="turn_on_two_step_login">Zapnout dvoufázové přihlášení</string>
   <string name="change_account_email">Změnit e-mail účtu</string>
   <string name="choose_three_or_four_random_words">Vyberte tři nebo čtyři náhodná slova</string>
   <string name="pick_three_or_four_random_unrelated_words">Vyberte tři nebo čtyři náhodná slova, která si snadno pamatujete. Vzpomeňte si na <annotation emphasis="bold">objekty, místa nebo věci,</annotation> které se Vám líbí.</string>
@@ -1162,7 +1158,6 @@ Chcete se přepnout na tento účet?</string>
   <string name="we_couldnt_verify_the_servers_certificate">Certifikát serveru se nám nepodařilo ověřit. Řetězec certifikátů nebo nastavení proxy serveru na Vašem zařízení nebo serveru Bitwardenu nemusí být správně nastaven.</string>
   <string name="review_flow_launched">Přehled byl spuštěn!</string>
   <string name="copy_private_key">Kopírovat soukromý klíč</string>
-  <string name="you_can_change_your_account_email_on_the_bitwarden_web_app">E-mail účtu můžete změnit ve webové aplikaci Bitwarden.</string>
   <string name="login_credentials">Přihlašovací údaje</string>
   <string name="autofill_options">Volby automatického vyplňování</string>
   <string name="use_this_button_to_generate_a_new_unique_password">Použijte toto tlačítko pro vytvoření nového jedinečného hesla.</string>
@@ -1206,18 +1201,17 @@ Chcete se přepnout na tento účet?</string>
   <string name="system_certificates_are_not_as_secure_as_importing_certificates_to_bitwarden">Použití systémového certifikátu je méně bezpečné než ukládání certifikátu v Bitwardenu. Pokračování zobrazí seznam dostupných systémových certifikátů, pokud jsou již nainstalovány.</string>
   <string name="certificate_alias_already_exists">Alias certifikátu již existuje</string>
   <string name="link">Odkaz</string>
-  <string name="passkey_operation_failed_because_app_is_signed_incorrectly">Operace přístupového klíče se nezdařila, protože aplikace je nesprávně podepsána.</string>
   <string name="passkey_operation_failed_because_host_url_is_not_present_in_request">Operace přístupového klíče se nezdařila, protože v poždavku není přítomna hostitelská URL.</string>
   <string name="passkey_operation_failed_because_app_signature_is_invalid">Operace přístupového klíče se nezdařila, protože podpis aplikace je neplatný.</string>
   <string name="passkey_registration_failed_due_to_an_internal_error">Operace přístupového klíče se nezdařila kvůli vnitřní chybě.</string>
   <string name="passkey_operation_failed_because_relying_party_cannot_be_identified">Operace přístupového klíče se nezdařila, protože nemůže být identifikována protistrana.</string>
-  <string name="passkey_authentication_failed_due_to_an_internal_error">Operace přístupového klíče se nezdařila kvůli vnitřní chybě.</string>
   <string name="passkey_operation_failed_because_the_selected_item_does_not_exist">Operace přístupového klíče se nezdařila, protože vybraná položka neexistuje.</string>
   <string name="passkey_operation_failed_because_user_is_locked_out">Operace přístupového klíče se nezdařila, protože byl uživatel uzamčen.</string>
   <string name="passkey_operation_failed_because_user_verification_was_cancelled">Operace přístupového klíče se nezdařila, protože ověření uživatele bylo zrušeno.</string>
   <string name="passkey_operation_failed_because_the_request_is_invalid">Operace přístupového klíče se nezdařila, protože je požadavek neplatný.</string>
   <string name="passkey_operation_failed_because_user_verification_attempts_exceeded">Operace přístupového klíče se nezdařila, protože byly vyčerpány všechny pokusy o ověření uživatele.</string>
   <string name="passkey_operation_failed_because_no_item_was_selected">Operace přístupového klíče se nezdařila, protože nebyla vybrána žádná položka.</string>
+  <string name="passkey_operation_failed_because_the_request_is_unsupported">Operace přístupového klíče se nezdařila, protože je požadavek nepodporovaný.</string>
   <string name="self_host_server_url">Adresa URL serveru vlastního hostování</string>
   <string name="use_chrome_autofill_integration">Použít integraci automatického vyplňování Chrome</string>
   <string name="use_chrome_beta_autofill_integration">Použít integraci automatického vyplňování Chrome (Beta)</string>
@@ -1228,4 +1222,42 @@ Chcete se přepnout na tento účet?</string>
   <string name="add_field">Přidat pole</string>
   <string name="x_ellipses">%s...</string>
   <string name="share_error_details">Sdílet podrobnosti o chybě</string>
+  <string name="flight_recorder">Letový zapisovač</string>
+  <string name="flight_recorder_help">Nápověda letového zapisovače</string>
+  <string name="view_recorded_logs">Zobrazit zaznamenané protokoly</string>
+  <string name="enable_flight_recorder_title">Povolit letový zapisovač</string>
+  <string name="recorded_logs_title">Nahrané protokoly</string>
+  <string name="no_logs_recorded">Nebyly zaznamenány žádné logy</string>
+  <string name="experiencing_an_issue">Máte problém?</string>
+  <string name="enable_temporary_logging_to_collect_and_inspect_logs_locally">Povolte dočasné logování pro shromažďování a prohlížení logů lokálně. Pokud je povoleno, stav aplikací a síťových hovorů mohou být zaznamenány - ale nikdy citlivé informace o trezoru.</string>
+  <string name="to_get_started_set_a_logging_duration">Chcete-li začít, nastavte dobu trvání logování. Logování 
+se po tomto období automaticky vypne, což Vám poskytne čas pro zachycení aktivity 
+při opakování problémů.</string>
+  <string name="logs_will_be_automatically_deleted_after_30_days">Logy budou automaticky smazány po 30 dnech. Bitwarden má přístup k Vašim logům jen pokud je sdílíte.</string>
+  <string name="for_details_on_what_is_and_isnt_logged">Pro podrobnosti o tom, co je a není logováno, navštivte\n<annotation link="helpCenter">centrum nápovědy Bitwardenu</annotation>.</string>
+  <string name="logging_duration">Doba logování</string>
+  <string name="flight_recorder_one_hour">1 hodina</string>
+  <string name="flight_recorder_eight_hours">8 hodin</string>
+  <string name="flight_recorder_twenty_four_hours">24 hodin</string>
+  <string name="flight_recorder_one_week">1 týden</string>
+  <string name="delete_all">Smazat vše</string>
+  <string name="share_all">Sdílet vše</string>
+  <string name="unable_to_share">Nelze sdílet</string>
+  <string name="please_try_again_or_select_a_different_log">Zkuste to znovu nebo vyberte jiný log.</string>
+  <string name="the_log_file_you_are_trying_to_share_has_been_removed">Soubor s logem, který se snažíte sdílet, byl odebrán.</string>
+  <string name="delete_log">Smazat log</string>
+  <string name="do_you_really_want_to_delete_this_log">Opravdu chcete smazat tento log?</string>
+  <string name="delete_logs">Smazat logy</string>
+  <string name="do_you_really_want_to_delete_all_recorded_logs">Opravdu chcete smazat všechny zaznamenané logy?</string>
+  <string name="confirm_key_connector_domain">Potvrdit doménu Key Connectoru</string>
+  <string name="key_connector_domain">Doména Key Connectoru:</string>
+  <string name="key_connector_organization">Organizace:</string>
+  <string name="password_no_longer_required_confirm_domain">Hlavní heslo již není vyžadováno pro členy následující organizace. Potvrďte níže uvedenou doménu u správce Vaší organizace.</string>
+  <string name="please_confirm_domain_with_admin">Potvrďte níže uvedenou doménu u správce Vaší organizace.\n\nDoména Key Connectoru:\n%1$s</string>
+  <string name="flight_recorder_banner_title">Letový zapisovač zapnutý</string>
+  <string name="flight_recorder_banner_message">Letový zapisovač bude aktivní do %1$s v %2$s. Pro deaktivování se vraťte do nastavení.</string>
+  <string name="go_to_settings">Přejít do nastavení</string>
+  <string name="all_logs_deleted">Všechny logy byly smazány</string>
+  <string name="log_deleted">Log byl smazán</string>
+  <string name="app_settings">App settings</string>
 </resources>

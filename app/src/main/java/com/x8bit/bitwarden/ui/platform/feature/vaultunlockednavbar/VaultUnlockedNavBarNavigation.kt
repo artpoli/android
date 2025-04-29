@@ -1,8 +1,11 @@
+@file:OmitFromCoverage
+
 package com.x8bit.bitwarden.ui.platform.feature.vaultunlockednavbar
 
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
+import com.bitwarden.core.annotation.OmitFromCoverage
 import com.x8bit.bitwarden.ui.platform.base.util.composableWithStayTransitions
 import com.x8bit.bitwarden.ui.platform.feature.search.model.SearchType
 import com.x8bit.bitwarden.ui.platform.manager.snackbar.SnackbarRelay
@@ -40,6 +43,8 @@ fun NavGraphBuilder.vaultUnlockedNavBarDestination(
     onNavigateToPasswordHistory: () -> Unit,
     onNavigateToSetupUnlockScreen: () -> Unit,
     onNavigateToSetupAutoFillScreen: () -> Unit,
+    onNavigateToFlightRecorder: () -> Unit,
+    onNavigateToRecordedLogs: () -> Unit,
     onNavigateToImportLogins: (SnackbarRelay) -> Unit,
     onNavigateToAddFolderScreen: (selectedFolderName: String?) -> Unit,
 ) {
@@ -63,6 +68,8 @@ fun NavGraphBuilder.vaultUnlockedNavBarDestination(
             onNavigateToSetupAutoFillScreen = onNavigateToSetupAutoFillScreen,
             onNavigateToImportLogins = onNavigateToImportLogins,
             onNavigateToAddFolderScreen = onNavigateToAddFolderScreen,
+            onNavigateToFlightRecorder = onNavigateToFlightRecorder,
+            onNavigateToRecordedLogs = onNavigateToRecordedLogs,
         )
     }
 }

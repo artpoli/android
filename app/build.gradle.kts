@@ -13,16 +13,13 @@ plugins {
     // Crashlytics is enabled for all builds initially but removed for FDroid builds in gradle and
     // standardDebug builds in the merged manifest.
     alias(libs.plugins.crashlytics)
-    alias(libs.plugins.detekt)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlinx.kover)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
-    alias(libs.plugins.sonarqube)
 }
 
 /**
@@ -54,7 +51,7 @@ android {
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
-        versionName = "2024.9.0"
+        versionName = "2025.4.0"
 
         setProperty("archivesBaseName", "com.x8bit.bitwarden")
 
@@ -102,6 +99,7 @@ android {
             applicationIdSuffix = ".beta"
             isDebuggable = false
             isMinifyEnabled = true
+            matchingFallbacks += listOf("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -215,6 +213,11 @@ dependencies {
 
     implementation(files("libs/authenticatorbridge-1.0.0-release.aar"))
 
+    implementation(project(":core"))
+    implementation(project(":data"))
+    implementation(project(":network"))
+    implementation(project(":ui"))
+
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.autofill)
@@ -226,6 +229,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.adaptive)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -250,7 +254,6 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization)
-    implementation(libs.nulab.zxcvbn4j)
     implementation(libs.square.okhttp)
     implementation(libs.square.okhttp.logging)
     implementation(platform(libs.square.retrofit.bom))
@@ -269,8 +272,14 @@ dependencies {
     standardImplementation(libs.google.firebase.crashlytics)
     standardImplementation(libs.google.play.review)
 
+    // Pull in test fixtures from other modules
+    testImplementation(testFixtures(project(":data")))
+    testImplementation(testFixtures(project(":network")))
+
     testImplementation(libs.androidx.compose.ui.test)
     testImplementation(libs.google.hilt.android.testing)
+    testImplementation(platform(libs.junit.bom))
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.junit.junit5)
     testImplementation(libs.junit.vintage)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -278,90 +287,9 @@ dependencies {
     testImplementation(libs.robolectric.robolectric)
     testImplementation(libs.square.okhttp.mockwebserver)
     testImplementation(libs.square.turbine)
-
-    detektPlugins(libs.detekt.detekt.formatting)
-    detektPlugins(libs.detekt.detekt.rules)
-}
-
-detekt {
-    autoCorrect = true
-    config.from(files("$rootDir/detekt-config.yml"))
-}
-
-kover {
-    currentProject {
-        sources {
-            excludeJava = true
-        }
-    }
-    reports {
-        filters {
-            excludes {
-                androidGeneratedClasses()
-                annotatedBy(
-                    // Compose previews
-                    "androidx.compose.ui.tooling.preview.Preview",
-                    "androidx.compose.ui.tooling.preview.PreviewScreenSizes",
-                    // Manually excluded classes/files/etc.
-                    "com.x8bit.bitwarden.data.platform.annotation.OmitFromCoverage",
-                )
-                classes(
-                    // Navigation helpers
-                    "*.*NavigationKt*",
-                    // Composable singletons
-                    "*.*ComposableSingletons*",
-                    // Generated classes related to interfaces with default values
-                    "*.*DefaultImpls*",
-                    // Databases
-                    "*.database.*Database*",
-                    "*.dao.*Dao*",
-                    // Dagger Hilt
-                    "dagger.hilt.*",
-                    "hilt_aggregated_deps.*",
-                    "*_Factory",
-                    "*_Factory\$*",
-                    "*_*Factory",
-                    "*_*Factory\$*",
-                    "*.Hilt_*",
-                    "*_HiltModules",
-                    "*_HiltModules*",
-                    "*_HiltModules\$*",
-                    "*_Impl",
-                    "*_Impl\$*",
-                    "*_MembersInjector",
-                )
-                packages(
-                    // Dependency injection
-                    "*.di",
-                    // Models
-                    "*.model",
-                    // Custom UI components
-                    "com.x8bit.bitwarden.ui.platform.components",
-                    // Theme-related code
-                    "com.x8bit.bitwarden.ui.platform.theme",
-                )
-            }
-        }
-    }
 }
 
 tasks {
-    getByName("check") {
-        // Add detekt with type resolution to check
-        dependsOn("detekt")
-    }
-
-    getByName("sonar") {
-        dependsOn("check")
-    }
-
-    withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-        jvmTarget = libs.versions.jvmTarget.get()
-    }
-    withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
-        jvmTarget = libs.versions.jvmTarget.get()
-    }
-
     withType<Test> {
         useJUnitPlatform()
         maxHeapSize = "2g"
@@ -379,18 +307,6 @@ afterEvaluate {
     fdroidTasksToDisable
         .filter { it.name.contains("Fdroid") }
         .forEach { it.enabled = false }
-}
-
-sonar {
-    properties {
-        property("sonar.projectKey", "bitwarden_android")
-        property("sonar.organization", "bitwarden")
-        property("sonar.host.url", "https://sonarcloud.io")
-        property("sonar.sources", "app/src/")
-        property("sonar.tests", "app/src/")
-        property("sonar.test.inclusions", "app/src/test/")
-        property("sonar.exclusions", "app/src/test/")
-    }
 }
 
 private fun renameFile(path: String, newName: String) {

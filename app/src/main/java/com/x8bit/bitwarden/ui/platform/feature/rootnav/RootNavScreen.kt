@@ -12,7 +12,6 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.x8bit.bitwarden.ui.auth.feature.accountsetup.SETUP_AUTO_FILL_AS_ROOT_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.accountsetup.SETUP_COMPLETE_ROUTE
@@ -28,7 +27,6 @@ import com.x8bit.bitwarden.ui.auth.feature.auth.authGraph
 import com.x8bit.bitwarden.ui.auth.feature.auth.navigateToAuthGraph
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.navigateToCompleteRegistration
 import com.x8bit.bitwarden.ui.auth.feature.expiredregistrationlink.navigateToExpiredRegistrationLinkScreen
-import com.x8bit.bitwarden.ui.auth.feature.newdevicenotice.navigateToNewDeviceNoticeEmailAccess
 import com.x8bit.bitwarden.ui.auth.feature.preventaccountlockout.navigateToPreventAccountLockout
 import com.x8bit.bitwarden.ui.auth.feature.removepassword.REMOVE_PASSWORD_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.removepassword.navigateToRemovePassword
@@ -45,6 +43,7 @@ import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.VAULT_UNLOCK_ROUTE
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.navigateToVaultUnlock
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.vaultUnlockDestination
 import com.x8bit.bitwarden.ui.auth.feature.welcome.navigateToWelcome
+import com.x8bit.bitwarden.ui.platform.components.util.rememberBitwardenNavController
 import com.x8bit.bitwarden.ui.platform.feature.rootnav.util.toVaultItemListingType
 import com.x8bit.bitwarden.ui.platform.feature.settings.accountsecurity.loginapproval.navigateToLoginApproval
 import com.x8bit.bitwarden.ui.platform.feature.splash.SPLASH_ROUTE
@@ -73,7 +72,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Composable
 fun RootNavScreen(
     viewModel: RootNavViewModel = hiltViewModel(),
-    navController: NavHostController = rememberNavController(),
+    navController: NavHostController = rememberBitwardenNavController(name = "RootNavScreen"),
     onSplashScreenRemoved: () -> Unit = {},
 ) {
     val state by viewModel.stateFlow.collectAsStateWithLifecycle()
@@ -130,7 +129,6 @@ fun RootNavScreen(
         is RootNavState.VaultUnlockedForFido2Save,
         is RootNavState.VaultUnlockedForFido2Assertion,
         is RootNavState.VaultUnlockedForFido2GetCredentials,
-        is RootNavState.NewDeviceTwoFactorNotice,
             -> VAULT_UNLOCKED_GRAPH_ROUTE
 
         RootNavState.OnboardingAccountLockSetup -> SETUP_UNLOCK_AS_ROOT_ROUTE
@@ -262,13 +260,6 @@ fun RootNavScreen(
 
             RootNavState.OnboardingStepsComplete -> {
                 navController.navigateToSetupCompleteScreen(rootNavOptions)
-            }
-
-            is RootNavState.NewDeviceTwoFactorNotice -> {
-                navController.navigateToNewDeviceNoticeEmailAccess(
-                    emailAddress = currentState.email,
-                    navOptions = rootNavOptions,
-                )
             }
         }
     }

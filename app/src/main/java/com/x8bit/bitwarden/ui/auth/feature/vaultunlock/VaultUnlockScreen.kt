@@ -36,8 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.x8bit.bitwarden.R
-import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CredentialAssertionResult
-import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2GetCredentialsResult
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.inputFieldVisibilityToggleTestTag
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenInputLabel
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenInputTestTag
@@ -45,6 +43,8 @@ import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenKeyboard
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenMessage
 import com.x8bit.bitwarden.ui.auth.feature.vaultunlock.util.unlockScreenTitle
 import com.x8bit.bitwarden.ui.autofill.fido2.manager.Fido2CompletionManager
+import com.x8bit.bitwarden.ui.autofill.fido2.manager.model.AssertFido2CredentialResult
+import com.x8bit.bitwarden.ui.autofill.fido2.manager.model.GetFido2CredentialsResult
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.base.util.cardStyle
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
@@ -70,7 +70,14 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import javax.crypto.Cipher
 
-private const val AUTO_FOCUS_DELAY = 415L
+/**
+ * Time slice to delay auto-focusing on the password/pin field. Because of the refresh that
+ * takes place when switching accounts or changing the lock status we want to delay this
+ * longer than the delay in place for sending those actions in [com.x8bit.bitwarden.MainViewModel]
+ * defined by `ANIMATION_REFRESH_DELAY`. We need to  ensure this value is
+ * always greater.
+ */
+private const val AUTO_FOCUS_DELAY = 575L
 
 /**
  * The top level composable for the Vault Unlock screen.
@@ -123,13 +130,13 @@ fun VaultUnlockScreen(
 
             is VaultUnlockEvent.Fido2CredentialAssertionError -> {
                 fido2CompletionManager.completeFido2Assertion(
-                    result = Fido2CredentialAssertionResult.Error(event.message),
+                    result = AssertFido2CredentialResult.Error(message = event.message),
                 )
             }
 
             is VaultUnlockEvent.Fido2GetCredentialsError -> {
-                fido2CompletionManager.completeFido2GetCredentialRequest(
-                    result = Fido2GetCredentialsResult.Error(message = event.message),
+                fido2CompletionManager.completeFido2GetCredentialsRequest(
+                    result = GetFido2CredentialsResult.Error(message = event.message),
                 )
             }
         }
@@ -149,6 +156,7 @@ fun VaultUnlockScreen(
             onDismissRequest = remember(viewModel) {
                 { viewModel.trySendAction(VaultUnlockAction.DismissDialog) }
             },
+            throwable = dialog.throwable,
         )
 
         VaultUnlockState.VaultUnlockDialog.Loading -> BitwardenLoadingDialog(

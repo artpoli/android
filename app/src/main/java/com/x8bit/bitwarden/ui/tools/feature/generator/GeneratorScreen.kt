@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -37,13 +37,13 @@ import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
 import com.x8bit.bitwarden.data.platform.manager.util.AppResumeStateManager
 import com.x8bit.bitwarden.data.platform.manager.util.RegisterScreenDataOnLifecycleEffect
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
 import com.x8bit.bitwarden.ui.platform.base.util.LivecycleEventEffect
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.scrolledContainerBottomDivider
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenMediumTopAppBar
@@ -149,6 +149,7 @@ fun GeneratorScreen(
     LaunchedEffect(key1 = coachMarkState.isVisible.value) {
         onDimNavBarRequest(coachMarkState.isVisible.value)
     }
+    val scope = rememberCoroutineScope()
     EventsEffect(viewModel = viewModel) { event ->
         when (event) {
             GeneratorEvent.NavigateToPasswordHistory -> onNavigateToPasswordHistory()
@@ -168,7 +169,9 @@ fun GeneratorScreen(
 
             GeneratorEvent.NavigateBack -> onNavigateBack.invoke()
             GeneratorEvent.StartCoachMarkTour -> {
-                coachMarkState.showCoachMark(ExploreGeneratorCoachMark.PASSWORD_MODE)
+                scope.launch {
+                    coachMarkState.showCoachMark(ExploreGeneratorCoachMark.PASSWORD_MODE)
+                }
             }
         }
     }
@@ -193,23 +196,14 @@ fun GeneratorScreen(
             }
         }
 
-    val scope = rememberCoroutineScope()
     val onShowNextCoachMark: () -> Unit = remember {
-        {
-            scope.launch { coachMarkState.showNextCoachMark() }
-        }
+        { scope.launch { coachMarkState.showNextCoachMark() } }
     }
-
     val onShowPreviousCoachMark: () -> Unit = remember {
-        {
-            scope.launch { coachMarkState.showPreviousCoachMark() }
-        }
+        { scope.launch { coachMarkState.showPreviousCoachMark() } }
     }
-
     val onDismissCoachMark: () -> Unit = remember {
-        {
-            scope.launch { lazyListState.animateScrollToItem(index = 0) }
-        }
+        { scope.launch { lazyListState.animateScrollToItem(index = 0) } }
     }
 
     val passwordHandlers = rememberPasswordHandlers(viewModel)
@@ -383,11 +377,11 @@ private fun CoachMarkScope<ExploreGeneratorCoachMark>.ScrollContent(
     onCoachMarkComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val windowAdaptiveInfo = currentWindowAdaptiveInfo()
     LazyColumn(
         state = lazyListState,
         modifier = modifier
-            .fillMaxHeight()
-            .imePadding(),
+            .fillMaxHeight(),
     ) {
         item {
             Spacer(modifier = Modifier.height(12.dp))
@@ -463,7 +457,7 @@ private fun CoachMarkScope<ExploreGeneratorCoachMark>.ScrollContent(
                     onActionClick = onCoachMarkComplete,
                 )
             },
-            modifier = Modifier.standardHorizontalMargin(),
+            modifier = Modifier.standardHorizontalMargin(windowAdaptiveInfo = windowAdaptiveInfo),
         ) {
             BitwardenFilledButton(
                 label = stringResource(id = R.string.copy),
@@ -509,7 +503,8 @@ private fun CoachMarkScope<ExploreGeneratorCoachMark>.ScrollContent(
                             onActionClick = onShowNextCoachMark,
                         )
                     },
-                    modifier = Modifier.standardHorizontalMargin(),
+                    modifier = Modifier
+                        .standardHorizontalMargin(windowAdaptiveInfo = windowAdaptiveInfo),
                 ) {
                     PasswordTypeContent(
                         passwordTypeState = selectedType,
@@ -1222,7 +1217,7 @@ private fun ForwardedEmailAliasTypeContent(
         when (usernameTypeState.selectedServiceType) {
             is ServiceType.AddyIo -> {
                 BitwardenPasswordField(
-                    label = stringResource(id = R.string.api_access_token),
+                    label = stringResource(id = R.string.api_access_token_required_parenthesis),
                     value = usernameTypeState.selectedServiceType.apiAccessToken,
                     onValueChange = forwardedEmailAliasHandlers.onAddyIoAccessTokenTextChange,
                     showPasswordTestTag = "ShowForwardedEmailApiSecretButton",
@@ -1292,7 +1287,7 @@ private fun ForwardedEmailAliasTypeContent(
 
             is ServiceType.FirefoxRelay -> {
                 BitwardenPasswordField(
-                    label = stringResource(id = R.string.api_access_token),
+                    label = stringResource(id = R.string.api_access_token_required_parenthesis),
                     value = usernameTypeState.selectedServiceType.apiAccessToken,
                     onValueChange = forwardedEmailAliasHandlers.onFirefoxRelayAccessTokenTextChange,
                     showPasswordTestTag = "ShowForwardedEmailApiSecretButton",

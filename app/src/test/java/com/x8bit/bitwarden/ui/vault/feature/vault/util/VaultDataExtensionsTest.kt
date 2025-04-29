@@ -1,30 +1,32 @@
 package com.x8bit.bitwarden.ui.vault.feature.vault.util
 
 import android.net.Uri
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseIconUrl
+import com.bitwarden.ui.util.asText
 import com.bitwarden.vault.CipherRepromptType
 import com.bitwarden.vault.CipherType
 import com.bitwarden.vault.FolderView
 import com.bitwarden.vault.LoginUriView
 import com.bitwarden.vault.UriMatchType
 import com.x8bit.bitwarden.R
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.baseIconUrl
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCollectionView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockFolderView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockSendView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockSshKeyView
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.model.IconData
-import com.x8bit.bitwarden.ui.platform.components.model.IconRes
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.model.ListingItemOverflowAction
+import com.x8bit.bitwarden.ui.vault.feature.util.toLabelIcons
+import com.x8bit.bitwarden.ui.vault.feature.util.toOverflowActions
 import com.x8bit.bitwarden.ui.vault.feature.vault.VaultState
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterType
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.collections.immutable.persistentListOf
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -86,8 +88,12 @@ class VaultDataExtensionsTest {
                         name = "Folder".asText(),
                         itemCount = 0,
                     ),
-
+                    VaultState.ViewState.FolderItem(
+                        id = null,
+                        name = R.string.folder_none.asText(),
+                        itemCount = 0,
                     ),
+                ),
                 collectionItems = listOf(
                     VaultState.ViewState.CollectionItem(
                         id = "mockId-1",
@@ -193,6 +199,11 @@ class VaultDataExtensionsTest {
                         id = "mockId-1",
                         name = "mockName-1".asText(),
                         itemCount = 1,
+                    ),
+                    VaultState.ViewState.FolderItem(
+                        id = null,
+                        name = R.string.folder_none.asText(),
+                        itemCount = 0,
                     ),
                 ),
                 collectionItems = listOf(
@@ -719,6 +730,66 @@ class VaultDataExtensionsTest {
         unmockkStatic(Uri::class)
     }
 
+    @Suppress("MaxLineLength")
+    @Test
+    fun `toViewState with under 100 no folder items and no collections should not show no folder option`() {
+        mockkStatic(Uri::class)
+        val uriMock = mockk<Uri>()
+        every { Uri.parse(any()) } returns uriMock
+        every { uriMock.host } returns "www.mockuri1.com"
+        val mockCipher = createMockCipherView(number = 1, folderId = null)
+        val vaultData = VaultData(
+            cipherViewList = listOf(mockCipher),
+            collectionViewList = listOf(),
+            folderViewList = listOf(),
+            sendViewList = listOf(),
+        )
+
+        val actual = vaultData.toViewState(
+            isPremium = true,
+            isIconLoadingDisabled = false,
+            baseIconUrl = Environment.Us.environmentUrlData.baseIconUrl,
+            vaultFilterType = VaultFilterType.AllVaults,
+            hasMasterPassword = true,
+        )
+
+        assertEquals(
+            VaultState.ViewState.Content(
+                loginItemsCount = 1,
+                cardItemsCount = 0,
+                identityItemsCount = 0,
+                secureNoteItemsCount = 0,
+                favoriteItems = listOf(),
+                folderItems = listOf(),
+                collectionItems = listOf(),
+                noFolderItems = listOf(
+                    VaultState.ViewState.VaultItem.Login(
+                        id = "mockId-1",
+                        name = mockCipher.name.asText(),
+                        startIcon = IconData.Network(
+                            uri = "https://vault.bitwarden.com/icons/www.mockuri1.com/icon.png",
+                            fallbackIconRes = R.drawable.ic_globe,
+                        ),
+                        startIconTestTag = "LoginCipherIcon",
+                        extraIconList = mockCipher.toLabelIcons(),
+                        overflowOptions = mockCipher.toOverflowActions(
+                            hasMasterPassword = true,
+                            isPremiumUser = true,
+                        ),
+                        shouldShowMasterPasswordReprompt = false,
+                        username = "mockUsername-1".asText(),
+                    ),
+                ),
+                trashItemsCount = 0,
+                totpItemsCount = 1,
+                itemTypesCount = 5,
+                sshKeyItemsCount = 0,
+            ),
+            actual,
+        )
+        unmockkStatic(Uri::class)
+    }
+
     @Test
     fun `toViewState should properly filter nested items out`() {
         val vaultData = VaultData(
@@ -783,8 +854,12 @@ class VaultDataExtensionsTest {
                         name = "Folder".asText(),
                         itemCount = 0,
                     ),
-
+                    VaultState.ViewState.FolderItem(
+                        id = null,
+                        name = R.string.folder_none.asText(),
+                        itemCount = 0,
                     ),
+                ),
                 noFolderItems = listOf(),
                 trashItemsCount = 0,
                 totpItemsCount = 1,
@@ -928,13 +1003,13 @@ private fun createMockSshKeyVaultItem(number: Int): VaultState.ViewState.VaultIt
         ),
         startIcon = IconData.Local(iconRes = R.drawable.ic_ssh_key),
         startIconTestTag = "SshKeyCipherIcon",
-        extraIconList = listOf(
-            IconRes(
+        extraIconList = persistentListOf(
+            IconData.Local(
                 iconRes = R.drawable.ic_collections,
                 contentDescription = R.string.collections.asText(),
                 testTag = "CipherInCollectionIcon",
             ),
-            IconRes(
+            IconData.Local(
                 iconRes = R.drawable.ic_paperclip,
                 contentDescription = R.string.attachments.asText(),
                 testTag = "CipherWithAttachmentsIcon",

@@ -1,9 +1,14 @@
 package com.x8bit.bitwarden.ui.vault.feature.itemlisting.util
 
-import android.content.pm.SigningInfo
 import android.net.Uri
+import androidx.core.os.bundleOf
+import androidx.credentials.provider.ProviderCreateCredentialRequest
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseIconUrl
+import com.bitwarden.data.repository.util.baseWebSendUrl
 import com.bitwarden.send.SendType
 import com.bitwarden.send.SendView
+import com.bitwarden.ui.util.asText
 import com.bitwarden.vault.CipherRepromptType
 import com.bitwarden.vault.CipherType
 import com.bitwarden.vault.CipherView
@@ -11,9 +16,6 @@ import com.bitwarden.vault.FolderView
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.autofill.fido2.model.Fido2CreateCredentialRequest
 import com.x8bit.bitwarden.data.autofill.model.AutofillSelectionData
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.baseIconUrl
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebSendUrl
 import com.x8bit.bitwarden.data.platform.util.subtitle
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCollectionView
@@ -22,14 +24,15 @@ import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockFolderView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockSdkFido2CredentialList
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockSendView
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.model.IconData
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.VaultItemListingState
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterType
 import com.x8bit.bitwarden.ui.vault.model.TotpData
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -50,6 +53,7 @@ class VaultItemListingDataExtensionsTest {
     fun tearDown() {
         unmockkStatic(Uri::class)
         unmockkStatic(CipherView::subtitle)
+        unmockkObject(ProviderCreateCredentialRequest.Companion)
     }
 
     @Test
@@ -677,12 +681,20 @@ class VaultItemListingDataExtensionsTest {
     @Suppress("MaxLineLength")
     @Test
     fun `toViewState should transform an empty list of CipherViews into a NoItems ViewState with the appropriate data`() {
+        mockkObject(ProviderCreateCredentialRequest.Companion)
         val vaultData = VaultData(
             cipherViewList = listOf(),
             collectionViewList = listOf(),
             folderViewList = listOf(),
             sendViewList = listOf(),
         )
+
+        every {
+            ProviderCreateCredentialRequest.fromBundle(any())
+        } returns mockk(relaxed = true) {
+            every { callingAppInfo.isOriginPopulated() } returns true
+            every { callingRequest.origin } returns "www.test.com"
+        }
 
         // Trash
         assertEquals(
@@ -874,12 +886,9 @@ class VaultItemListingDataExtensionsTest {
                 isIconLoadingDisabled = false,
                 autofillSelectionData = null,
                 fido2CreationData = Fido2CreateCredentialRequest(
-                    userId = "",
-                    requestJson = "",
-                    packageName = "",
-                    signingInfo = SigningInfo(),
-                    origin = "https://www.test.com",
-                    isUserVerified = true,
+                    userId = "userId",
+                    isUserPreVerified = false,
+                    requestData = bundleOf(),
                 ),
                 fido2CredentialAutofillViews = null,
                 totpData = null,

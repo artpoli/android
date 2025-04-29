@@ -21,7 +21,9 @@ fun <T : Any> FlagKey<T>.ListItemContent(
     FlagKey.DummyBoolean,
     is FlagKey.DummyInt,
     FlagKey.DummyString,
-        -> Unit
+        -> {
+        Unit
+    }
 
     FlagKey.AuthenticatorSync,
     FlagKey.EmailVerification,
@@ -31,10 +33,7 @@ fun <T : Any> FlagKey<T>.ListItemContent(
     FlagKey.VerifiedSsoDomainEndpoint,
     FlagKey.CredentialExchangeProtocolImport,
     FlagKey.CredentialExchangeProtocolExport,
-    FlagKey.AppReviewPrompt,
     FlagKey.CipherKeyEncryption,
-    FlagKey.NewDevicePermanentDismiss,
-    FlagKey.NewDeviceTemporaryDismiss,
     FlagKey.IgnoreEnvironmentCheck,
     FlagKey.MutualTls,
     FlagKey.SingleTapPasskeyCreation,
@@ -43,6 +42,8 @@ fun <T : Any> FlagKey<T>.ListItemContent(
     FlagKey.SimpleLoginSelfHostAlias,
     FlagKey.ChromeAutofill,
     FlagKey.MobileErrorReporting,
+    FlagKey.FlightRecorder,
+    FlagKey.PreAuthSettings,
         -> {
         @Suppress("UNCHECKED_CAST")
         BooleanFlagItem(
@@ -92,10 +93,7 @@ private fun <T : Any> FlagKey<T>.getDisplayLabel(): String = when (this) {
     FlagKey.VerifiedSsoDomainEndpoint -> stringResource(R.string.verified_sso_domain_verified)
     FlagKey.CredentialExchangeProtocolImport -> stringResource(R.string.cxp_import)
     FlagKey.CredentialExchangeProtocolExport -> stringResource(R.string.cxp_export)
-    FlagKey.AppReviewPrompt -> stringResource(R.string.app_review_prompt)
     FlagKey.CipherKeyEncryption -> stringResource(R.string.cipher_key_encryption)
-    FlagKey.NewDevicePermanentDismiss -> stringResource(R.string.new_device_permanent_dismiss)
-    FlagKey.NewDeviceTemporaryDismiss -> stringResource(R.string.new_device_temporary_dismiss)
     FlagKey.IgnoreEnvironmentCheck -> stringResource(R.string.ignore_environment_check)
     FlagKey.MutualTls -> stringResource(R.string.mutual_tls)
     FlagKey.SingleTapPasskeyCreation -> stringResource(R.string.single_tap_passkey_creation)
@@ -107,4 +105,6 @@ private fun <T : Any> FlagKey<T>.getDisplayLabel(): String = when (this) {
     FlagKey.SimpleLoginSelfHostAlias -> stringResource(R.string.simple_login_self_hosted_aliases)
     FlagKey.ChromeAutofill -> stringResource(R.string.enable_chrome_autofill)
     FlagKey.MobileErrorReporting -> stringResource(R.string.enable_error_reporting_dialog)
+    FlagKey.FlightRecorder -> stringResource(R.string.enable_flight_recorder)
+    FlagKey.PreAuthSettings -> stringResource(R.string.enable_pre_auth_settings)
 }

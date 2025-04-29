@@ -8,15 +8,15 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
-import com.bitwarden.authenticator.data.platform.repository.util.bufferedMutableSharedFlow
 import com.bitwarden.authenticator.ui.authenticator.feature.itemlisting.model.SharedCodesDisplayState
 import com.bitwarden.authenticator.ui.authenticator.feature.itemlisting.model.VaultDropdownMenuAction
 import com.bitwarden.authenticator.ui.authenticator.feature.itemlisting.model.VerificationCodeDisplayItem
 import com.bitwarden.authenticator.ui.platform.base.BaseComposeTest
-import com.bitwarden.authenticator.ui.platform.base.util.asText
+import com.bitwarden.ui.util.asText
 import com.bitwarden.authenticator.ui.platform.feature.settings.appearance.model.AppTheme
 import com.bitwarden.authenticator.ui.platform.manager.intent.IntentManager
 import com.bitwarden.authenticator.ui.platform.manager.permissions.FakePermissionManager
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -59,6 +59,38 @@ class ItemListingScreenTest : BaseComposeTest() {
                 onNavigateToQrCodeScanner = { onNavigateToQrCodeScannerCalled = true },
                 onNavigateToManualKeyEntry = { onNavigateToManualKeyEntryCalled = true },
                 onNavigateToEditItemScreen = { onNavigateToEditItemScreenCalled = true },
+            )
+        }
+    }
+
+    @Test
+    @Suppress("MaxLineLength")
+    fun `when denying camera permissions and attempting to add a code we should be shown the manual entry screen`() {
+        permissionsManager.getPermissionsResult = false
+
+        composeTestRule
+            .onNodeWithText("Add code")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(
+                ItemListingAction.EnterSetupKeyClick,
+            )
+        }
+    }
+
+    @Test
+    @Suppress("MaxLineLength")
+    fun `when allowing camera permissions and attempting to add a code we should be shown the scan QR code screen`() {
+        permissionsManager.getPermissionsResult = true
+
+        composeTestRule
+            .onNodeWithText("Add code")
+            .performClick()
+
+        verify {
+            viewModel.trySendAction(
+                ItemListingAction.ScanQrCodeClick,
             )
         }
     }

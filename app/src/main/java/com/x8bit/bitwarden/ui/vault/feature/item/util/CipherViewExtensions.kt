@@ -1,6 +1,8 @@
 package com.x8bit.bitwarden.ui.vault.feature.item.util
 
 import androidx.annotation.DrawableRes
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.bitwarden.vault.CardView
 import com.bitwarden.vault.CipherRepromptType
 import com.bitwarden.vault.CipherType
@@ -12,8 +14,6 @@ import com.bitwarden.vault.IdentityView
 import com.bitwarden.vault.LoginUriView
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.capitalize
 import com.x8bit.bitwarden.ui.platform.base.util.nullIfAllEqual
 import com.x8bit.bitwarden.ui.platform.base.util.orNullIfBlank
@@ -57,7 +57,14 @@ fun CipherView.toViewState(
             name = name,
             requiresReprompt = (reprompt == CipherRepromptType.PASSWORD && hasMasterPassword) &&
                 previousState?.common?.requiresReprompt != false,
-            customFields = fields.orEmpty().map { it.toCustomField() },
+            customFields = fields.orEmpty().map { fieldView ->
+                fieldView.toCustomField(
+                    previousState = previousState
+                        ?.common
+                        ?.customFields
+                        ?.find { it.id == fieldView.hashCode().toString() },
+                )
+            },
             lastUpdated = revisionDate.toFormattedPattern(
                 pattern = LAST_UPDATED_DATE_TIME_PATTERN,
                 clock = clock,
@@ -195,27 +202,39 @@ fun CipherView.toViewState(
         },
     )
 
-private fun FieldView.toCustomField(): VaultItemState.ViewState.Content.Common.Custom =
+/**
+ * Transforms [FieldView] into [VaultItemState.ViewState.Content.Common.Custom].
+ */
+fun FieldView.toCustomField(
+    previousState: VaultItemState.ViewState.Content.Common.Custom?,
+): VaultItemState.ViewState.Content.Common.Custom =
     when (type) {
         FieldType.TEXT -> VaultItemState.ViewState.Content.Common.Custom.TextField(
+            id = this.hashCode().toString(),
             name = name.orEmpty(),
             value = value.orZeroWidthSpace(),
             isCopyable = !value.isNullOrBlank(),
         )
 
         FieldType.HIDDEN -> VaultItemState.ViewState.Content.Common.Custom.HiddenField(
+            id = this.hashCode().toString(),
             name = name.orEmpty(),
             value = value.orZeroWidthSpace(),
             isCopyable = !value.isNullOrBlank(),
-            isVisible = false,
+            isVisible = (previousState as?
+                VaultItemState.ViewState.Content.Common.Custom.HiddenField)
+                ?.isVisible
+                ?: false,
         )
 
         FieldType.BOOLEAN -> VaultItemState.ViewState.Content.Common.Custom.BooleanField(
+            id = this.hashCode().toString(),
             name = name.orEmpty(),
             value = value?.toBoolean() ?: false,
         )
 
         FieldType.LINKED -> VaultItemState.ViewState.Content.Common.Custom.LinkedField(
+            id = this.hashCode().toString(),
             vaultLinkedFieldType = VaultLinkedFieldType.fromId(requireNotNull(linkedId)),
             name = name.orEmpty(),
         )

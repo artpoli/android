@@ -3,6 +3,13 @@ package com.x8bit.bitwarden.ui.vault.feature.item
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.model.DataState
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseIconUrl
+import com.bitwarden.network.model.OrganizationType
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
+import com.bitwarden.ui.util.concat
 import com.bitwarden.vault.CipherView
 import com.bitwarden.vault.CollectionView
 import com.bitwarden.vault.FolderView
@@ -19,11 +26,7 @@ import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
-import com.x8bit.bitwarden.data.platform.repository.model.DataState
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
 import com.x8bit.bitwarden.data.platform.repository.util.FakeEnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.util.baseIconUrl
-import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCollectionView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockFolderView
@@ -34,9 +37,6 @@ import com.x8bit.bitwarden.data.vault.repository.model.DeleteCipherResult
 import com.x8bit.bitwarden.data.vault.repository.model.DownloadAttachmentResult
 import com.x8bit.bitwarden.data.vault.repository.model.RestoreCipherResult
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
-import com.x8bit.bitwarden.ui.platform.base.util.concat
 import com.x8bit.bitwarden.ui.platform.components.model.IconData
 import com.x8bit.bitwarden.ui.vault.feature.item.model.TotpCodeItemData
 import com.x8bit.bitwarden.ui.vault.feature.item.model.VaultItemLocation
@@ -400,12 +400,13 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                 mutableFoldersStateFlow.value = DataState.Loaded(emptyList())
 
                 val viewModel = createViewModel(state = DEFAULT_STATE)
+                val error = Throwable("Oh dang.")
                 coEvery {
                     vaultRepo.softDeleteCipher(
                         cipherId = VAULT_ITEM_ID,
                         cipherView = createMockCipherView(number = 1),
                     )
-                } returns DeleteCipherResult.Error
+                } returns DeleteCipherResult.Error(error = error)
 
                 viewModel.trySendAction(VaultItemAction.Common.ConfirmDeleteClick)
 
@@ -414,6 +415,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                         viewState = loginViewState,
                         dialog = VaultItemState.DialogState.Generic(
                             message = R.string.generic_error_message.asText(),
+                            error = error,
                         ),
                     ),
                     viewModel.stateFlow.value,
@@ -624,12 +626,13 @@ class VaultItemViewModelTest : BaseViewModelTest() {
             mutableFoldersStateFlow.value = DataState.Loaded(emptyList())
 
             val viewModel = createViewModel(state = DEFAULT_STATE)
+            val error = Throwable("Fail")
             coEvery {
                 vaultRepo.restoreCipher(
                     cipherId = VAULT_ITEM_ID,
                     cipherView = createMockCipherView(number = 1),
                 )
-            } returns RestoreCipherResult.Error
+            } returns RestoreCipherResult.Error(error = error)
 
             viewModel.trySendAction(VaultItemAction.Common.ConfirmRestoreClick)
 
@@ -638,6 +641,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                     viewState = DEFAULT_VIEW_STATE,
                     dialog = VaultItemState.DialogState.Generic(
                         message = R.string.generic_error_message.asText(),
+                        error = error,
                     ),
                 ),
                 viewModel.stateFlow.value,
@@ -895,11 +899,11 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                         relatedLocations = persistentListOf(),
                     )
                 } returns loginViewState
-
                 val password = "password"
+                val error = Throwable("Fail!")
                 coEvery {
                     authRepo.validatePassword(password)
-                } returns ValidatePasswordResult.Error
+                } returns ValidatePasswordResult.Error(error = error)
                 mutableVaultItemFlow.value = DataState.Loaded(data = mockCipherView)
                 mutableAuthCodeItemFlow.value = DataState.Loaded(data = null)
                 mutableCollectionsStateFlow.value = DataState.Loaded(emptyList())
@@ -928,6 +932,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                         loginState.copy(
                             dialog = VaultItemState.DialogState.Generic(
                                 message = R.string.generic_error_message.asText(),
+                                error = error,
                             ),
                         ),
                         awaitItem(),
@@ -1065,6 +1070,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
             runTest {
                 val loginState = DEFAULT_STATE.copy(viewState = DEFAULT_VIEW_STATE)
                 val field = VaultItemState.ViewState.Content.Common.Custom.HiddenField(
+                    id = "12345",
                     name = "hidden",
                     value = "value",
                     isCopyable = true,
@@ -1130,6 +1136,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
             runTest {
                 val hiddenField =
                     VaultItemState.ViewState.Content.Common.Custom.HiddenField(
+                        id = "12345",
                         name = "hidden",
                         value = "value",
                         isCopyable = true,
@@ -1702,10 +1709,10 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                     url = "https://example.com",
                     title = "test.mp4",
                 )
-
+                val error = Throwable("Fail")
                 coEvery {
                     vaultRepo.downloadAttachment(any(), any())
-                } returns DownloadAttachmentResult.Failure
+                } returns DownloadAttachmentResult.Failure(error = error)
 
                 viewModel.stateFlow.test {
                     assertEquals(
@@ -1726,6 +1733,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                         loginState.copy(
                             dialog = VaultItemState.DialogState.Generic(
                                 R.string.unable_to_download_file.asText(),
+                                error = error,
                             ),
                         ),
                         awaitItem(),
@@ -3341,6 +3349,7 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                                 shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.OWNER,
+                                keyConnectorUrl = null,
                             ),
                         ),
                     ),
@@ -3696,25 +3705,30 @@ class VaultItemViewModelTest : BaseViewModelTest() {
                 notes = "Lots of notes",
                 customFields = listOf(
                     VaultItemState.ViewState.Content.Common.Custom.TextField(
+                        id = "12345",
                         name = "text",
                         value = "value",
                         isCopyable = true,
                     ),
                     VaultItemState.ViewState.Content.Common.Custom.HiddenField(
+                        id = "12345",
                         name = "hidden",
                         value = "value",
                         isCopyable = true,
                         isVisible = false,
                     ),
                     VaultItemState.ViewState.Content.Common.Custom.BooleanField(
+                        id = "12345",
                         name = "boolean",
                         value = true,
                     ),
                     VaultItemState.ViewState.Content.Common.Custom.LinkedField(
+                        id = "12345",
                         name = "linked username",
                         vaultLinkedFieldType = VaultLinkedFieldType.USERNAME,
                     ),
                     VaultItemState.ViewState.Content.Common.Custom.LinkedField(
+                        id = "12345",
                         name = "linked password",
                         vaultLinkedFieldType = VaultLinkedFieldType.PASSWORD,
                     ),

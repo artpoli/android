@@ -13,9 +13,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.util.assertNoPopupExists
 import io.mockk.every
@@ -201,6 +201,79 @@ class EnterpriseSignOnScreenTest : BaseComposeTest() {
             .filterToOne(hasAnyAncestor(isDialog()))
             .performClick()
         verify { viewModel.trySendAction(EnterpriseSignOnAction.DialogDismiss) }
+    }
+
+    @Test
+    fun `ConfirmKeyConnector dialog should be shown or hidden according to the state`() {
+        composeTestRule.onNode(isDialog()).assertDoesNotExist()
+
+        mutableStateFlow.update {
+            it.copy(
+                dialogState = EnterpriseSignOnState.DialogState.KeyConnectorDomain(
+                    keyConnectorDomain = "bitwarden.com",
+                ),
+            )
+        }
+
+        composeTestRule.onNode(isDialog()).assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Confirm Key Connector domain")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(
+                "Please confirm the domain below with your organization administrator." +
+                    "\n\n" +
+                    "Key Connector domain:" +
+                    "\n" +
+                    "bitwarden.com",
+            )
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText("Confirm")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText("Cancel")
+            .assert(hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `ConfirmKeyConnector Confirm click should send ConfirmKeyConnectorDomainClick action`() {
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                dialogState = EnterpriseSignOnState.DialogState.KeyConnectorDomain(
+                    keyConnectorDomain = "bitwarden.com",
+                ),
+            )
+        }
+
+        composeTestRule
+            .onAllNodesWithText("Confirm")
+            .filterToOne(hasAnyAncestor(isDialog()))
+            .performClick()
+        verify { viewModel.trySendAction(EnterpriseSignOnAction.ConfirmKeyConnectorDomainClick) }
+    }
+
+    @Test
+    fun `ConfirmKeyConnector Cancel click should send CancelKeyConnectorDomainClick action`() {
+        mutableStateFlow.update {
+            DEFAULT_STATE.copy(
+                dialogState = EnterpriseSignOnState.DialogState.KeyConnectorDomain(
+                    keyConnectorDomain = "bitwarden.com",
+                ),
+            )
+        }
+
+        composeTestRule
+            .onAllNodesWithText("Cancel")
+            .filterToOne(hasAnyAncestor(isDialog()))
+            .performClick()
+        verify { viewModel.trySendAction(EnterpriseSignOnAction.CancelKeyConnectorDomainClick) }
     }
 
     companion object {

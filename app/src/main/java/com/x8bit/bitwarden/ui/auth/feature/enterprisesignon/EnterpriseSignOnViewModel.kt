@@ -4,6 +4,9 @@ import android.net.Uri
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.data.repository.util.baseIdentityUrl
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
@@ -19,12 +22,9 @@ import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.manager.network.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.util.baseIdentityUrl
 import com.x8bit.bitwarden.data.tools.generator.repository.GeneratorRepository
 import com.x8bit.bitwarden.data.tools.generator.repository.utils.generateRandomString
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -131,6 +131,14 @@ class EnterpriseSignOnViewModel @Inject constructor(
             is EnterpriseSignOnAction.Internal.OnVerifiedOrganizationDomainSsoDetailsReceive -> {
                 handleOnVerifiedOrganizationDomainSsoDetailsReceive(action)
             }
+
+            EnterpriseSignOnAction.CancelKeyConnectorDomainClick -> {
+                handleCancelKeyConnectorDomainClick()
+            }
+
+            EnterpriseSignOnAction.ConfirmKeyConnectorDomainClick -> {
+                handleConfirmKeyConnectorDomainClick()
+            }
         }
     }
 
@@ -161,6 +169,7 @@ class EnterpriseSignOnViewModel @Inject constructor(
                 showError(
                     message = loginResult.errorMessage?.asText()
                         ?: R.string.login_sso_error.asText(),
+                    error = loginResult.error,
                 )
             }
 
@@ -198,6 +207,12 @@ class EnterpriseSignOnViewModel @Inject constructor(
                         ?: R.string.login_sso_error.asText(),
                 )
             }
+
+            is LoginResult.ConfirmKeyConnectorDomain -> {
+                showKeyConnectorDomainConfirmation(
+                    keyConnectorDomain = loginResult.domain,
+                )
+            }
         }
     }
 
@@ -211,7 +226,10 @@ class EnterpriseSignOnViewModel @Inject constructor(
     private fun handleOnSsoPrevalidationFailure(
         action: EnterpriseSignOnAction.Internal.OnSsoPrevalidationFailure,
     ) {
-        showError(message = action.message?.asText() ?: R.string.login_sso_error.asText())
+        showError(
+            message = action.message?.asText() ?: R.string.login_sso_error.asText(),
+            error = action.error,
+        )
     }
 
     private fun handleOnOrganizationDomainSsoDetailsFailure() {
@@ -386,6 +404,7 @@ class EnterpriseSignOnViewModel @Inject constructor(
                     sendAction(
                         action = EnterpriseSignOnAction.Internal.OnSsoPrevalidationFailure(
                             message = prevalidateSso.message,
+                            error = prevalidateSso.error,
                         ),
                     )
                 }
@@ -490,12 +509,14 @@ class EnterpriseSignOnViewModel @Inject constructor(
     private fun showError(
         title: Text = R.string.an_error_has_occurred.asText(),
         message: Text = R.string.login_sso_error.asText(),
+        error: Throwable? = null,
     ) {
         mutableStateFlow.update {
             it.copy(
                 dialogState = EnterpriseSignOnState.DialogState.Error(
                     title = title,
                     message = message,
+                    error = error,
                 ),
             )
         }
@@ -509,6 +530,29 @@ class EnterpriseSignOnViewModel @Inject constructor(
                 ),
             )
         }
+    }
+
+    private fun showKeyConnectorDomainConfirmation(keyConnectorDomain: String) {
+        mutableStateFlow.update {
+            it.copy(
+                dialogState = EnterpriseSignOnState.DialogState.KeyConnectorDomain(
+                    keyConnectorDomain = keyConnectorDomain,
+                ),
+            )
+        }
+    }
+
+    private fun handleConfirmKeyConnectorDomainClick() {
+        showLoading()
+        viewModelScope.launch {
+            val result = authRepository.continueKeyConnectorLogin()
+            sendAction(EnterpriseSignOnAction.Internal.OnLoginResult(result))
+        }
+    }
+
+    private fun handleCancelKeyConnectorDomainClick() {
+        mutableStateFlow.update { it.copy(dialogState = null) }
+        authRepository.cancelKeyConnectorLogin()
     }
 }
 
@@ -533,6 +577,7 @@ data class EnterpriseSignOnState(
         data class Error(
             val title: Text,
             val message: Text,
+            val error: Throwable? = null,
         ) : DialogState()
 
         /**
@@ -541,6 +586,14 @@ data class EnterpriseSignOnState(
         @Parcelize
         data class Loading(
             val message: Text,
+        ) : DialogState()
+
+        /**
+         * Represents a dialog indicating that the user needs to confirm the [keyConnectorDomain].
+         */
+        @Parcelize
+        data class KeyConnectorDomain(
+            val keyConnectorDomain: String,
         ) : DialogState()
     }
 }
@@ -598,6 +651,18 @@ sealed class EnterpriseSignOnAction {
     data object LogInClick : EnterpriseSignOnAction()
 
     /**
+     * Indicates that the confirm button has been clicked
+     * on the KeyConnector confirmation dialog.
+     */
+    data object ConfirmKeyConnectorDomainClick : EnterpriseSignOnAction()
+
+    /**
+     * Indicates that the cancel button has been clicked
+     * on the KeyConnector confirmation dialog.
+     */
+    data object CancelKeyConnectorDomainClick : EnterpriseSignOnAction()
+
+    /**
      * Indicates that the organization identifier input has changed.
      */
     data class OrgIdentifierInputChange(
@@ -628,6 +693,7 @@ sealed class EnterpriseSignOnAction {
          */
         data class OnSsoPrevalidationFailure(
             val message: String?,
+            val error: Throwable?,
         ) : Internal()
 
         /**

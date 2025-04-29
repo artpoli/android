@@ -1,17 +1,19 @@
 package com.x8bit.bitwarden.data.platform.datasource.disk.util
 
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.core.data.util.decodeFromStringOrNull
 import com.x8bit.bitwarden.data.platform.datasource.disk.SettingsDiskSource
+import com.x8bit.bitwarden.data.platform.datasource.disk.model.FlightRecorderDataSet
 import com.x8bit.bitwarden.data.platform.manager.model.AppResumeScreenData
 import com.x8bit.bitwarden.data.platform.repository.model.UriMatchType
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
-import com.x8bit.bitwarden.data.platform.util.decodeFromStringOrNull
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppLanguage
 import com.x8bit.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Assertions.assertEquals
 import java.time.Instant
 
 /**
@@ -22,6 +24,8 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private val mutableAppLanguageFlow = bufferedMutableSharedFlow<AppLanguage?>(replay = 1)
 
     private val mutableAppThemeFlow = bufferedMutableSharedFlow<AppTheme>(replay = 1)
+
+    private val mutableScreenCaptureAllowedFlow = bufferedMutableSharedFlow<Boolean?>(replay = 1)
 
     private val mutableLastSyncCallFlowMap = mutableMapOf<String, MutableSharedFlow<Instant?>>()
 
@@ -45,11 +49,11 @@ class FakeSettingsDiskSource : SettingsDiskSource {
 
     private val mutableShouldShowAddLoginCoachMarkFlow = bufferedMutableSharedFlow<Boolean?>()
 
-    private val mutableScreenCaptureAllowedFlowMap =
-        mutableMapOf<String, MutableSharedFlow<Boolean?>>()
-
     private val mutableShouldShowGeneratorCoachMarkFlow =
         bufferedMutableSharedFlow<Boolean?>()
+
+    private val mutableFlightRecorderDataFlow =
+        bufferedMutableSharedFlow<FlightRecorderDataSet?>(replay = 1)
 
     private var storedAppLanguage: AppLanguage? = null
     private var storedAppTheme: AppTheme = AppTheme.DEFAULT
@@ -67,7 +71,7 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private var storedIsCrashLoggingEnabled: Boolean? = null
     private var storedHasUserLoggedInOrCreatedAccount: Boolean? = null
     private var storedInitialAutofillDialogShown: Boolean? = null
-    private val storedScreenCaptureAllowed = mutableMapOf<String, Boolean?>()
+    private var storedScreenCaptureAllowed: Boolean? = null
     private var storedSystemBiometricIntegritySource: String? = null
     private val storedAccountBiometricIntegrityValidity = mutableMapOf<String, Boolean?>()
     private val storedAppResumeScreenData = mutableMapOf<String, String?>()
@@ -81,6 +85,7 @@ class FakeSettingsDiskSource : SettingsDiskSource {
     private var createSendActionCount: Int? = null
     private var hasSeenAddLoginCoachMark: Boolean? = null
     private var hasSeenGeneratorCoachMark: Boolean? = null
+    private var storedFlightRecorderData: FlightRecorderDataSet? = null
 
     private val mutableShowAutoFillSettingBadgeFlowMap =
         mutableMapOf<String, MutableSharedFlow<Boolean?>>()
@@ -115,6 +120,16 @@ class FakeSettingsDiskSource : SettingsDiskSource {
         get() = mutableAppThemeFlow.onSubscription {
             emit(appTheme)
         }
+
+    override var screenCaptureAllowed: Boolean?
+        get() = storedScreenCaptureAllowed
+        set(value) {
+            storedScreenCaptureAllowed = value
+            mutableScreenCaptureAllowedFlow.tryEmit(value)
+        }
+
+    override val screenCaptureAllowedFlow: Flow<Boolean?>
+        get() = mutableScreenCaptureAllowedFlow.onSubscription { emit(screenCaptureAllowed) }
 
     override var systemBiometricIntegritySource: String?
         get() = storedSystemBiometricIntegritySource
@@ -163,6 +178,17 @@ class FakeSettingsDiskSource : SettingsDiskSource {
         get() = mutableHasUserLoggedInOrCreatedAccount.onSubscription {
             emit(hasUserLoggedInOrCreatedAccount)
         }
+
+    override var flightRecorderData: FlightRecorderDataSet?
+        get() = storedFlightRecorderData
+        set(value) {
+            storedFlightRecorderData = value
+            mutableFlightRecorderDataFlow.tryEmit(value)
+        }
+
+    override val flightRecorderDataFlow: Flow<FlightRecorderDataSet?>
+        get() = mutableFlightRecorderDataFlow
+            .onSubscription { emit(storedFlightRecorderData) }
 
     override fun getAccountBiometricIntegrityValidity(
         userId: String,
@@ -304,21 +330,6 @@ class FakeSettingsDiskSource : SettingsDiskSource {
         storedBlockedAutofillUris[userId] = blockedAutofillUris
     }
 
-    override fun getScreenCaptureAllowed(userId: String): Boolean? =
-        storedScreenCaptureAllowed[userId]
-
-    override fun getScreenCaptureAllowedFlow(userId: String): Flow<Boolean?> {
-        return getMutableScreenCaptureAllowedFlow(userId)
-    }
-
-    override fun storeScreenCaptureAllowed(
-        userId: String,
-        isScreenCaptureAllowed: Boolean?,
-    ) {
-        storedScreenCaptureAllowed[userId] = isScreenCaptureAllowed
-        getMutableScreenCaptureAllowedFlow(userId).tryEmit(isScreenCaptureAllowed)
-    }
-
     override fun storeUseHasLoggedInPreviously(userId: String) {
         userSignIns[userId] = true
     }
@@ -436,13 +447,14 @@ class FakeSettingsDiskSource : SettingsDiskSource {
         return storedAppResumeScreenData[userId]?.let { Json.decodeFromStringOrNull(it) }
     }
 
-    //region Private helper functions
-    private fun getMutableScreenCaptureAllowedFlow(userId: String): MutableSharedFlow<Boolean?> {
-        return mutableScreenCaptureAllowedFlowMap.getOrPut(userId) {
-            bufferedMutableSharedFlow(replay = 1)
-        }
+    /**
+     * Asserts that the stored [FlightRecorderDataSet] matches the [expected] one.
+     */
+    fun assertFlightRecorderData(expected: FlightRecorderDataSet) {
+        assertEquals(expected, storedFlightRecorderData)
     }
 
+    //region Private helper functions
     private fun getMutableLastSyncTimeFlow(
         userId: String,
     ): MutableSharedFlow<Instant?> =

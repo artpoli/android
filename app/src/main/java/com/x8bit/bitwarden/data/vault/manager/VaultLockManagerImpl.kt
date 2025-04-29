@@ -7,25 +7,29 @@ import android.content.IntentFilter
 import com.bitwarden.core.InitOrgCryptoRequest
 import com.bitwarden.core.InitUserCryptoMethod
 import com.bitwarden.core.InitUserCryptoRequest
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.core.data.util.asSuccess
+import com.bitwarden.core.data.util.concurrentMapOf
+import com.bitwarden.core.data.util.flatMap
 import com.bitwarden.crypto.HashPurpose
 import com.bitwarden.crypto.Kdf
+import com.bitwarden.data.manager.DispatcherManager
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.auth.datasource.sdk.AuthSdkSource
 import com.x8bit.bitwarden.data.auth.manager.TrustedDeviceManager
 import com.x8bit.bitwarden.data.auth.manager.UserLogoutManager
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.util.toSdkParams
 import com.x8bit.bitwarden.data.auth.repository.util.userAccountTokens
 import com.x8bit.bitwarden.data.auth.repository.util.userSwitchingChangesFlow
+import com.x8bit.bitwarden.data.platform.error.MissingPropertyException
+import com.x8bit.bitwarden.data.platform.error.NoActiveUserException
 import com.x8bit.bitwarden.data.platform.manager.AppStateManager
-import com.x8bit.bitwarden.data.platform.manager.dispatcher.DispatcherManager
 import com.x8bit.bitwarden.data.platform.manager.model.AppCreationState
 import com.x8bit.bitwarden.data.platform.manager.model.AppForegroundState
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeout
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
-import com.x8bit.bitwarden.data.platform.util.asSuccess
-import com.x8bit.bitwarden.data.platform.util.flatMap
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.InitializeCryptoResult
 import com.x8bit.bitwarden.data.vault.manager.model.VaultStateEvent
@@ -55,7 +59,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -85,7 +88,7 @@ class VaultLockManagerImpl(
      * This [Map] tracks all active timeout [Job]s that are running and their associated data using
      * the user ID as the key.
      */
-    private val userIdTimerJobMap: MutableMap<String, TimeoutJobData> = ConcurrentHashMap()
+    private val userIdTimerJobMap: MutableMap<String, TimeoutJobData> = concurrentMapOf()
 
     private val activeUserId: String? get() = authDiskSource.userState?.activeUserId
 
@@ -98,6 +101,8 @@ class VaultLockManagerImpl(
 
     override val vaultStateEventFlow: Flow<VaultStateEvent>
         get() = mutableVaultStateEventSharedFlow.asSharedFlow()
+
+    override var isFromLockFlow: Boolean = false
 
     init {
         observeAppCreationChanges()
@@ -117,13 +122,17 @@ class VaultLockManagerImpl(
     override fun isVaultUnlocking(userId: String): Boolean =
         mutableVaultUnlockDataStateFlow.value.statusFor(userId) == VaultUnlockData.Status.UNLOCKING
 
-    override fun lockVault(userId: String) {
+    override fun lockVault(userId: String, isUserInitiated: Boolean) {
+        isFromLockFlow = isUserInitiated
         setVaultToLocked(userId = userId)
     }
 
-    override fun lockVaultForCurrentUser() {
+    override fun lockVaultForCurrentUser(isUserInitiated: Boolean) {
         activeUserId?.let {
-            lockVault(it)
+            lockVault(
+                userId = it,
+                isUserInitiated = isUserInitiated,
+            )
         }
     }
 
@@ -167,7 +176,7 @@ class VaultLockManagerImpl(
                     .fold(
                         onFailure = {
                             incrementInvalidUnlockCount(userId = userId)
-                            VaultUnlockResult.GenericError
+                            VaultUnlockResult.GenericError(error = it)
                         },
                         onSuccess = { initializeCryptoResult ->
                             initializeCryptoResult
@@ -245,7 +254,7 @@ class VaultLockManagerImpl(
         )
 
         if (invalidUnlockAttempts >= MAXIMUM_INVALID_UNLOCK_ATTEMPTS) {
-            userLogoutManager.logout(userId = userId)
+            userLogoutManager.logout(userId = userId, reason = LogoutReason.TooManyUnlockAttempts)
         }
     }
 
@@ -595,7 +604,7 @@ class VaultLockManagerImpl(
             }
 
             VaultTimeoutAction.LOGOUT -> {
-                userLogoutManager.softLogout(userId = userId)
+                userLogoutManager.softLogout(userId = userId, reason = LogoutReason.Timeout)
             }
         }
     }
@@ -605,9 +614,11 @@ class VaultLockManagerImpl(
         initUserCryptoMethod: InitUserCryptoMethod,
     ): VaultUnlockResult {
         val account = authDiskSource.userState?.accounts?.get(userId)
-            ?: return VaultUnlockResult.InvalidStateError
+            ?: return VaultUnlockResult.InvalidStateError(error = NoActiveUserException())
         val privateKey = authDiskSource.getPrivateKey(userId = userId)
-            ?: return VaultUnlockResult.InvalidStateError
+            ?: return VaultUnlockResult.InvalidStateError(
+                error = MissingPropertyException("Private key"),
+            )
         val organizationKeys = authDiskSource.getOrganizationKeys(userId = userId)
         return unlockVault(
             userId = userId,

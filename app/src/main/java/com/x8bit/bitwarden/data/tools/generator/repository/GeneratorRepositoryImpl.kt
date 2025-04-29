@@ -2,13 +2,13 @@
 
 package com.x8bit.bitwarden.data.tools.generator.repository
 
+import com.bitwarden.data.manager.DispatcherManager
 import com.bitwarden.generators.PassphraseGeneratorRequest
 import com.bitwarden.generators.PasswordGeneratorRequest
 import com.bitwarden.generators.UsernameGeneratorRequest
 import com.bitwarden.vault.PasswordHistoryView
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.platform.manager.ReviewPromptManager
-import com.x8bit.bitwarden.data.platform.manager.dispatcher.DispatcherManager
 import com.x8bit.bitwarden.data.platform.repository.model.LocalDataState
 import com.x8bit.bitwarden.data.platform.repository.util.observeWhenSubscribedAndLoggedIn
 import com.x8bit.bitwarden.data.tools.generator.datasource.disk.GeneratorDiskSource
@@ -130,7 +130,7 @@ class GeneratorRepositoryImpl(
                     }
                     GeneratedPasswordResult.Success(generatedPassword)
                 },
-                onFailure = { GeneratedPasswordResult.InvalidRequest },
+                onFailure = { GeneratedPasswordResult.InvalidRequest(error = it) },
             )
 
     override suspend fun generatePassphrase(
@@ -149,7 +149,7 @@ class GeneratorRepositoryImpl(
                     }
                     GeneratedPassphraseResult.Success(generatedPassphrase)
                 },
-                onFailure = { GeneratedPassphraseResult.InvalidRequest },
+                onFailure = { GeneratedPassphraseResult.InvalidRequest(error = it) },
             )
 
     override suspend fun generatePlusAddressedEmail(
@@ -161,7 +161,7 @@ class GeneratorRepositoryImpl(
                     GeneratedPlusAddressedUsernameResult.Success(generatedEmail)
                 },
                 onFailure = {
-                    GeneratedPlusAddressedUsernameResult.InvalidRequest
+                    GeneratedPlusAddressedUsernameResult.InvalidRequest(error = it)
                 },
             )
 
@@ -174,7 +174,7 @@ class GeneratorRepositoryImpl(
                     GeneratedCatchAllUsernameResult.Success(generatedEmail)
                 },
                 onFailure = {
-                    GeneratedCatchAllUsernameResult.InvalidRequest
+                    GeneratedCatchAllUsernameResult.InvalidRequest(error = it)
                 },
             )
 
@@ -187,7 +187,7 @@ class GeneratorRepositoryImpl(
                     GeneratedRandomWordUsernameResult.Success(generatedUsername)
                 },
                 onFailure = {
-                    GeneratedRandomWordUsernameResult.InvalidRequest
+                    GeneratedRandomWordUsernameResult.InvalidRequest(error = it)
                 },
             )
 
@@ -200,7 +200,7 @@ class GeneratorRepositoryImpl(
                     GeneratedForwardedServiceUsernameResult.Success(generatedEmail)
                 },
                 onFailure = {
-                    GeneratedForwardedServiceUsernameResult.InvalidRequest(it.message)
+                    GeneratedForwardedServiceUsernameResult.InvalidRequest(it.message, error = it)
                 },
             )
     }

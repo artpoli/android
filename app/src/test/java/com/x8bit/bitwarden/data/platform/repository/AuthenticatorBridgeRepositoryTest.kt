@@ -3,15 +3,15 @@ package com.x8bit.bitwarden.data.platform.repository
 import com.bitwarden.authenticatorbridge.model.SharedAccountData
 import com.bitwarden.authenticatorbridge.util.generateSecretKey
 import com.bitwarden.authenticatorbridge.util.toSymmetricEncryptionKeyData
+import com.bitwarden.core.data.util.asSuccess
+import com.bitwarden.network.model.SyncResponseJson
 import com.bitwarden.vault.Cipher
 import com.bitwarden.vault.CipherView
 import com.x8bit.bitwarden.data.auth.datasource.disk.util.FakeAuthDiskSource
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.platform.repository.util.sanitizeTotpUri
-import com.x8bit.bitwarden.data.platform.util.asSuccess
 import com.x8bit.bitwarden.data.vault.datasource.disk.VaultDiskSource
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockData
@@ -88,7 +88,7 @@ class AuthenticatorBridgeRepositoryTest {
         every { vaultRepository.isVaultUnlocked(USER_1_ID) } returns true
         // But locked for user 2:
         every { vaultRepository.isVaultUnlocked(USER_2_ID) } returns false
-        every { vaultRepository.lockVault(USER_2_ID) } returns Unit
+        every { vaultRepository.lockVault(USER_2_ID, isUserInitiated = false) } returns Unit
         coEvery {
             vaultRepository.unlockVaultWithDecryptedUserKey(
                 userId = USER_2_ID,
@@ -147,7 +147,7 @@ class AuthenticatorBridgeRepositoryTest {
                     decryptedUserKey = USER_2_UNLOCK_KEY,
                 )
             }
-            verify { vaultRepository.lockVault(USER_2_ID) }
+            verify { vaultRepository.lockVault(USER_2_ID, isUserInitiated = false) }
             coVerify { vaultSdkSource.decryptCipher(USER_1_ID, USER_1_ENCRYPTED_SDK_TOTP_CIPHER) }
             coVerify { vaultSdkSource.decryptCipher(USER_2_ID, USER_2_ENCRYPTED_SDK_TOTP_CIPHER) }
         }
@@ -185,7 +185,7 @@ class AuthenticatorBridgeRepositoryTest {
                 )
             }
             verify { vaultRepository.vaultUnlockDataStateFlow }
-            verify { vaultRepository.lockVault(USER_2_ID) }
+            verify { vaultRepository.lockVault(USER_2_ID, isUserInitiated = false) }
             verify { vaultDiskSource.getCiphers(USER_2_ID) }
             coVerify { vaultSdkSource.decryptCipher(USER_2_ID, USER_2_ENCRYPTED_SDK_TOTP_CIPHER) }
         }
@@ -198,7 +198,7 @@ class AuthenticatorBridgeRepositoryTest {
             coEvery {
                 vaultRepository.unlockVaultWithDecryptedUserKey(USER_1_ID, USER_1_UNLOCK_KEY)
             } returns VaultUnlockResult.Success
-            every { vaultRepository.lockVault(USER_1_ID) } returns Unit
+            every { vaultRepository.lockVault(USER_1_ID, isUserInitiated = false) } returns Unit
 
             val sharedAccounts = authenticatorBridgeRepository.getSharedAccounts()
             assertEquals(
@@ -216,7 +216,7 @@ class AuthenticatorBridgeRepositoryTest {
                     decryptedUserKey = USER_1_UNLOCK_KEY,
                 )
             }
-            verify { vaultRepository.lockVault(USER_1_ID) }
+            verify { vaultRepository.lockVault(USER_1_ID, isUserInitiated = false) }
             verify { vaultRepository.isVaultUnlocked(USER_2_ID) }
             coVerify {
                 vaultRepository.unlockVaultWithDecryptedUserKey(
@@ -225,7 +225,7 @@ class AuthenticatorBridgeRepositoryTest {
                 )
             }
             verify { vaultRepository.vaultUnlockDataStateFlow }
-            verify { vaultRepository.lockVault(USER_2_ID) }
+            verify { vaultRepository.lockVault(USER_2_ID, isUserInitiated = false) }
             verify { vaultDiskSource.getCiphers(USER_2_ID) }
             coVerify { vaultSdkSource.decryptCipher(USER_2_ID, USER_2_ENCRYPTED_SDK_TOTP_CIPHER) }
         }
@@ -235,9 +235,10 @@ class AuthenticatorBridgeRepositoryTest {
     fun `syncAccounts when for user 1 vault is locked and unlock fails should reset authenticator sync unlock key and omit user from the list`() =
         runTest {
             every { vaultRepository.isVaultUnlocked(USER_1_ID) } returns false
+            val error = Throwable("Fail")
             coEvery {
                 vaultRepository.unlockVaultWithDecryptedUserKey(USER_1_ID, USER_1_UNLOCK_KEY)
-            } returns VaultUnlockResult.InvalidStateError
+            } returns VaultUnlockResult.InvalidStateError(error = error)
 
             val sharedAccounts = authenticatorBridgeRepository.getSharedAccounts()
             assertEquals(SharedAccountData(listOf(USER_2_SHARED_ACCOUNT)), sharedAccounts)
@@ -259,7 +260,7 @@ class AuthenticatorBridgeRepositoryTest {
                 )
             }
             verify { vaultRepository.vaultUnlockDataStateFlow }
-            verify { vaultRepository.lockVault(USER_2_ID) }
+            verify { vaultRepository.lockVault(USER_2_ID, isUserInitiated = false) }
             verify { vaultDiskSource.getCiphers(USER_2_ID) }
             coVerify { vaultSdkSource.decryptCipher(USER_2_ID, USER_2_ENCRYPTED_SDK_TOTP_CIPHER) }
         }
@@ -306,7 +307,7 @@ class AuthenticatorBridgeRepositoryTest {
                     decryptedUserKey = USER_2_UNLOCK_KEY,
                 )
             }
-            verify { vaultRepository.lockVault(USER_2_ID) }
+            verify { vaultRepository.lockVault(USER_2_ID, isUserInitiated = false) }
             coVerify { vaultSdkSource.decryptCipher(USER_1_ID, USER_1_ENCRYPTED_SDK_TOTP_CIPHER) }
             coVerify { vaultSdkSource.decryptCipher(USER_2_ID, USER_2_ENCRYPTED_SDK_TOTP_CIPHER) }
         }

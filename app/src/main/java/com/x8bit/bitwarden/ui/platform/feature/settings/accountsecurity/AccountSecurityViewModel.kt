@@ -4,8 +4,13 @@ import android.os.Build
 import android.os.Parcelable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.data.repository.util.baseWebVaultUrlOrDefault
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.PolicyInformation
 import com.x8bit.bitwarden.data.auth.repository.model.UserFingerprintResult
 import com.x8bit.bitwarden.data.auth.repository.util.policyInformation
@@ -19,13 +24,9 @@ import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
 import com.x8bit.bitwarden.data.platform.repository.model.BiometricsKeyResult
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeout
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebVaultUrlOrDefault
 import com.x8bit.bitwarden.data.platform.util.isBuildVersionBelow
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.toggle.UnlockWithPinState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.launchIn
@@ -74,8 +75,8 @@ class AccountSecurityViewModel @Inject constructor(
                 ?.hasMasterPassword != false,
             isUnlockWithPinEnabled = settingsRepository.isUnlockWithPinEnabled,
             shouldShowEnableAuthenticatorSync =
-            featureFlagManager.getFeatureFlag(FlagKey.AuthenticatorSync) &&
-                !isBuildVersionBelow(Build.VERSION_CODES.S),
+                featureFlagManager.getFeatureFlag(FlagKey.AuthenticatorSync) &&
+                    !isBuildVersionBelow(Build.VERSION_CODES.S),
             userId = userId,
             vaultTimeout = settingsRepository.vaultTimeout,
             vaultTimeoutAction = settingsRepository.vaultTimeoutAction,
@@ -225,7 +226,9 @@ class AccountSecurityViewModel @Inject constructor(
 
     private fun handleConfirmLogoutClick() {
         mutableStateFlow.update { it.copy(dialog = null) }
-        authRepository.logout()
+        authRepository.logout(
+            reason = LogoutReason.Click(source = "AccountSecurityViewModel"),
+        )
     }
 
     private fun handleDeleteAccountClick() {
@@ -265,7 +268,7 @@ class AccountSecurityViewModel @Inject constructor(
     }
 
     private fun handleLockNowClick() {
-        vaultRepository.lockVaultForCurrentUser()
+        vaultRepository.lockVaultForCurrentUser(isUserInitiated = true)
     }
 
     private fun handlePushNotificationConfirm() {
@@ -365,7 +368,7 @@ class AccountSecurityViewModel @Inject constructor(
                 settingsRepository.storeUnlockPin(
                     pin = state.pin,
                     shouldRequireMasterPasswordOnRestart =
-                    state.shouldRequireMasterPasswordOnRestart,
+                        state.shouldRequireMasterPasswordOnRestart,
                 )
             }
         }
@@ -464,7 +467,7 @@ class AccountSecurityViewModel @Inject constructor(
         action: AccountSecurityAction.Internal.BiometricsKeyResultReceive,
     ) {
         when (action.result) {
-            BiometricsKeyResult.Error -> {
+            is BiometricsKeyResult.Error -> {
                 mutableStateFlow.update {
                     it.copy(
                         dialog = null,

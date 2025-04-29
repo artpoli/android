@@ -620,6 +620,10 @@ Skan prosesi avtomatik baş tutacaq.</string>
   <string name="deletion_date_info">\"Send\" göstərilən tarix və saatda birdəfəlik silinəcək.</string>
   <string name="pending_delete">Silinməsi gözlənilir</string>
   <string name="expired">Müddəti bitib</string>
+  <string name="expires_at">%s müddəti bitir</string>
+  <string name="expires_tomorrow">Sabah müddəti bitir</string>
+  <string name="expires_on">%s müddəti bitir</string>
+  <string name="stops_logging_on">%1$s %2$s vaxtı üzrə jurnala yazmağı dayandırır</string>
   <string name="maximum_access_count">Maksimal müraciət sayı</string>
   <string name="maximum_access_count_info">Əgər ayarlanıbsa, istifadəçilər maksimal müraciət sayına çatdıqdan sonra bu \"Send\"ə müraciət edə bilməyəcək.</string>
   <string name="maximum_access_count_reached">Maksimal müraciət sayına çatıldı</string>
@@ -772,7 +776,9 @@ Skan prosesi avtomatik baş tutacaq.</string>
   <string name="forwarded_email_alias">Yönləndirilən e-poçt ləqəbi</string>
   <string name="random_word">Təsadüfi söz</string>
   <string name="email_required_parenthesis">E-poçt (tələb olunur)</string>
+  <string name="domain_name">domen adı</string>
   <string name="domain_name_required_parenthesis">Domen adı (tələb olunur)</string>
+  <string name="api_key">API açarı</string>
   <string name="api_key_required_parenthesis">API açarı (tələb olunur)</string>
   <string name="service">Xidmət</string>
   <string name="addy_io">addy.io</string>
@@ -781,6 +787,7 @@ Skan prosesi avtomatik baş tutacaq.</string>
   <string name="duck_duck_go">DuckDuckGo</string>
   <string name="fastmail">Fastmail</string>
   <string name="forward_email">ForwardEmail</string>
+  <string name="api_access_token_required_parenthesis">API access token (tələb olunur)</string>
   <string name="api_access_token">API müraciət tokeni</string>
   <string name="are_you_sure_you_want_to_overwrite_the_current_username">Hazırkı istifadəçi adının üzərinə yazmaq istədiyinizə əminsiniz?</string>
   <string name="generate_username">İstifadəçi adı yarat</string>
@@ -962,7 +969,6 @@ Bu hesaba keçmək istəyirsiniz?</string>
   <string name="your_passkey_will_be_saved_to_your_bitwarden_vault_for_x">Keçid açarınız %1$s üçün Bitwarden seyfinizdə saxlanılacaq</string>
   <string name="organization_unassigned_items_message_useu_description_long">Təyin edilməmiş təşkilat elementləri artıq Bütün Seyflər görünüşündə görünməyəndir və yalnız Admin Konsolu vasitəsilə əlçatandır. Bu elementləri görünən etmək üçün Admin Konsolundan bir kolleksiyaya təyin edin.</string>
   <string name="organization_unassigned_items_message_self_host_041624_description_long">16 May 2024-cü ildən etibarən təyin edilməmiş təşkilat elementləri artıq Bütün Seyflər görünüşündə görünməyən və yalnız Admin Konsolu vasitəsilə əlçatan olacaq. Bu elementləri görünən etmək üçün Admin Konsolundan bir kolleksiyaya təyin edin.</string>
-  <string name="remind_me_later">Daha sonra xatırlat</string>
   <string name="notice">Xəbərdarlıq</string>
   <string name="passkeys_not_supported_for_this_app">Keçid açarları bu tətbiq üçün dəstəklənmir</string>
   <string name="passkey_operation_failed_because_browser_is_not_privileged">Brauzer, imtiyazlı olmadığı üçün keçid açarı əməliyyatı uğursuz oldu</string>
@@ -971,10 +977,7 @@ Bu hesaba keçmək istəyirsiniz?</string>
   <string name="passkey_operation_failed_because_app_not_found_in_asset_links">Varlıq keçidlərində tətbiq tapılmadığına görə keçid açarı əməliyyatı uğursuz oldu</string>
   <string name="passkey_operation_failed_because_app_could_not_be_verified">Tətbiq doğrulana bilmədiyi üçün keçid açarı əməliyyatı uğursuz oldu</string>
   <string name="confirm_file_password">Fayl parolunu təsdiqlə</string>
-  <string name="continue_to_give_feedback">\"Əks-əlaqə ver\" ilə davam edilsin?</string>
-  <string name="continue_to_provide_feedback">Yeni tətbiq haqqında əks-əlaqə vermək üçün \"Davam et\"i seçin!</string>
   <string name="file_password">Fayl parolu</string>
-  <string name="give_feedback">Əks-əlaqə ver</string>
   <string name="password_protected">Parolla qorunur</string>
   <string name="password_used_to_export">Bu parol, bu faylı daxilə və xaricə köçürmək üçün istifadə olunacaq</string>
   <string name="autofill_suggestion">Avto-doldurma təklifləri</string>
@@ -1138,17 +1141,10 @@ Bu hesaba keçmək istəyirsiniz?</string>
   <string name="copy_email">E-poçtu kopyala</string>
   <string name="copy_phone">Telefon nömrəsini kopyala</string>
   <string name="copy_address">Ünvanı kopyala</string>
-  <string name="important_notice">Vacib bildiriş</string>
-  <string name="bitwarden_will_soon_send_a_code_to_your_account_email_to_verify_logins_from_new_devices_in_february">Bitwarden, 2025-ci ilin Fevral ayından etibarən yeni cihazlardan gələn girişləri doğrulamaq üçün hesabınızın e-poçtuna bir kod göndərəcək.</string>
-  <string name="do_you_have_reliable_access_to_your_email"><annotation emphasis="bold"><annotation arg="0">%1$s</annotation></annotation> e-poçtunuza güvənli şəkildə müraciət edə bilirsiniz?</string>
-  <string name="yes_i_can_reliably_access_my_email">Bəli, e-poçtuma güvənli şəkildə müraciət edə bilirəm</string>
   <string name="biometrics_no_longer_supported_title">Biometriklər artıq bu cihazda dəstəklənmir</string>
   <string name="biometrics_no_longer_supported">Hesabınızdan çıxış edildi, çünki cihazınızın biometrikləri son güvənlik tələblərinə cavab vermir. Ayarları güncəlləmək üçün təkrar giriş edin və ya müraciət üçün inzibatçınızla əlaqə saxlayın.</string>
   <string name="cxp_import">CXP daxilə köçürmə</string>
   <string name="cxp_export">CXP xaricə köçürmə</string>
-  <string name="set_up_two_step_login">İki addımlı girişi qur</string>
-  <string name="you_can_set_up_two_step_login_as_an_alternative_way_to_protect_your_account_or_change_your_email_to_one_you_can_access">Hesabınızı qorumaq üçün alternativ bir yol kimi iki addımlı girişi qura və ya e-poçtunuzu müraciət edə biləcəyiniz e-poçtla dəyişdirə bilərsiniz.</string>
-  <string name="turn_on_two_step_login">İki addımlı girişi işə sal</string>
   <string name="change_account_email">Hesabın e-poçtunu dəyişdir</string>
   <string name="choose_three_or_four_random_words">Üç və ya dörd təsadüfi söz seçin</string>
   <string name="pick_three_or_four_random_unrelated_words">Asanlıqla xatırlaya biləcəyiniz üç və ya dörd təsadüfi və əlaqəsiz söz seçin. Bəyəndiniz obyektləri, məkanları və ya şeyləri düşünün.</string>
@@ -1162,7 +1158,6 @@ Bu hesaba keçmək istəyirsiniz?</string>
   <string name="we_couldnt_verify_the_servers_certificate">Serverin sertifikatını doğrulaya bilmədik. Cihazınızda və ya Bitwarden serverinizdə sertifikat zənciri və ya proksi ayarları düzgün qurulmamış ola bilər.</string>
   <string name="review_flow_launched">İncələmə axını başladıldı!</string>
   <string name="copy_private_key">Private açarı kopyala</string>
-  <string name="you_can_change_your_account_email_on_the_bitwarden_web_app">Hesabınızın e-poçtunu Bitwarden veb tətbiqində dəyişdirə bilərsiniz.</string>
   <string name="login_credentials">Giriş məlumatları</string>
   <string name="autofill_options">Avto-doldurma seçimləri</string>
   <string name="use_this_button_to_generate_a_new_unique_password">Yeni və unikal bir parol yaratmaq üçün bu düyməni istifadə edin.</string>
@@ -1206,18 +1201,17 @@ Bu hesaba keçmək istəyirsiniz?</string>
   <string name="system_certificates_are_not_as_secure_as_importing_certificates_to_bitwarden">Sistem sertifikatını istifadə etmək, sertifikatı Bitwarden ilə saxlamaqdan daha az güvənlidir. Davam etsəniz, artıq quraşdırılmış bir sistem sertifikatı varsa, mövcud sistem sertifikatlarının bir siyahısı göstəriləcək.</string>
   <string name="certificate_alias_already_exists">Sertifikat alias-ı artıq mövcuddur</string>
   <string name="link">Keçid</string>
-  <string name="passkey_operation_failed_because_app_is_signed_incorrectly">Tətbiq yanlış imzalandığı üçün keçid açarı əməliyyatı uğursuz oldu</string>
   <string name="passkey_operation_failed_because_host_url_is_not_present_in_request">Sorğuda host URL təqdim olunmadığı üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_app_signature_is_invalid">Tətbiq imzası yararsız olduğu üçün keçid açarı əməliyyatı uğursuz oldu</string>
   <string name="passkey_registration_failed_due_to_an_internal_error">Daxili bir xətaya görə keçid açarı qeydiyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_relying_party_cannot_be_identified">Güvənilən tərəf müəyyən edilə bilmədiyi üçün keçid açarı əəməliyyatı uğursuz oldu.</string>
-  <string name="passkey_authentication_failed_due_to_an_internal_error">Daxili bir xətaya görə keçid açarı kimlik doğrulaması uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_the_selected_item_does_not_exist">Seçilmiş element mövcud olmadığı üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_user_is_locked_out">İstifadəçi kilidləndiyi üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_user_verification_was_cancelled">İstifadəçi doğrulaması ləğv edildiyi üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_the_request_is_invalid">Sorğu yararsız olduğu üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_user_verification_attempts_exceeded">İstifadəçi doğrulama cəhdlərini aşdığı üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="passkey_operation_failed_because_no_item_was_selected">Heç bir element seçilmədiyi üçün keçid açarı əməliyyatı uğursuz oldu.</string>
+  <string name="passkey_operation_failed_because_the_request_is_unsupported">Sorğu dəstəklənmədiyi üçün keçid açarı əməliyyatı uğursuz oldu.</string>
   <string name="self_host_server_url">Self-host server URL-si</string>
   <string name="use_chrome_autofill_integration">Chrome avto-doldurma inteqrasiyasını istifadə et</string>
   <string name="use_chrome_beta_autofill_integration">Chrome avto-doldurma inteqrasiyasını istifadə et (Beta)</string>
@@ -1225,7 +1219,45 @@ Bu hesaba keçmək istəyirsiniz?</string>
   <string name="show_more">Daha çox göstər</string>
   <string name="no_folder">Qovluq yoxdur</string>
   <string name="show_less">Daha az göstər</string>
-  <string name="add_field">Add field</string>
+  <string name="add_field">Xana əlavə et</string>
   <string name="x_ellipses">%s...</string>
-  <string name="share_error_details">Share error details</string>
+  <string name="share_error_details">Xəta detallarını paylaş</string>
+  <string name="flight_recorder">Uçuş yazıcısı</string>
+  <string name="flight_recorder_help">Uçuş yazıcısı üzrə kömək</string>
+  <string name="view_recorded_logs">Yazılmış qeydlərə bax</string>
+  <string name="enable_flight_recorder_title">Uçuş yazıcısını fəallaşdır</string>
+  <string name="recorded_logs_title">Yazılmış qeydlər</string>
+  <string name="no_logs_recorded">Heç bir qeyd yazılmayıb</string>
+  <string name="experiencing_an_issue">Problemlə üzləşmisiniz?</string>
+  <string name="enable_temporary_logging_to_collect_and_inspect_logs_locally">Qeydləri daxili anbarda yığmaq və yoxlamaq üçün müvəqqəti jurnala yazma prosesini fəallaşdırın. Fəal olduqda, tətbiq statusları və şəbəkə zəngləri jurnala yazıla bilər, ancaq həssas seyf məlumatları heç vaxt yazılmır.</string>
+  <string name="to_get_started_set_a_logging_duration">Başlamaq üçün, jurnala yazma müddətini təyin edin.
+Jurnala yazma, bu müddətdən sonra avtomatik söndürüləcək, hər hansısa problemi yenidən yaradarkən
+fəaliyyəti yaxalamaq üçün sizə vaxt verəcək.</string>
+  <string name="logs_will_be_automatically_deleted_after_30_days">Qeydlər 30 gün sonra avtomatik silinəcək. Bitwarden, jurnal datalarınıza yalnız siz paylaşdığınız zaman müraciət edə bilər.</string>
+  <string name="for_details_on_what_is_and_isnt_logged">Nəyin yazılıb-yazılmadığını öyrənmək üçün \n<annotation link="helpCenter">Bitwarden kömək mərkəzini</annotation> ziyarət edin.</string>
+  <string name="logging_duration">Jurnala yazma müddəti</string>
+  <string name="flight_recorder_one_hour">1 saat</string>
+  <string name="flight_recorder_eight_hours">8 saat</string>
+  <string name="flight_recorder_twenty_four_hours">24 saat</string>
+  <string name="flight_recorder_one_week">1 həftə</string>
+  <string name="delete_all">Hamısını sil</string>
+  <string name="share_all">Hamısını paylaş</string>
+  <string name="unable_to_share">Paylaşıla bilmir</string>
+  <string name="please_try_again_or_select_a_different_log">Lütfən yenidən sınayın və ya fərqli bir jurnal seçin.</string>
+  <string name="the_log_file_you_are_trying_to_share_has_been_removed">Paylaşmağa çalışdığınız jurnal faylı silinib.</string>
+  <string name="delete_log">Jurnalı sil</string>
+  <string name="do_you_really_want_to_delete_this_log">Həqiqətən bu jurnalı silmək istəyirsiniz?</string>
+  <string name="delete_logs">Jurnalları sil</string>
+  <string name="do_you_really_want_to_delete_all_recorded_logs">Həqiqətən yazılmış bütün jurnalları silmək istəyirsiniz?</string>
+  <string name="confirm_key_connector_domain">Key Connector domenini təsdiqlə</string>
+  <string name="key_connector_domain">Key Connector domeni:</string>
+  <string name="key_connector_organization">Təşkilat:</string>
+  <string name="password_no_longer_required_confirm_domain">Aşağıdakı təşkilatların üzvləri üçün artıq ana parol tələb olunmur. Lütfən aşağıdakı domeni təşkilatınızın inzibatçısı ilə təsdiqləyin.</string>
+  <string name="please_confirm_domain_with_admin">Lütfən aşağıdakı domeni təşkilatınızın inzibatçısı ilə təsdiqləyin.\n\nKey Connector domeni:\n%1$s</string>
+  <string name="flight_recorder_banner_title">Flight recorder on</string>
+  <string name="flight_recorder_banner_message">Flight recorder will be active until %1$s at %2$s. Return to settings to deactivate now.</string>
+  <string name="go_to_settings">Go to settings</string>
+  <string name="all_logs_deleted">All logs deleted</string>
+  <string name="log_deleted">Log deleted</string>
+  <string name="app_settings">App settings</string>
 </resources>

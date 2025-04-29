@@ -3,7 +3,13 @@ package com.x8bit.bitwarden.ui.tools.feature.generator
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import app.cash.turbine.turbineScope
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.data.repository.model.Environment
 import com.bitwarden.generators.PasswordGeneratorRequest
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.network.model.createMockPolicy
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
@@ -16,8 +22,6 @@ import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardMan
 import com.x8bit.bitwarden.data.platform.manager.model.CoachMarkTourType
 import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.data.tools.generator.repository.model.GeneratedCatchAllUsernameResult
 import com.x8bit.bitwarden.data.tools.generator.repository.model.GeneratedForwardedServiceUsernameResult
 import com.x8bit.bitwarden.data.tools.generator.repository.model.GeneratedPassphraseResult
@@ -27,11 +31,7 @@ import com.x8bit.bitwarden.data.tools.generator.repository.model.GeneratorResult
 import com.x8bit.bitwarden.data.tools.generator.repository.model.PasscodeGenerationOptions
 import com.x8bit.bitwarden.data.tools.generator.repository.model.UsernameGenerationOptions
 import com.x8bit.bitwarden.data.tools.generator.repository.util.FakeGeneratorRepository
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockPolicy
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.tools.feature.generator.GeneratorState.MainType.Username.UsernameType.ForwardedEmailAlias.ServiceType
 import com.x8bit.bitwarden.ui.tools.feature.generator.GeneratorState.MainType.Username.UsernameType.ForwardedEmailAlias.ServiceTypeOption
 import com.x8bit.bitwarden.ui.tools.feature.generator.model.GeneratorMode
@@ -403,7 +403,7 @@ class GeneratorViewModelTest : BaseViewModelTest() {
             val viewModel = createViewModel()
 
             fakeGeneratorRepository.setMockGeneratePasswordResult(
-                GeneratedPasswordResult.InvalidRequest,
+                GeneratedPasswordResult.InvalidRequest(error = Throwable("Fail")),
             )
 
             viewModel.trySendAction(GeneratorAction.RegenerateClick)
@@ -465,7 +465,7 @@ class GeneratorViewModelTest : BaseViewModelTest() {
             val viewModel = createViewModel(initialPassphraseState)
 
             fakeGeneratorRepository.setMockGeneratePassphraseResult(
-                GeneratedPassphraseResult.InvalidRequest,
+                GeneratedPassphraseResult.InvalidRequest(error = Throwable("Fail")),
             )
 
             viewModel.trySendAction(GeneratorAction.RegenerateClick)
@@ -490,15 +490,14 @@ class GeneratorViewModelTest : BaseViewModelTest() {
 
             viewModel.trySendAction(GeneratorAction.RegenerateClick)
 
-            val expectedState =
-                initialPasscodeState.copy(
-                    generatedText = "email+abcd1234@address.com",
-                    selectedType = GeneratorState.MainType.Username(
-                        GeneratorState.MainType.Username.UsernameType.PlusAddressedEmail(
-                            email = "currentEmail",
-                        ),
+            val expectedState = initialPasscodeState.copy(
+                generatedText = "email+abcd1234@address.com",
+                selectedType = GeneratorState.MainType.Username(
+                    GeneratorState.MainType.Username.UsernameType.PlusAddressedEmail(
+                        email = "currentEmail",
                     ),
-                )
+                ),
+            )
 
             assertEquals(expectedState, viewModel.stateFlow.value)
         }
@@ -514,16 +513,37 @@ class GeneratorViewModelTest : BaseViewModelTest() {
 
             viewModel.trySendAction(GeneratorAction.RegenerateClick)
 
-            val expectedState =
-                initialCatchAllEmailState.copy(
-                    generatedText = "DifferentUsername",
-                    selectedType = GeneratorState.MainType.Username(
-                        GeneratorState.MainType.Username.UsernameType.CatchAllEmail(
-                            domainName = "defaultDomain",
+            val expectedState = initialCatchAllEmailState.copy(
+                generatedText = "DifferentUsername",
+                selectedType = GeneratorState.MainType.Username(
+                    GeneratorState.MainType.Username.UsernameType.CatchAllEmail(
+                        domainName = "defaultDomain",
+                    ),
+                ),
+            )
+
+            assertEquals(expectedState, viewModel.stateFlow.value)
+        }
+
+    @Suppress("MaxLineLength")
+    @Test
+    fun `RegenerateClick for catch all email state should update the catch all email correctly when domain name is blank`() =
+        runTest {
+            val initialState = createCatchAllEmailState(domain = "")
+            val viewModel = createViewModel(createSavedStateHandleWithState(initialState))
+            val expectedState = initialState.copy(generatedText = "-")
+
+            viewModel.eventFlow.test {
+                viewModel.trySendAction(GeneratorAction.RegenerateClick)
+                assertEquals(
+                    GeneratorEvent.ShowSnackbar(
+                        message = R.string.validation_field_required.asText(
+                            R.string.domain_name.asText(),
                         ),
                     ),
+                    awaitItem(),
                 )
-
+            }
             assertEquals(expectedState, viewModel.stateFlow.value)
         }
 
@@ -539,13 +559,12 @@ class GeneratorViewModelTest : BaseViewModelTest() {
 
             viewModel.trySendAction(GeneratorAction.RegenerateClick)
 
-            val expectedState =
-                initialCatchAllEmailState.copy(
-                    generatedText = "DifferentUsername",
-                    selectedType = GeneratorState.MainType.Username(
-                        GeneratorState.MainType.Username.UsernameType.RandomWord(),
-                    ),
-                )
+            val expectedState = initialCatchAllEmailState.copy(
+                generatedText = "DifferentUsername",
+                selectedType = GeneratorState.MainType.Username(
+                    GeneratorState.MainType.Username.UsernameType.RandomWord(),
+                ),
+            )
 
             assertEquals(expectedState, viewModel.stateFlow.value)
         }

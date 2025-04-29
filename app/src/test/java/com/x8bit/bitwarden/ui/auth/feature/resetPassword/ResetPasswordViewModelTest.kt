@@ -2,10 +2,12 @@ package com.x8bit.bitwarden.ui.auth.feature.resetPassword
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
 import com.x8bit.bitwarden.data.auth.datasource.sdk.model.PasswordStrength
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.PasswordStrengthResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResetPasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
@@ -15,7 +17,6 @@ import com.x8bit.bitwarden.ui.auth.feature.resetpassword.ResetPasswordEvent
 import com.x8bit.bitwarden.ui.auth.feature.resetpassword.ResetPasswordState
 import com.x8bit.bitwarden.ui.auth.feature.resetpassword.ResetPasswordViewModel
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -37,12 +38,16 @@ class ResetPasswordViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `ConfirmLogoutClick logs out`() = runTest {
-        every { authRepository.logout() } just runs
+        every { authRepository.logout(reason = any()) } just runs
 
         val viewModel = createViewModel()
         viewModel.trySendAction(ResetPasswordAction.ConfirmLogoutClick)
 
-        verify { authRepository.logout() }
+        verify(exactly = 1) {
+            authRepository.logout(
+                reason = LogoutReason.Click(source = "ResetPasswordViewModel"),
+            )
+        }
     }
 
     @Test
@@ -170,12 +175,13 @@ class ResetPasswordViewModelTest : BaseViewModelTest() {
     fun `SubmitClicked with error for validating current password shows error alert`() {
         val currentPassword = "CurrentTest123"
         val password = "Test123"
+        val error = Throwable("Fail!")
         coEvery {
             authRepository.validatePasswordAgainstPolicies(password)
         } returns true
         coEvery {
             authRepository.validatePassword(currentPassword)
-        } returns ValidatePasswordResult.Error
+        } returns ValidatePasswordResult.Error(error = error)
         coEvery {
             authRepository.getPasswordStrength(password = any())
         } returns PasswordStrengthResult.Success(passwordStrength = PasswordStrength.LEVEL_0)
@@ -192,6 +198,7 @@ class ResetPasswordViewModelTest : BaseViewModelTest() {
                 dialogState = ResetPasswordState.DialogState.Error(
                     title = R.string.an_error_has_occurred.asText(),
                     message = R.string.generic_error_message.asText(),
+                    error = error,
                 ),
                 currentPasswordInput = currentPassword,
                 passwordInput = password,

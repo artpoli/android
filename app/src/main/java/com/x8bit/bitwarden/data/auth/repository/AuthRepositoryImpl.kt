@@ -2,42 +2,51 @@ package com.x8bit.bitwarden.data.auth.repository
 
 import com.bitwarden.core.AuthRequestMethod
 import com.bitwarden.core.InitUserCryptoMethod
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
+import com.bitwarden.core.data.util.asFailure
+import com.bitwarden.core.data.util.asSuccess
+import com.bitwarden.core.data.util.flatMap
 import com.bitwarden.crypto.HashPurpose
 import com.bitwarden.crypto.Kdf
+import com.bitwarden.data.datasource.disk.ConfigDiskSource
+import com.bitwarden.data.manager.DispatcherManager
+import com.bitwarden.data.repository.util.toEnvironmentUrls
+import com.bitwarden.network.model.DeleteAccountResponseJson
+import com.bitwarden.network.model.GetTokenResponseJson
+import com.bitwarden.network.model.IdentityTokenAuthModel
+import com.bitwarden.network.model.OrganizationType
+import com.bitwarden.network.model.PasswordHintResponseJson
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.PrevalidateSsoResponseJson
+import com.bitwarden.network.model.RefreshTokenResponseJson
+import com.bitwarden.network.model.RegisterFinishRequestJson
+import com.bitwarden.network.model.RegisterRequestJson
+import com.bitwarden.network.model.RegisterResponseJson
+import com.bitwarden.network.model.ResendEmailRequestJson
+import com.bitwarden.network.model.ResendNewDeviceOtpRequestJson
+import com.bitwarden.network.model.ResetPasswordRequestJson
+import com.bitwarden.network.model.SendVerificationEmailRequestJson
+import com.bitwarden.network.model.SendVerificationEmailResponseJson
+import com.bitwarden.network.model.SetPasswordRequestJson
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.network.model.TrustedDeviceUserDecryptionOptionsJson
+import com.bitwarden.network.model.TwoFactorAuthMethod
+import com.bitwarden.network.model.TwoFactorDataModel
+import com.bitwarden.network.model.VerifyEmailTokenRequestJson
+import com.bitwarden.network.model.VerifyEmailTokenResponseJson
+import com.bitwarden.network.service.AccountsService
+import com.bitwarden.network.service.DevicesService
+import com.bitwarden.network.service.HaveIBeenPwnedService
+import com.bitwarden.network.service.IdentityService
+import com.bitwarden.network.service.OrganizationService
+import com.bitwarden.network.util.isSslHandShakeError
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
-import com.x8bit.bitwarden.data.auth.datasource.disk.model.NewDeviceNoticeDisplayStatus
-import com.x8bit.bitwarden.data.auth.datasource.disk.model.NewDeviceNoticeState
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.DeleteAccountResponseJson
 import com.x8bit.bitwarden.data.auth.datasource.network.model.DeviceDataModel
-import com.x8bit.bitwarden.data.auth.datasource.network.model.GetTokenResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.IdentityTokenAuthModel
-import com.x8bit.bitwarden.data.auth.datasource.network.model.PasswordHintResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.PrevalidateSsoResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.RefreshTokenResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterFinishRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.RegisterResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendEmailRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.ResendNewDeviceOtpRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.ResetPasswordRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.SendVerificationEmailResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.SetPasswordRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserDecryptionOptionsJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorAuthMethod
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorDataModel
-import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyEmailTokenRequestJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.VerifyEmailTokenResponseJson
-import com.x8bit.bitwarden.data.auth.datasource.network.service.AccountsService
-import com.x8bit.bitwarden.data.auth.datasource.network.service.DevicesService
-import com.x8bit.bitwarden.data.auth.datasource.network.service.HaveIBeenPwnedService
-import com.x8bit.bitwarden.data.auth.datasource.network.service.IdentityService
-import com.x8bit.bitwarden.data.auth.datasource.network.service.OrganizationService
 import com.x8bit.bitwarden.data.auth.datasource.sdk.AuthSdkSource
 import com.x8bit.bitwarden.data.auth.datasource.sdk.util.toInt
 import com.x8bit.bitwarden.data.auth.datasource.sdk.util.toKdfTypeJson
@@ -50,7 +59,9 @@ import com.x8bit.bitwarden.data.auth.repository.model.BreachCountResult
 import com.x8bit.bitwarden.data.auth.repository.model.DeleteAccountResult
 import com.x8bit.bitwarden.data.auth.repository.model.EmailTokenResult
 import com.x8bit.bitwarden.data.auth.repository.model.KnownDeviceResult
+import com.x8bit.bitwarden.data.auth.repository.model.LeaveOrganizationResult
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.NewSsoUserResult
 import com.x8bit.bitwarden.data.auth.repository.model.OrganizationDomainSsoDetailsResult
 import com.x8bit.bitwarden.data.auth.repository.model.PasswordHintResult
@@ -97,28 +108,18 @@ import com.x8bit.bitwarden.data.auth.repository.util.userSwitchingChangesFlow
 import com.x8bit.bitwarden.data.auth.util.KdfParamsConstants.DEFAULT_PBKDF2_ITERATIONS
 import com.x8bit.bitwarden.data.auth.util.YubiKeyResult
 import com.x8bit.bitwarden.data.auth.util.toSdkParams
-import com.x8bit.bitwarden.data.platform.datasource.disk.ConfigDiskSource
-import com.x8bit.bitwarden.data.platform.datasource.network.util.isSslHandShakeError
+import com.x8bit.bitwarden.data.platform.error.MissingPropertyException
+import com.x8bit.bitwarden.data.platform.error.NoActiveUserException
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
 import com.x8bit.bitwarden.data.platform.manager.LogsManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.PushManager
-import com.x8bit.bitwarden.data.platform.manager.dispatcher.DispatcherManager
 import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.model.FlagKey
 import com.x8bit.bitwarden.data.platform.manager.util.getActivePolicies
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
-import com.x8bit.bitwarden.data.platform.repository.util.toEnvironmentUrls
-import com.x8bit.bitwarden.data.platform.util.asFailure
-import com.x8bit.bitwarden.data.platform.util.asSuccess
-import com.x8bit.bitwarden.data.platform.util.flatMap
-import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.sdk.VaultSdkSource
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.VaultUnlockData
@@ -146,7 +147,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import java.time.ZonedDateTime
 import javax.inject.Singleton
 
 /**
@@ -238,6 +238,8 @@ class AuthRepositoryImpl(
      * the user can complete the login flow. This value is stored using the user ID.
      */
     private var passwordsToCheckMap = mutableMapOf<String, String>()
+
+    private var keyConnectorResponse: GetTokenResponseJson.Success? = null
 
     override var twoFactorResponse: GetTokenResponseJson.TwoFactorRequired? = null
 
@@ -400,8 +402,12 @@ class AuthRepositoryImpl(
             .syncOrgKeysFlow
             .onEach {
                 val userId = activeUserId ?: return@onEach
-                refreshAccessTokenSynchronously(userId)
-                vaultRepository.sync()
+                // TODO: [PM-20593] Investigate why tokens are explicitly refreshed.
+                refreshAccessTokenSynchronouslyInternal(
+                    userId = userId,
+                    logOutOnFailure = false,
+                )
+                vaultRepository.sync(forced = true)
             }
             // This requires the ioScope to ensure that refreshAccessTokenSynchronously
             // happens on a background thread
@@ -409,7 +415,7 @@ class AuthRepositoryImpl(
 
         pushManager
             .logoutFlow
-            .onEach { logout(userId = it.userId) }
+            .onEach { logout(userId = it.userId, reason = LogoutReason.Notification) }
             .launchIn(unconfinedScope)
 
         // When the policies for the user have been set, complete the login process.
@@ -467,7 +473,7 @@ class AuthRepositoryImpl(
         masterPassword: String,
     ): DeleteAccountResult {
         val profile = authDiskSource.userState?.activeAccount?.profile
-            ?: return DeleteAccountResult.Error(message = null)
+            ?: return DeleteAccountResult.Error(message = null, error = NoActiveUserException())
         mutableHasPendingAccountDeletionStateFlow.value = true
         return authSdkSource
             .hashPassword(
@@ -501,22 +507,17 @@ class AuthRepositoryImpl(
         fold(
             onFailure = {
                 clearPendingAccountDeletion()
-                DeleteAccountResult.Error(message = null)
+                DeleteAccountResult.Error(error = it, message = null)
             },
             onSuccess = { response ->
                 when (response) {
                     is DeleteAccountResponseJson.Invalid -> {
                         clearPendingAccountDeletion()
-                        DeleteAccountResult.Error(
-                            message = response.validationErrors
-                                ?.values
-                                ?.firstOrNull()
-                                ?.firstOrNull(),
-                        )
+                        DeleteAccountResult.Error(message = response.message, error = null)
                     }
 
                     DeleteAccountResponseJson.Success -> {
-                        logout()
+                        logout(reason = LogoutReason.AccountDelete)
                         DeleteAccountResult.Success
                     }
                 }
@@ -524,8 +525,10 @@ class AuthRepositoryImpl(
         )
 
     override suspend fun createNewSsoUser(): NewSsoUserResult {
-        val account = authDiskSource.userState?.activeAccount ?: return NewSsoUserResult.Failure
-        val orgIdentifier = rememberedOrgIdentifier ?: return NewSsoUserResult.Failure
+        val account = authDiskSource.userState?.activeAccount
+            ?: return NewSsoUserResult.Failure(error = NoActiveUserException())
+        val orgIdentifier = rememberedOrgIdentifier
+            ?: return NewSsoUserResult.Failure(error = MissingPropertyException("OrgIdentifier"))
         val userId = account.profile.userId
         return organizationService
             .getOrganizationAutoEnrollStatus(orgIdentifier)
@@ -577,7 +580,7 @@ class AuthRepositoryImpl(
             }
             .fold(
                 onSuccess = { NewSsoUserResult.Success },
-                onFailure = { NewSsoUserResult.Failure },
+                onFailure = { NewSsoUserResult.Failure(error = it) },
             )
     }
 
@@ -586,10 +589,13 @@ class AuthRepositoryImpl(
         asymmetricalKey: String,
     ): LoginResult {
         val profile = authDiskSource.userState?.activeAccount?.profile
-            ?: return LoginResult.Error(errorMessage = null)
+            ?: return LoginResult.Error(errorMessage = null, error = NoActiveUserException())
         val userId = profile.userId
         val privateKey = authDiskSource.getPrivateKey(userId = userId)
-            ?: return LoginResult.Error(errorMessage = null)
+            ?: return LoginResult.Error(
+                errorMessage = null,
+                error = MissingPropertyException("Private Key"),
+            )
 
         checkForVaultUnlockError(
             onVaultUnlockError = { error ->
@@ -639,7 +645,7 @@ class AuthRepositoryImpl(
             onFailure = { throwable ->
                 when {
                     throwable.isSslHandShakeError() -> LoginResult.CertificateError
-                    else -> LoginResult.Error(errorMessage = null)
+                    else -> LoginResult.Error(errorMessage = null, error = throwable)
                 }
             },
             onSuccess = { it },
@@ -688,7 +694,10 @@ class AuthRepositoryImpl(
                 orgIdentifier = orgIdentifier,
             )
         }
-        ?: LoginResult.Error(errorMessage = null)
+        ?: LoginResult.Error(
+            errorMessage = null,
+            error = MissingPropertyException("Identity Token Auth Model"),
+        )
 
     override suspend fun login(
         email: String,
@@ -708,7 +717,29 @@ class AuthRepositoryImpl(
                 orgIdentifier = orgIdentifier,
             )
         }
-        ?: LoginResult.Error(errorMessage = null)
+        ?: LoginResult.Error(
+            errorMessage = null,
+            error = MissingPropertyException("Identity Token Auth Model"),
+        )
+
+    override suspend fun continueKeyConnectorLogin(): LoginResult {
+        val response = keyConnectorResponse ?: return LoginResult.Error(
+            errorMessage = null,
+            error = MissingPropertyException("Key Connector Response"),
+        )
+        return handleLoginCommonSuccess(
+            loginResponse = response,
+            email = rememberedEmailAddress.orEmpty(),
+            orgIdentifier = rememberedOrgIdentifier,
+            password = null,
+            deviceData = null,
+            userConfirmedKeyConnector = true,
+        )
+    }
+
+    override fun cancelKeyConnectorLogin() {
+        keyConnectorResponse = null
+    }
 
     override suspend fun login(
         email: String,
@@ -728,46 +759,24 @@ class AuthRepositoryImpl(
         orgIdentifier = organizationIdentifier,
     )
 
-    override fun refreshAccessTokenSynchronously(userId: String): Result<RefreshTokenResponseJson> {
-        val refreshToken = authDiskSource
-            .getAccountTokens(userId = userId)
-            ?.refreshToken
-            ?: return IllegalStateException("Must be logged in.").asFailure()
-        return identityService
-            .refreshTokenSynchronously(refreshToken)
-            .flatMap { refreshTokenResponse ->
-                // Check to make sure the user is still logged in after making the request
-                authDiskSource
-                    .userState
-                    ?.accounts
-                    ?.get(userId)
-                    ?.let { refreshTokenResponse.asSuccess() }
-                    ?: IllegalStateException("Must be logged in.").asFailure()
-            }
-            .onSuccess { refreshTokenResponse ->
-                // Update the existing UserState with updated token information
-                authDiskSource.storeAccountTokens(
-                    userId = userId,
-                    accountTokens = AccountTokensJson(
-                        accessToken = refreshTokenResponse.accessToken,
-                        refreshToken = refreshTokenResponse.refreshToken,
-                    ),
-                )
-            }
+    override fun refreshAccessTokenSynchronously(userId: String): Result<RefreshTokenResponseJson> =
+        refreshAccessTokenSynchronouslyInternal(
+            userId = userId,
+            logOutOnFailure = true,
+        )
+
+    override fun logout(reason: LogoutReason) {
+        activeUserId?.let { userId -> logout(userId = userId, reason = reason) }
     }
 
-    override fun logout() {
-        activeUserId?.let { userId -> logout(userId) }
-    }
-
-    override fun logout(userId: String) {
-        userLogoutManager.logout(userId = userId)
+    override fun logout(userId: String, reason: LogoutReason) {
+        userLogoutManager.logout(userId = userId, reason = reason)
     }
 
     override suspend fun requestOneTimePasscode(): RequestOtpResult =
         accountsService.requestOneTimePasscode()
             .fold(
-                onFailure = { RequestOtpResult.Error(it.message) },
+                onFailure = { RequestOtpResult.Error(message = it.message, error = it) },
                 onSuccess = { RequestOtpResult.Success },
             )
 
@@ -777,7 +786,7 @@ class AuthRepositoryImpl(
                 passcode = oneTimePasscode,
             )
             .fold(
-                onFailure = { VerifyOtpResult.NotVerified(it.message) },
+                onFailure = { VerifyOtpResult.NotVerified(errorMessage = it.message, error = it) },
                 onSuccess = { VerifyOtpResult.Verified },
             )
 
@@ -785,21 +794,27 @@ class AuthRepositoryImpl(
         resendEmailRequestJson
             ?.let { jsonRequest ->
                 accountsService.resendVerificationCodeEmail(body = jsonRequest).fold(
-                    onFailure = { ResendEmailResult.Error(message = it.message) },
+                    onFailure = { ResendEmailResult.Error(message = it.message, error = it) },
                     onSuccess = { ResendEmailResult.Success },
                 )
             }
-            ?: ResendEmailResult.Error(message = null)
+            ?: ResendEmailResult.Error(
+                message = null,
+                error = MissingPropertyException("Resend Email Request"),
+            )
 
     override suspend fun resendNewDeviceOtp(): ResendEmailResult =
         resendNewDeviceOtpRequestJson
             ?.let { jsonRequest ->
                 accountsService.resendNewDeviceOtp(body = jsonRequest).fold(
-                    onFailure = { ResendEmailResult.Error(message = it.message) },
+                    onFailure = { ResendEmailResult.Error(message = it.message, error = it) },
                     onSuccess = { ResendEmailResult.Success },
                 )
             }
-            ?: ResendEmailResult.Error(message = null)
+            ?: ResendEmailResult.Error(
+                message = null,
+                error = MissingPropertyException("Resend New Device OTP Request"),
+            )
 
     override fun switchAccount(userId: String): SwitchAccountResult {
         val currentUserState = authDiskSource.userState ?: return SwitchAccountResult.NoChange
@@ -901,7 +916,10 @@ class AuthRepositoryImpl(
                         is RegisterResponseJson.CaptchaRequired -> {
                             it.validationErrors.captchaKeys.firstOrNull()
                                 ?.let { key -> RegisterResult.CaptchaRequired(captchaId = key) }
-                                ?: RegisterResult.Error(errorMessage = null)
+                                ?: RegisterResult.Error(
+                                    errorMessage = null,
+                                    error = MissingPropertyException("Captcha ID"),
+                                )
                         }
 
                         is RegisterResponseJson.Success -> {
@@ -910,11 +928,11 @@ class AuthRepositoryImpl(
                         }
 
                         is RegisterResponseJson.Invalid -> {
-                            RegisterResult.Error(errorMessage = it.message)
+                            RegisterResult.Error(errorMessage = it.message, error = null)
                         }
                     }
                 },
-                onFailure = { RegisterResult.Error(errorMessage = null) },
+                onFailure = { RegisterResult.Error(errorMessage = null, error = it) },
             )
     }
 
@@ -922,11 +940,15 @@ class AuthRepositoryImpl(
         return accountsService.requestPasswordHint(email).fold(
             onSuccess = {
                 when (it) {
-                    is PasswordHintResponseJson.Error -> PasswordHintResult.Error(it.errorMessage)
+                    is PasswordHintResponseJson.Error -> PasswordHintResult.Error(
+                        message = it.errorMessage,
+                        error = null,
+                    )
+
                     PasswordHintResponseJson.Success -> PasswordHintResult.Success
                 }
             },
-            onFailure = { PasswordHintResult.Error(null) },
+            onFailure = { PasswordHintResult.Error(message = null, error = it) },
         )
     }
 
@@ -934,12 +956,12 @@ class AuthRepositoryImpl(
         val activeAccount = authDiskSource
             .userState
             ?.activeAccount
-            ?: return RemovePasswordResult.Error
+            ?: return RemovePasswordResult.Error(error = NoActiveUserException())
         val profile = activeAccount.profile
         val userId = profile.userId
         val userKey = authDiskSource
             .getUserKey(userId = userId)
-            ?: return RemovePasswordResult.Error
+            ?: return RemovePasswordResult.Error(error = MissingPropertyException("User Key"))
         val keyConnectorUrl = organizations
             .find {
                 it.shouldUseKeyConnector &&
@@ -947,7 +969,9 @@ class AuthRepositoryImpl(
                     it.type != OrganizationType.ADMIN
             }
             ?.keyConnectorUrl
-            ?: return RemovePasswordResult.Error
+            ?: return RemovePasswordResult.Error(
+                error = MissingPropertyException("Key Connector URL"),
+            )
         return keyConnectorManager
             .migrateExistingUserToKeyConnector(
                 userId = userId,
@@ -965,7 +989,7 @@ class AuthRepositoryImpl(
                 settingsRepository.setDefaultsIfNecessary(userId = userId)
             }
             .fold(
-                onFailure = { RemovePasswordResult.Error },
+                onFailure = { RemovePasswordResult.Error(error = it) },
                 onSuccess = { RemovePasswordResult.Success },
             )
     }
@@ -978,7 +1002,7 @@ class AuthRepositoryImpl(
         val activeAccount = authDiskSource
             .userState
             ?.activeAccount
-            ?: return ResetPasswordResult.Error
+            ?: return ResetPasswordResult.Error(error = NoActiveUserException())
         val currentPasswordHash = currentPassword?.let { password ->
             authSdkSource
                 .hashPassword(
@@ -988,7 +1012,7 @@ class AuthRepositoryImpl(
                     purpose = HashPurpose.SERVER_AUTHORIZATION,
                 )
                 .fold(
-                    onFailure = { return ResetPasswordResult.Error },
+                    onFailure = { return ResetPasswordResult.Error(error = it) },
                     onSuccess = { it },
                 )
         }
@@ -1034,7 +1058,7 @@ class AuthRepositoryImpl(
                     // Return the success.
                     ResetPasswordResult.Success
                 },
-                onFailure = { ResetPasswordResult.Error },
+                onFailure = { ResetPasswordResult.Error(error = it) },
             )
     }
 
@@ -1047,7 +1071,7 @@ class AuthRepositoryImpl(
         val activeAccount = authDiskSource
             .userState
             ?.activeAccount
-            ?: return SetPasswordResult.Error
+            ?: return SetPasswordResult.Error(error = NoActiveUserException())
         val userId = activeAccount.profile.userId
 
         // Update the saved master password hash.
@@ -1058,7 +1082,7 @@ class AuthRepositoryImpl(
                 kdf = activeAccount.profile.toSdkParams(),
                 purpose = HashPurpose.SERVER_AUTHORIZATION,
             )
-            .getOrElse { return@setPassword SetPasswordResult.Error }
+            .getOrElse { return@setPassword SetPasswordResult.Error(error = it) }
 
         return when (activeAccount.profile.forcePasswordResetReason) {
             ForcePasswordResetReason.TDE_USER_WITHOUT_PASSWORD_HAS_PASSWORD_RESET_PERMISSION -> {
@@ -1108,7 +1132,7 @@ class AuthRepositoryImpl(
                     }
             }
             .flatMap {
-                when (vaultRepository.unlockVaultWithMasterPassword(password)) {
+                when (val result = vaultRepository.unlockVaultWithMasterPassword(password)) {
                     is VaultUnlockResult.Success -> {
                         enrollUserInPasswordReset(
                             userId = userId,
@@ -1117,12 +1141,9 @@ class AuthRepositoryImpl(
                         )
                     }
 
-                    is VaultUnlockResult.AuthenticationError,
-                    VaultUnlockResult.BiometricDecodingError,
-                    VaultUnlockResult.InvalidStateError,
-                    VaultUnlockResult.GenericError,
-                        -> {
-                        IllegalStateException("Failed to unlock vault").asFailure()
+                    is VaultUnlockError -> {
+                        (result.error ?: IllegalStateException("Failed to unlock vault"))
+                            .asFailure()
                     }
                 }
             }
@@ -1132,7 +1153,7 @@ class AuthRepositoryImpl(
                 this.organizationIdentifier = null
             }
             .fold(
-                onFailure = { SetPasswordResult.Error },
+                onFailure = { SetPasswordResult.Error(error = it) },
                 onSuccess = { SetPasswordResult.Success },
             )
     }
@@ -1167,7 +1188,7 @@ class AuthRepositoryImpl(
                     verifiedDate = it.verifiedDate,
                 )
             },
-            onFailure = { OrganizationDomainSsoDetailsResult.Failure },
+            onFailure = { OrganizationDomainSsoDetailsResult.Failure(error = it) },
         )
 
     override suspend fun getVerifiedOrganizationDomainSsoDetails(
@@ -1182,7 +1203,7 @@ class AuthRepositoryImpl(
                     verifiedOrganizationDomainSsoDetails = it.verifiedOrganizationDomainSsoDetails,
                 )
             },
-            onFailure = { VerifiedOrganizationDomainSsoDetailsResult.Failure },
+            onFailure = { VerifiedOrganizationDomainSsoDetailsResult.Failure(error = it) },
         )
 
     override suspend fun prevalidateSso(
@@ -1192,22 +1213,23 @@ class AuthRepositoryImpl(
             organizationIdentifier = organizationIdentifier,
         )
         .fold(
-            onSuccess = {
-                when (it) {
+            onSuccess = { response ->
+                when (response) {
                     is PrevalidateSsoResponseJson.Error -> {
-                        PrevalidateSsoResult.Failure(message = it.message)
+                        PrevalidateSsoResult.Failure(message = response.message, error = null)
                     }
 
                     is PrevalidateSsoResponseJson.Success -> {
-                        if (it.token.isNullOrBlank()) {
-                            PrevalidateSsoResult.Failure()
-                        } else {
-                            PrevalidateSsoResult.Success(token = it.token)
-                        }
+                        response.token
+                            ?.takeUnless { it.isBlank() }
+                            ?.let { PrevalidateSsoResult.Success(token = it) }
+                            ?: PrevalidateSsoResult.Failure(
+                                error = MissingPropertyException("Token"),
+                            )
                     }
                 }
             },
-            onFailure = { PrevalidateSsoResult.Failure() },
+            onFailure = { PrevalidateSsoResult.Failure(error = it) },
         )
 
     override fun setSsoCallbackResult(result: SsoCallbackResult) {
@@ -1221,8 +1243,8 @@ class AuthRepositoryImpl(
                 deviceId = authDiskSource.uniqueAppId,
             )
             .fold(
-                onFailure = { KnownDeviceResult.Error },
-                onSuccess = { KnownDeviceResult.Success(it) },
+                onFailure = { KnownDeviceResult.Error(error = it) },
+                onSuccess = { KnownDeviceResult.Success(isKnownDevice = it) },
             )
 
     override suspend fun getPasswordBreachCount(password: String): BreachCountResult =
@@ -1249,11 +1271,11 @@ class AuthRepositoryImpl(
             )
             .fold(
                 onSuccess = { PasswordStrengthResult.Success(passwordStrength = it) },
-                onFailure = { PasswordStrengthResult.Error },
+                onFailure = { PasswordStrengthResult.Error(error = it) },
             )
 
     override suspend fun validatePassword(password: String): ValidatePasswordResult {
-        val userId = activeUserId ?: return ValidatePasswordResult.Error
+        val userId = activeUserId ?: return ValidatePasswordResult.Error(NoActiveUserException())
         return authDiskSource
             .getMasterPasswordHash(userId = userId)
             ?.let { masterPasswordHash ->
@@ -1265,13 +1287,13 @@ class AuthRepositoryImpl(
                     )
                     .fold(
                         onSuccess = { ValidatePasswordResult.Success(isValid = it) },
-                        onFailure = { ValidatePasswordResult.Error },
+                        onFailure = { ValidatePasswordResult.Error(error = it) },
                     )
             }
             ?: run {
                 val encryptedKey = authDiskSource
                     .getUserKey(userId)
-                    ?: return ValidatePasswordResult.Error
+                    ?: return ValidatePasswordResult.Error(MissingPropertyException("UserKey"))
                 vaultSdkSource
                     .validatePasswordUserKey(
                         userId = userId,
@@ -1301,10 +1323,12 @@ class AuthRepositoryImpl(
             .userState
             ?.activeAccount
             ?.profile
-            ?: return ValidatePinResult.Error
+            ?: return ValidatePinResult.Error(error = NoActiveUserException())
         val pinProtectedUserKey = authDiskSource
             .getPinProtectedUserKey(userId = activeAccount.userId)
-            ?: return ValidatePinResult.Error
+            ?: return ValidatePinResult.Error(
+                error = MissingPropertyException("Pin Protected User Key"),
+            )
         return vaultSdkSource
             .validatePin(
                 userId = activeAccount.userId,
@@ -1313,7 +1337,7 @@ class AuthRepositoryImpl(
             )
             .fold(
                 onSuccess = { ValidatePinResult.Success(isValid = it) },
-                onFailure = { ValidatePinResult.Error },
+                onFailure = { ValidatePinResult.Error(error = it) },
             )
     }
 
@@ -1339,7 +1363,10 @@ class AuthRepositoryImpl(
                 onSuccess = {
                     when (it) {
                         is SendVerificationEmailResponseJson.Invalid -> {
-                            SendVerificationEmailResult.Error(it.message)
+                            SendVerificationEmailResult.Error(
+                                errorMessage = it.message,
+                                error = null,
+                            )
                         }
 
                         is SendVerificationEmailResponseJson.Success -> {
@@ -1347,9 +1374,7 @@ class AuthRepositoryImpl(
                         }
                     }
                 },
-                onFailure = {
-                    SendVerificationEmailResult.Error(null)
-                },
+                onFailure = { SendVerificationEmailResult.Error(errorMessage = null, error = it) },
             )
 
     override suspend fun validateEmailToken(email: String, token: String): EmailTokenResult {
@@ -1365,15 +1390,13 @@ class AuthRepositoryImpl(
                     when (val json = it) {
                         VerifyEmailTokenResponseJson.Valid -> EmailTokenResult.Success
                         is VerifyEmailTokenResponseJson.Invalid -> {
-                            EmailTokenResult.Error(json.message)
+                            EmailTokenResult.Error(message = json.message, error = null)
                         }
 
                         VerifyEmailTokenResponseJson.TokenExpired -> EmailTokenResult.Expired
                     }
                 },
-                onFailure = {
-                    EmailTokenResult.Error(message = null)
-                },
+                onFailure = { EmailTokenResult.Error(message = null, error = it) },
             )
     }
 
@@ -1386,90 +1409,46 @@ class AuthRepositoryImpl(
         }
     }
 
-    override fun getNewDeviceNoticeState(): NewDeviceNoticeState? {
-        return activeUserId?.let { userId ->
-            authDiskSource.getNewDeviceNoticeState(userId = userId)
-        }
-    }
+    override suspend fun leaveOrganization(organizationId: String): LeaveOrganizationResult =
+        organizationService.leaveOrganization(organizationId).fold(
+            onSuccess = { LeaveOrganizationResult.Success },
+            onFailure = { LeaveOrganizationResult.Error(error = it) },
+        )
 
-    override fun setNewDeviceNoticeState(newState: NewDeviceNoticeState?) {
-        activeUserId?.let { userId ->
-            authDiskSource.storeNewDeviceNoticeState(userId = userId, newState = newState)
-        }
-    }
-
-    override fun checkUserNeedsNewDeviceTwoFactorNotice(): Boolean {
-        return activeUserId?.let { userId ->
-            val temporaryFlag = featureFlagManager.getFeatureFlag(FlagKey.NewDeviceTemporaryDismiss)
-            val permanentFlag = featureFlagManager.getFeatureFlag(FlagKey.NewDevicePermanentDismiss)
-
-            // check if feature flags are disabled
-            if (!temporaryFlag && !permanentFlag) {
-                return false
+    private fun refreshAccessTokenSynchronouslyInternal(
+        userId: String,
+        logOutOnFailure: Boolean,
+    ): Result<RefreshTokenResponseJson> {
+        val refreshToken = authDiskSource
+            .getAccountTokens(userId = userId)
+            ?.refreshToken
+            ?: return IllegalStateException("Must be logged in.").asFailure()
+        return identityService
+            .refreshTokenSynchronously(refreshToken)
+            .flatMap { refreshTokenResponse ->
+                // Check to make sure the user is still logged in after making the request
+                authDiskSource
+                    .userState
+                    ?.accounts
+                    ?.get(userId)
+                    ?.let { refreshTokenResponse.asSuccess() }
+                    ?: IllegalStateException("Must be logged in.").asFailure()
             }
-
-            if (!newDeviceNoticePreConditionsValid()) {
-                return false
+            .onFailure {
+                if (logOutOnFailure) {
+                    logout(userId = userId, reason = LogoutReason.TokenRefreshFail)
+                }
             }
-
-            val newDeviceNoticeState = authDiskSource.getNewDeviceNoticeState(userId = userId)
-            return when (newDeviceNoticeState.displayStatus) {
-                // if the user has already attested email access but permanent flag is enabled,
-                // the notice needs to appear again
-                NewDeviceNoticeDisplayStatus.CAN_ACCESS_EMAIL -> permanentFlag
-                // if the user has already seen but 7 days have already passed,
-                // the notice needs to appear again
-                NewDeviceNoticeDisplayStatus.HAS_SEEN ->
-                    newDeviceNoticeState.shouldDisplayNoticeIfSeen
-
-                NewDeviceNoticeDisplayStatus.HAS_NOT_SEEN -> true
-                // the user never needs to see the notice again
-                NewDeviceNoticeDisplayStatus.CAN_ACCESS_EMAIL_PERMANENT -> false
+            .onSuccess { refreshTokenResponse ->
+                // Update the existing UserState with updated token information
+                authDiskSource.storeAccountTokens(
+                    userId = userId,
+                    accountTokens = AccountTokensJson(
+                        accessToken = refreshTokenResponse.accessToken,
+                        refreshToken = refreshTokenResponse.refreshToken,
+                    ),
+                )
             }
-        }
-            ?: false
-    }
-
-    /**
-     * Checks if the preconditions are met for a user to see a new device notice:
-     * - Must be a Bitwarden cloud user.
-     * - The account must be at least one week old.
-     * - Cannot have an active policy requiring SSO to be enabled.
-     * - Cannot have two-factor authentication enabled.
-     */
-    private fun newDeviceNoticePreConditionsValid(): Boolean {
-        val checkEnvironment = !featureFlagManager.getFeatureFlag(FlagKey.IgnoreEnvironmentCheck)
-        val isSelfHosted = environmentRepository.environment.type == Environment.Type.SELF_HOSTED
-        if (checkEnvironment && isSelfHosted) {
-            return false
-        }
-
-        val userProfile = authDiskSource.userState?.activeAccount?.profile
-        val isProfileAtLeastWeekOld = userProfile
-            ?.let {
-                it.creationDate
-                    ?.plusWeeks(1)
-                    ?.isBefore(
-                        ZonedDateTime.now(),
-                    )
-            }
-            ?: false
-        if (!isProfileAtLeastWeekOld) {
-            return false
-        }
-
-        val hasTwoFactorEnabled = userProfile
-            ?.isTwoFactorEnabled
-            ?: false
-        if (hasTwoFactorEnabled) {
-            return false
-        }
-
-        val hasSSOPolicy =
-            policyManager.getActivePolicies(type = PolicyTypeJson.REQUIRE_SSO)
-                .any { p -> p.isEnabled }
-
-        return !hasSSOPolicy
     }
 
     @Suppress("CyclomaticComplexMethod")
@@ -1619,6 +1598,7 @@ class AuthRepositoryImpl(
      * A helper function to extract the common logic of logging in through
      * any of the available methods.
      */
+    @Suppress("LongMethod")
     private suspend fun loginCommon(
         email: String,
         password: String? = null,
@@ -1645,7 +1625,10 @@ class AuthRepositoryImpl(
                         LoginResult.UnofficialServerError
                     }
 
-                    else -> LoginResult.Error(errorMessage = null)
+                    else -> LoginResult.Error(
+                        errorMessage = null,
+                        error = throwable,
+                    )
                 }
             },
             onSuccess = { loginResponse ->
@@ -1667,6 +1650,7 @@ class AuthRepositoryImpl(
                         password = password,
                         deviceData = deviceData,
                         orgIdentifier = orgIdentifier,
+                        userConfirmedKeyConnector = false,
                     )
 
                     is GetTokenResponseJson.Invalid -> {
@@ -1681,6 +1665,7 @@ class AuthRepositoryImpl(
                             is GetTokenResponseJson.Invalid.InvalidType.GenericInvalid -> {
                                 LoginResult.Error(
                                     errorMessage = loginResponse.errorMessage,
+                                    error = null,
                                 )
                             }
                         }
@@ -1699,6 +1684,7 @@ class AuthRepositoryImpl(
         password: String?,
         deviceData: DeviceDataModel?,
         orgIdentifier: String?,
+        userConfirmedKeyConnector: Boolean,
     ): LoginResult = userStateTransaction {
         val userStateJson = loginResponse.toUserState(
             previousUserState = authDiskSource.userState,
@@ -1728,6 +1714,21 @@ class AuthRepositoryImpl(
                     deviceData = deviceData,
                 )
             } else if (keyConnectorUrl != null && orgIdentifier != null) {
+                val isNewKeyConnectorUser =
+                    loginResponse.userDecryptionOptions?.hasMasterPassword == false &&
+                        loginResponse.key == null &&
+                        loginResponse.privateKey == null
+                val isNotConfirmed = !userConfirmedKeyConnector
+
+                // If a new KeyConnector user is logging in for the first time,
+                // we should ask him to confirm the domain
+                if (isNewKeyConnectorUser && isNotConfirmed) {
+                    keyConnectorResponse = loginResponse
+                    return LoginResult.ConfirmKeyConnectorDomain(
+                        domain = keyConnectorUrl,
+                    )
+                }
+
                 unlockVaultWithKeyConnectorOnLoginSuccess(
                     profile = profile,
                     keyConnectorUrl = keyConnectorUrl,
@@ -1801,6 +1802,7 @@ class AuthRepositoryImpl(
         resendEmailRequestJson = null
         twoFactorDeviceData = null
         resendNewDeviceOtpRequestJson = null
+        keyConnectorResponse = null
         settingsRepository.setDefaultsIfNecessary(userId = userId)
         settingsRepository.storeUserHasLoggedInValue(userId)
         vaultRepository.syncIfNecessary()
@@ -1854,17 +1856,20 @@ class AuthRepositoryImpl(
     /**
      * Attempt to unlock the current user's vault with key connector data.
      */
+    @Suppress("LongMethod")
     private suspend fun unlockVaultWithKeyConnectorOnLoginSuccess(
         profile: AccountJson.Profile,
         keyConnectorUrl: String,
         orgIdentifier: String,
         loginResponse: GetTokenResponseJson.Success,
-    ): VaultUnlockResult? =
-        if (loginResponse.userDecryptionOptions?.hasMasterPassword != false) {
+    ): VaultUnlockResult? {
+        val key = loginResponse.key
+        val privateKey = loginResponse.privateKey
+        return if (loginResponse.userDecryptionOptions?.hasMasterPassword != false) {
             // This user has a master password, so we skip the key-connector logic as it is not
             // setup yet. The user can still unlock the vault with their master password.
             null
-        } else if (loginResponse.key != null && loginResponse.privateKey != null) {
+        } else if (key != null && privateKey != null) {
             // This is a returning user who should already have the key connector setup
             keyConnectorManager
                 .getMasterKeyFromKeyConnector(
@@ -1874,16 +1879,16 @@ class AuthRepositoryImpl(
                 .map {
                     unlockVault(
                         accountProfile = profile,
-                        privateKey = loginResponse.privateKey,
+                        privateKey = privateKey,
                         initUserCryptoMethod = InitUserCryptoMethod.KeyConnector(
                             masterKey = it.masterKey,
-                            userKey = loginResponse.key,
+                            userKey = key,
                         ),
                     )
                 }
                 .fold(
                     // If the request failed, we want to abort the login process
-                    onFailure = { VaultUnlockResult.GenericError },
+                    onFailure = { VaultUnlockResult.GenericError(error = it) },
                     onSuccess = { it },
                 )
         } else {
@@ -1923,10 +1928,11 @@ class AuthRepositoryImpl(
                 }
                 .fold(
                     // If the request failed, we want to abort the login process
-                    onFailure = { VaultUnlockResult.GenericError },
+                    onFailure = { VaultUnlockResult.GenericError(error = it) },
                     onSuccess = { it },
                 )
         }
+    }
 
     /**
      * Attempt to unlock the current user's vault with password data.
@@ -1960,11 +1966,13 @@ class AuthRepositoryImpl(
     ): VaultUnlockResult? {
         // Attempt to unlock the vault with auth request if possible.
         // These values will only be null during the Just-in-Time provisioning flow.
-        if (loginResponse.privateKey != null && loginResponse.key != null) {
+        val privateKey = loginResponse.privateKey
+        val key = loginResponse.key
+        if (privateKey != null && key != null) {
             deviceData?.let { model ->
                 return unlockVault(
                     accountProfile = profile,
-                    privateKey = loginResponse.privateKey,
+                    privateKey = privateKey,
                     initUserCryptoMethod = InitUserCryptoMethod.AuthRequest(
                         requestPrivateKey = model.privateKey,
                         method = model
@@ -1972,7 +1980,7 @@ class AuthRepositoryImpl(
                             ?.let {
                                 AuthRequestMethod.MasterKey(
                                     protectedMasterKey = model.asymmetricalKey,
-                                    authRequestKey = loginResponse.key,
+                                    authRequestKey = key,
                                 )
                             }
                             ?: AuthRequestMethod.UserKey(protectedUserKey = model.asymmetricalKey),

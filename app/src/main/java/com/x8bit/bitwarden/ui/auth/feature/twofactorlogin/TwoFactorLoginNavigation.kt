@@ -1,3 +1,5 @@
+@file:OmitFromCoverage
+
 package com.x8bit.bitwarden.ui.auth.feature.twofactorlogin
 
 import androidx.lifecycle.SavedStateHandle
@@ -6,9 +8,9 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.x8bit.bitwarden.data.platform.annotation.OmitFromCoverage
-import com.x8bit.bitwarden.data.platform.datasource.network.util.base64UrlDecodeOrNull
-import com.x8bit.bitwarden.data.platform.datasource.network.util.base64UrlEncode
+import com.bitwarden.core.annotation.OmitFromCoverage
+import com.bitwarden.network.util.base64UrlDecodeOrNull
+import com.bitwarden.network.util.base64UrlEncode
 import com.x8bit.bitwarden.ui.platform.base.util.composableWithSlideTransitions
 
 private const val EMAIL_ADDRESS = "email_address"
@@ -25,7 +27,6 @@ private const val TWO_FACTOR_LOGIN_ROUTE =
 /**
  * Class to retrieve Two-Factor Login arguments from the [SavedStateHandle].
  */
-@OmitFromCoverage
 data class TwoFactorLoginArgs(
     val emailAddress: String,
     val password: String?,

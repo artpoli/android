@@ -620,6 +620,10 @@ Kod otomatik olarak taranacaktır.</string>
   <string name="deletion_date_info">Bu Send belirtilen tarih ve saatte kalıcı olacak silinecek.</string>
   <string name="pending_delete">Silinmesi bekleniyor</string>
   <string name="expired">Süresi dolmuş</string>
+  <string name="expires_at">Expires at %s</string>
+  <string name="expires_tomorrow">Expires tomorrow</string>
+  <string name="expires_on">%s tarihinde süresi dolacak</string>
+  <string name="stops_logging_on">Stops logging on %1$s at %2$s</string>
   <string name="maximum_access_count">Maksimum erişim sayısı</string>
   <string name="maximum_access_count_info">Bunu ayarlarsanız maksimum erişim sayısına ulaşıldıktan sonra bu Send\'e erişilemeyecektir.</string>
   <string name="maximum_access_count_reached">Maksimum erişim sayısına ulaşıldı</string>
@@ -772,7 +776,9 @@ Kod otomatik olarak taranacaktır.</string>
   <string name="forwarded_email_alias">İletilen e-posta maskesi</string>
   <string name="random_word">Rastgele kelime</string>
   <string name="email_required_parenthesis">E-posta (gerekli)</string>
+  <string name="domain_name">alan adı</string>
   <string name="domain_name_required_parenthesis">Alan adı (gerekli)</string>
+  <string name="api_key">API anahtarı</string>
   <string name="api_key_required_parenthesis">API anahtarı (gerekli)</string>
   <string name="service">Servis</string>
   <string name="addy_io">addy.io</string>
@@ -781,6 +787,7 @@ Kod otomatik olarak taranacaktır.</string>
   <string name="duck_duck_go">DuckDuckGo</string>
   <string name="fastmail">Fastmail</string>
   <string name="forward_email">ForwardEmail</string>
+  <string name="api_access_token_required_parenthesis">API erişim token\'ı (gerekli)</string>
   <string name="api_access_token">API erişim token\'ı</string>
   <string name="are_you_sure_you_want_to_overwrite_the_current_username">Kullanıcı adının üzerine kaydetmek istediğinizden emin misiniz?</string>
   <string name="generate_username">Kullanıcı adı oluştur</string>
@@ -962,7 +969,6 @@ Bu hesaba geçmek ister misiniz?</string>
   <string name="your_passkey_will_be_saved_to_your_bitwarden_vault_for_x">%1$s için geçiş anahtarınız Bitwarden kasasına kaydedilecektir</string>
   <string name="organization_unassigned_items_message_useu_description_long">.</string>
   <string name="organization_unassigned_items_message_self_host_041624_description_long"></string>
-  <string name="remind_me_later">Daha sonra hatırlat</string>
   <string name="notice">Dikkat</string>
   <string name="passkeys_not_supported_for_this_app">Bu uygulamada geçiş anahtarları desteklenmiyor</string>
   <string name="passkey_operation_failed_because_browser_is_not_privileged">Geçiş anahtarı eylemi başarısız oldu çünkü tarayıcı ayrıcalıklı değil</string>
@@ -971,10 +977,7 @@ Bu hesaba geçmek ister misiniz?</string>
   <string name="passkey_operation_failed_because_app_not_found_in_asset_links">Geçiş anahtarı eylemi başarısız oldu çünkü uygulama varlık bağlantılarında bulunamadı</string>
   <string name="passkey_operation_failed_because_app_could_not_be_verified">Geçiş anahtarı eylemi başarısız oldu çünkü uygulama doğrulanamadı</string>
   <string name="confirm_file_password">Dosya parolasını onaylayın</string>
-  <string name="continue_to_give_feedback">Puanlamaya devam etmek istiyor musunuz?</string>
-  <string name="continue_to_provide_feedback">Devam ederek yeni uygulamamıza puan verin!</string>
   <string name="file_password">Dosya parolası</string>
-  <string name="give_feedback">Geribildirim Gönder</string>
   <string name="password_protected">Parola Korumalı</string>
   <string name="password_used_to_export">Bu parola, bu dosyayı dışa ve içe aktarmak için kullanılacaktır</string>
   <string name="autofill_suggestion">Öneriyi otomatik doldur</string>
@@ -1138,17 +1141,10 @@ Bu hesaba geçmek ister misiniz?</string>
   <string name="copy_email">E-postayı kopyala</string>
   <string name="copy_phone">Telefon numarasını kopyala</string>
   <string name="copy_address">Adresi kopyala</string>
-  <string name="important_notice">Önemli uyarı</string>
-  <string name="bitwarden_will_soon_send_a_code_to_your_account_email_to_verify_logins_from_new_devices_in_february">Şubat 2025 itibarıyla Bitwarden, yeni cihazlardan yeni girişleri doğrulamanız için e-posta adresinize bir kod gönderecektir.</string>
-  <string name="do_you_have_reliable_access_to_your_email">%1$s adresinize sağlıklı bir şekilde erişebiliyor musunuz? </string>
-  <string name="yes_i_can_reliably_access_my_email">Evet, e-postalarıma sağlıklı bir şekilde erişebiliyorum</string>
   <string name="biometrics_no_longer_supported_title">Artık bu cihazda biyometri desteklenmiyor</string>
   <string name="biometrics_no_longer_supported">Cihazınızın biyometrisi en son güvenlik gereksinimlerini karşılamadığı için oturumunuz kapatıldı. Ayarları güncellemek için yeniden oturum açın veya erişim için yöneticinize başvurun.</string>
   <string name="cxp_import">CXP Import</string>
   <string name="cxp_export">CXP Export</string>
-  <string name="set_up_two_step_login">İki adımlı girişi ayarlayın</string>
-  <string name="you_can_set_up_two_step_login_as_an_alternative_way_to_protect_your_account_or_change_your_email_to_one_you_can_access">Hesabınızı korumanın alternatif bir yolu olarak iki adımlı girişi etkinleştirebilirsiniz. Aksi halde e-posta adresinizin doğru olduğundan emin olmalısınız.</string>
-  <string name="turn_on_two_step_login">İki adımlı girişi etkinleştir</string>
   <string name="change_account_email">Hesap e-postasını değiştir</string>
   <string name="choose_three_or_four_random_words">Choose three or four random words</string>
   <string name="pick_three_or_four_random_unrelated_words">Pick three or four random, unrelated words that you can easily remember. Think of <annotation emphasis="bold">objects, places, or things</annotation> you like.</string>
@@ -1162,7 +1158,6 @@ Bu hesaba geçmek ister misiniz?</string>
   <string name="we_couldnt_verify_the_servers_certificate">We couldn’t verify the server’s certificate. The certificate chain or proxy settings on your device or your Bitwarden server may not be set up correctly.</string>
   <string name="review_flow_launched">Review flow launched!</string>
   <string name="copy_private_key">Copy private key</string>
-  <string name="you_can_change_your_account_email_on_the_bitwarden_web_app">Hesap e-postanızı Bitwarden web uygulamasında değiştirebilirsiniz.</string>
   <string name="login_credentials">Hesap Bilgileri</string>
   <string name="autofill_options">Otomatik Doldurma Seçenekleri</string>
   <string name="use_this_button_to_generate_a_new_unique_password">Yeni ve benzersiz bir parola üretmek için bu düğmeyi kullanın.</string>
@@ -1206,18 +1201,17 @@ Bu hesaba geçmek ister misiniz?</string>
   <string name="system_certificates_are_not_as_secure_as_importing_certificates_to_bitwarden">Using a system certificate is less secure than storing the certificate with Bitwarden. Continuing will display a list of available system certificates if one is already installed.</string>
   <string name="certificate_alias_already_exists">Certificate alias already exists</string>
   <string name="link">Link</string>
-  <string name="passkey_operation_failed_because_app_is_signed_incorrectly">Passkey operation failed because app is signed incorrectly.</string>
   <string name="passkey_operation_failed_because_host_url_is_not_present_in_request">Passkey operation failed because host URL is not present in request.</string>
   <string name="passkey_operation_failed_because_app_signature_is_invalid">Passkey operation failed because app signature is invalid.</string>
   <string name="passkey_registration_failed_due_to_an_internal_error">Passkey registration failed due to an internal error.</string>
   <string name="passkey_operation_failed_because_relying_party_cannot_be_identified">Passkey operation failed because relying party cannot be identified.</string>
-  <string name="passkey_authentication_failed_due_to_an_internal_error">Passkey authentication failed due to an internal error.</string>
   <string name="passkey_operation_failed_because_the_selected_item_does_not_exist">Passkey operation failed because the selected item does not exist.</string>
   <string name="passkey_operation_failed_because_user_is_locked_out">Passkey operation failed because user is locked out.</string>
   <string name="passkey_operation_failed_because_user_verification_was_cancelled">Passkey operation failed because user verification was cancelled.</string>
   <string name="passkey_operation_failed_because_the_request_is_invalid">Passkey operation failed because the request is invalid.</string>
   <string name="passkey_operation_failed_because_user_verification_attempts_exceeded">Passkey operation failed because user verification attempts exceeded.</string>
   <string name="passkey_operation_failed_because_no_item_was_selected">Passkey operation failed because no item was selected.</string>
+  <string name="passkey_operation_failed_because_the_request_is_unsupported">İstek desteklenmediği için geçiş anahtarı işlemi başarısız oldu.</string>
   <string name="self_host_server_url">Kendi kendine barındırılan sunucu URL\'si</string>
   <string name="use_chrome_autofill_integration">Chrome otomatik doldurma entegrasyonunu kullan</string>
   <string name="use_chrome_beta_autofill_integration">Chrome otomatik doldurma entegrasyonunu kullan (Beta)</string>
@@ -1228,4 +1222,40 @@ Bu hesaba geçmek ister misiniz?</string>
   <string name="add_field">Alan ekle</string>
   <string name="x_ellipses">%s...</string>
   <string name="share_error_details">Share error details</string>
+  <string name="flight_recorder">Flight recorder</string>
+  <string name="flight_recorder_help">Flight recorder help</string>
+  <string name="view_recorded_logs">View recorded logs</string>
+  <string name="enable_flight_recorder_title">Enable flight recorder</string>
+  <string name="recorded_logs_title">Recorded logs</string>
+  <string name="no_logs_recorded">No logs recorded</string>
+  <string name="experiencing_an_issue">Sorun mu yaşıyorsunuz?</string>
+  <string name="enable_temporary_logging_to_collect_and_inspect_logs_locally">Enable temporary logging to collect and inspect logs locally. When enabled, application states and network calls may be logged—never sensitive vault information.</string>
+  <string name="to_get_started_set_a_logging_duration">To get started, set a logging duration. Logging  will automatically turn off after this period, giving you time to capture activity while reproducing  any issues.</string>
+  <string name="logs_will_be_automatically_deleted_after_30_days">Logs will be automatically deleted after 30 days. Bitwarden is only able to access your log data when you share it.</string>
+  <string name="for_details_on_what_is_and_isnt_logged">For details on what is and isn’t logged, visit the\n<annotation link="helpCenter">Bitwarden help center.</annotation></string>
+  <string name="logging_duration">Log kayıt süresi</string>
+  <string name="flight_recorder_one_hour">1 saat</string>
+  <string name="flight_recorder_eight_hours">8 saat</string>
+  <string name="flight_recorder_twenty_four_hours">24 saat</string>
+  <string name="flight_recorder_one_week">1 hafta</string>
+  <string name="delete_all">Delete all</string>
+  <string name="share_all">Share all</string>
+  <string name="unable_to_share">Paylaşılamadı</string>
+  <string name="please_try_again_or_select_a_different_log">Please try again or select a different log.</string>
+  <string name="the_log_file_you_are_trying_to_share_has_been_removed">The log file you are trying to share has been removed.</string>
+  <string name="delete_log">Delete log</string>
+  <string name="do_you_really_want_to_delete_this_log">Do you really want to delete this log?</string>
+  <string name="delete_logs">Delete logs</string>
+  <string name="do_you_really_want_to_delete_all_recorded_logs">Do you really want to delete all recorded logs?</string>
+  <string name="confirm_key_connector_domain">Confirm Key Connector domain</string>
+  <string name="key_connector_domain">Key Connector domain:</string>
+  <string name="key_connector_organization">Organization:</string>
+  <string name="password_no_longer_required_confirm_domain">A master password is no longer required for members of the following organization. Please confirm the domain below with your organization administrator.</string>
+  <string name="please_confirm_domain_with_admin">Please confirm the domain below with your organization administrator.\n\nKey Connector domain:\n%1$s</string>
+  <string name="flight_recorder_banner_title">Flight recorder on</string>
+  <string name="flight_recorder_banner_message">Flight recorder will be active until %1$s at %2$s. Return to settings to deactivate now.</string>
+  <string name="go_to_settings">Ayarlara git</string>
+  <string name="all_logs_deleted">All logs deleted</string>
+  <string name="log_deleted">Log deleted</string>
+  <string name="app_settings">Uygulama ayarları</string>
 </resources>

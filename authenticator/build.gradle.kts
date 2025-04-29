@@ -6,13 +6,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.crashlytics)
-    alias(libs.plugins.detekt)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlinx.kover)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.protobuf)
     alias(libs.plugins.google.services)
@@ -153,6 +151,11 @@ dependencies {
 
     implementation(files("libs/authenticatorbridge-1.0.0-release.aar"))
 
+    implementation(project(":core"))
+    implementation(project(":data"))
+    implementation(project(":network"))
+    implementation(project(":ui"))
+
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.autofill)
@@ -204,8 +207,14 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    // Pull in test fixtures from other modules.
+    testImplementation(testFixtures(project(":data")))
+    testImplementation(testFixtures(project(":network")))
+
     testImplementation(libs.androidx.compose.ui.test)
     testImplementation(libs.google.hilt.android.testing)
+    testImplementation(platform(libs.junit.bom))
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.junit.junit5)
     testImplementation(libs.junit.vintage)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -213,69 +222,6 @@ dependencies {
     testImplementation(libs.robolectric.robolectric)
     testImplementation(libs.square.okhttp.mockwebserver)
     testImplementation(libs.square.turbine)
-
-    detektPlugins(libs.detekt.detekt.formatting)
-    detektPlugins(libs.detekt.detekt.rules)
-}
-
-detekt {
-    autoCorrect = true
-    config.from(files("$rootDir/detekt-config.yml"))
-}
-
-kover {
-    currentProject {
-        sources {
-            excludeJava = true
-        }
-    }
-    reports {
-        filters {
-            excludes {
-                androidGeneratedClasses()
-                annotatedBy(
-                    // Compose previews
-                    "androidx.compose.ui.tooling.preview.Preview",
-                    // Manually excluded classes/files/etc.
-                    "com.bitwarden.authenticator.data.platform.annotation.OmitFromCoverage",
-                )
-                classes(
-                    // Navigation helpers
-                    "*.*NavigationKt*",
-                    // Composable singletons
-                    "*.*ComposableSingletons*",
-                    // Generated classes related to interfaces with default values
-                    "*.*DefaultImpls*",
-                    // Databases
-                    "*.database.*Database*",
-                    "*.dao.*Dao*",
-                    // Dagger Hilt
-                    "dagger.hilt.*",
-                    "hilt_aggregated_deps.*",
-                    "*_Factory",
-                    "*_Factory\$*",
-                    "*_*Factory",
-                    "*_*Factory\$*",
-                    "*.Hilt_*",
-                    "*_HiltModules",
-                    "*_HiltModules\$*",
-                    "*_Impl",
-                    "*_Impl\$*",
-                    "*_MembersInjector",
-                )
-                packages(
-                    // Dependency injection
-                    "*.di",
-                    // Models
-                    "*.model",
-                    // Custom UI components
-                    "com.bitwarden.authenticator.ui.platform.components",
-                    // Theme-related code
-                    "com.bitwarden.authenticator.ui.platform.theme",
-                )
-            }
-        }
-    }
 }
 
 protobuf {
@@ -291,30 +237,9 @@ protobuf {
     }
 }
 
-sonar {
-    properties {
-        property("sonar.projectKey", "bitwarden_authenticator-android")
-        property("sonar.organization", "bitwarden")
-        property("sonar.host.url", "https://sonarcloud.io")
-        property("sonar.sources", "authenticator/src/")
-        property("sonar.tests", "authenticator/src/")
-        property("sonar.test.inclusions", "authenticator/src/test/")
-        property("sonar.exclusions", "authenticator/src/test/")
-    }
-}
-
 tasks {
     withType<Test> {
         useJUnitPlatform()
-    }
-    getByName("sonar") {
-        dependsOn("check")
-    }
-    withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-        jvmTarget = libs.versions.jvmTarget.get()
-    }
-    withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
-        jvmTarget = libs.versions.jvmTarget.get()
     }
 }
 

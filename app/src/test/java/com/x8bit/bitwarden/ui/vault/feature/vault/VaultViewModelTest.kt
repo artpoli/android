@@ -1,14 +1,24 @@
 package com.x8bit.bitwarden.ui.vault.feature.vault
 
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.model.DataState
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.data.repository.util.baseIconUrl
+import com.bitwarden.network.model.OrganizationType
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.bitwarden.vault.CipherType
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.Organization
 import com.x8bit.bitwarden.data.auth.repository.model.SwitchAccountResult
 import com.x8bit.bitwarden.data.auth.repository.model.UserState
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
+import com.x8bit.bitwarden.data.platform.datasource.disk.model.FlightRecorderDataSet
 import com.x8bit.bitwarden.data.platform.manager.FeatureFlagManager
 import com.x8bit.bitwarden.data.platform.manager.FirstTimeActionManager
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
@@ -22,12 +32,6 @@ import com.x8bit.bitwarden.data.platform.manager.model.OrganizationEvent
 import com.x8bit.bitwarden.data.platform.manager.model.SpecialCircumstance
 import com.x8bit.bitwarden.data.platform.manager.network.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.repository.SettingsRepository
-import com.x8bit.bitwarden.data.platform.repository.model.DataState
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.platform.repository.util.baseIconUrl
-import com.x8bit.bitwarden.data.vault.datasource.network.model.OrganizationType
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCipherView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockCollectionView
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockFolderView
@@ -36,8 +40,6 @@ import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.GenerateTotpResult
 import com.x8bit.bitwarden.data.vault.repository.model.VaultData
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.components.model.AccountSummary
 import com.x8bit.bitwarden.ui.platform.components.snackbar.BitwardenSnackbarData
 import com.x8bit.bitwarden.ui.platform.manager.snackbar.SnackbarRelay
@@ -46,6 +48,7 @@ import com.x8bit.bitwarden.ui.vault.components.model.CreateVaultItemType
 import com.x8bit.bitwarden.ui.vault.feature.itemlisting.model.ListingItemOverflowAction
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterData
 import com.x8bit.bitwarden.ui.vault.feature.vault.model.VaultFilterType
+import com.x8bit.bitwarden.ui.vault.feature.vault.util.toSnackbarData
 import com.x8bit.bitwarden.ui.vault.feature.vault.util.toViewState
 import com.x8bit.bitwarden.ui.vault.model.VaultItemCipherType
 import com.x8bit.bitwarden.ui.vault.model.VaultItemListingType
@@ -53,7 +56,9 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.runs
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +66,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -115,14 +121,19 @@ class VaultViewModelTest : BaseViewModelTest() {
             every { userStateFlow } returns mutableUserStateFlow
             every { hasPendingAccountAddition } returns false
             every { hasPendingAccountAddition = any() } just runs
-            every { logout(any()) } just runs
+            every { logout(userId = any(), reason = any()) } just runs
             every { switchAccount(any()) } answers { switchAccountResult }
         }
 
+    private var mutableFlightRecorderDataFlow =
+        MutableStateFlow(FlightRecorderDataSet(data = emptySet()))
     private val settingsRepository: SettingsRepository = mockk {
         every { getPullToRefreshEnabledFlow() } returns mutablePullToRefreshEnabledFlow
         every { isIconLoadingDisabledFlow } returns mutableIsIconLoadingDisabledFlow
         every { isIconLoadingDisabled } returns false
+        every { flightRecorderData } returns FlightRecorderDataSet(data = emptySet())
+        every { flightRecorderDataFlow } returns mutableFlightRecorderDataFlow
+        every { dismissFlightRecorderBanner() } just runs
     }
 
     private val vaultRepository: VaultRepository =
@@ -131,8 +142,8 @@ class VaultViewModelTest : BaseViewModelTest() {
             every { vaultDataStateFlow } returns mutableVaultDataStateFlow
             every { sync(forced = any()) } just runs
             every { syncIfNecessary() } just runs
-            every { lockVaultForCurrentUser() } just runs
-            every { lockVault(any()) } just runs
+            every { lockVaultForCurrentUser(any()) } just runs
+            every { lockVault(any(), any()) } just runs
         }
 
     private val organizationEventManager = mockk<OrganizationEventManager> {
@@ -154,6 +165,11 @@ class VaultViewModelTest : BaseViewModelTest() {
 
     private val networkConnectionManager: NetworkConnectionManager = mockk {
         every { isNetworkConnected } returns true
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(FlightRecorderDataSet::toSnackbarData)
     }
 
     @Test
@@ -242,6 +258,7 @@ class VaultViewModelTest : BaseViewModelTest() {
                                 shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
+                                keyConnectorUrl = null,
                             ),
                         ),
                         trustedDevice = null,
@@ -328,6 +345,7 @@ class VaultViewModelTest : BaseViewModelTest() {
                                 shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
+                                keyConnectorUrl = null,
                             ),
                         ),
                         trustedDevice = null,
@@ -372,6 +390,52 @@ class VaultViewModelTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `Flight Recorder changes should update flightRecorderSnackbar accordingly`() = runTest {
+        mockkStatic(FlightRecorderDataSet::toSnackbarData)
+        val viewModel = createViewModel()
+
+        viewModel.stateFlow.test {
+            assertEquals(DEFAULT_STATE.copy(flightRecorderSnackBar = null), awaitItem())
+
+            val snackbarData = mockk<BitwardenSnackbarData>()
+            mutableFlightRecorderDataFlow.value = mockk<FlightRecorderDataSet> {
+                every { toSnackbarData(clock = clock) } returns snackbarData
+            }
+            assertEquals(DEFAULT_STATE.copy(flightRecorderSnackBar = snackbarData), awaitItem())
+
+            mutableFlightRecorderDataFlow.value = mockk<FlightRecorderDataSet> {
+                every { toSnackbarData(clock = clock) } returns null
+            }
+            assertEquals(DEFAULT_STATE.copy(flightRecorderSnackBar = null), awaitItem())
+        }
+    }
+
+    @Test
+    fun `on DismissFlightRecorderSnackbar should call dismissFlightRecorderBanner`() {
+        val viewModel = createViewModel()
+
+        viewModel.trySendAction(VaultAction.DismissFlightRecorderSnackbar)
+
+        verify(exactly = 1) {
+            settingsRepository.dismissFlightRecorderBanner()
+        }
+    }
+
+    @Test
+    fun `on FlightRecorderGoToSettingsClick should send NavigateToAbout`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.eventFlow.test {
+            viewModel.trySendAction(VaultAction.FlightRecorderGoToSettingsClick)
+            assertEquals(VaultEvent.NavigateToAbout, awaitItem())
+        }
+
+        verify(exactly = 1) {
+            settingsRepository.dismissFlightRecorderBanner()
+        }
+    }
+
+    @Test
     fun `on LockAccountClick should call lockVault for the given account`() {
         val accountUserId = "userId"
         val accountSummary = mockk<AccountSummary> {
@@ -382,7 +446,7 @@ class VaultViewModelTest : BaseViewModelTest() {
 
         viewModel.trySendAction(VaultAction.LockAccountClick(accountSummary))
 
-        verify { vaultRepository.lockVault(userId = accountUserId) }
+        verify { vaultRepository.lockVault(userId = accountUserId, isUserInitiated = true) }
     }
 
     @Suppress("MaxLineLength")
@@ -403,7 +467,12 @@ class VaultViewModelTest : BaseViewModelTest() {
             ),
             viewModel.stateFlow.value,
         )
-        verify { authRepository.logout(userId = accountUserId) }
+        verify(exactly = 1) {
+            authRepository.logout(
+                userId = accountUserId,
+                reason = LogoutReason.Click(source = "VaultViewModel"),
+            )
+        }
     }
 
     @Suppress("MaxLineLength")
@@ -424,7 +493,12 @@ class VaultViewModelTest : BaseViewModelTest() {
             ),
             viewModel.stateFlow.value,
         )
-        verify { authRepository.logout(userId = accountUserId) }
+        verify(exactly = 1) {
+            authRepository.logout(
+                userId = accountUserId,
+                reason = LogoutReason.Click(source = "VaultViewModel"),
+            )
+        }
     }
 
     @Suppress("MaxLineLength")
@@ -520,7 +594,7 @@ class VaultViewModelTest : BaseViewModelTest() {
         val viewModel = createViewModel()
         viewModel.trySendAction(VaultAction.LockClick)
         verify {
-            vaultRepository.lockVaultForCurrentUser()
+            vaultRepository.lockVaultForCurrentUser(isUserInitiated = true)
         }
     }
 
@@ -559,6 +633,7 @@ class VaultViewModelTest : BaseViewModelTest() {
                                 shouldManageResetPassword = false,
                                 shouldUseKeyConnector = false,
                                 role = OrganizationType.ADMIN,
+                                keyConnectorUrl = null,
                             ),
                         ),
                     ),
@@ -671,6 +746,11 @@ class VaultViewModelTest : BaseViewModelTest() {
                             id = "mockId-5",
                             name = "mockName-5".asText(),
                             itemCount = 1,
+                        ),
+                        VaultState.ViewState.FolderItem(
+                            id = null,
+                            name = R.string.folder_none.asText(),
+                            itemCount = 0,
                         ),
                     ),
                     collectionItems = listOf(
@@ -830,6 +910,11 @@ class VaultViewModelTest : BaseViewModelTest() {
                             name = "mockName-1".asText(),
                             itemCount = 1,
                         ),
+                        VaultState.ViewState.FolderItem(
+                            id = null,
+                            name = R.string.folder_none.asText(),
+                            itemCount = 0,
+                        ),
                     ),
                     collectionItems = listOf(
                         VaultState.ViewState.CollectionItem(
@@ -930,6 +1015,11 @@ class VaultViewModelTest : BaseViewModelTest() {
                                 name = "mockName-1".asText(),
                                 itemCount = 1,
                             ),
+                            VaultState.ViewState.FolderItem(
+                                id = null,
+                                name = R.string.folder_none.asText(),
+                                itemCount = 0,
+                            ),
                         ),
                         collectionItems = listOf(
                             VaultState.ViewState.CollectionItem(
@@ -1027,6 +1117,11 @@ class VaultViewModelTest : BaseViewModelTest() {
                                 id = "mockId-1",
                                 name = "mockName-1".asText(),
                                 itemCount = 1,
+                            ),
+                            VaultState.ViewState.FolderItem(
+                                id = null,
+                                name = R.string.folder_none.asText(),
+                                itemCount = 0,
                             ),
                         ),
                         collectionItems = listOf(
@@ -1481,7 +1576,7 @@ class VaultViewModelTest : BaseViewModelTest() {
 
             coEvery {
                 vaultRepository.generateTotp(totpCode, clock.instant())
-            } returns GenerateTotpResult.Error
+            } returns GenerateTotpResult.Error(error = Throwable("Fail"))
 
             val viewModel = createViewModel()
             viewModel.trySendAction(
@@ -1608,9 +1703,10 @@ class VaultViewModelTest : BaseViewModelTest() {
     fun `MasterPasswordRepromptSubmit for a request Error should show a generic error dialog`() =
         runTest {
             val password = "password"
+            val error = Throwable("Fail!")
             coEvery {
                 authRepository.validatePassword(password = password)
-            } returns ValidatePasswordResult.Error
+            } returns ValidatePasswordResult.Error(error = error)
 
             val viewModel = createViewModel()
             viewModel.stateFlow.test {
@@ -1635,6 +1731,7 @@ class VaultViewModelTest : BaseViewModelTest() {
                         dialog = VaultState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.generic_error_message.asText(),
+                            error = error,
                         ),
                     ),
                     awaitItem(),
@@ -1858,9 +1955,8 @@ class VaultViewModelTest : BaseViewModelTest() {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `when LifecycleResumed action is handled, PromptForAppReview is sent if flag is enabled and criteria is met`() =
+    fun `when LifecycleResumed action is handled, PromptForAppReview is sent if criteria is met`() =
         runTest {
-            every { featureFlagManager.getFeatureFlag(FlagKey.AppReviewPrompt) } returns true
             every { reviewPromptManager.shouldPromptForAppReview() } returns true
             val viewModel = createViewModel()
             viewModel.eventFlow.test {
@@ -1871,22 +1967,8 @@ class VaultViewModelTest : BaseViewModelTest() {
 
     @Suppress("MaxLineLength")
     @Test
-    fun `when LifecycleResumed action is handled, PromptForAppReview is not sent if flag is disabled`() =
-        runTest {
-            every { featureFlagManager.getFeatureFlag(FlagKey.AppReviewPrompt) } returns false
-            every { reviewPromptManager.shouldPromptForAppReview() } returns true
-            val viewModel = createViewModel()
-            viewModel.eventFlow.test {
-                viewModel.trySendAction(VaultAction.LifecycleResumed)
-                expectNoEvents()
-            }
-        }
-
-    @Suppress("MaxLineLength")
-    @Test
     fun `when LifecycleResumed action is handled, PromptForAppReview is not sent if criteria is not met`() =
         runTest {
-            every { featureFlagManager.getFeatureFlag(FlagKey.AppReviewPrompt) } returns true
             every { reviewPromptManager.shouldPromptForAppReview() } returns false
             val viewModel = createViewModel()
             viewModel.eventFlow.test {
@@ -1943,22 +2025,22 @@ class VaultViewModelTest : BaseViewModelTest() {
         )
     }
 
-    @Suppress("MaxLineLength")
     @Test
-    fun `InternetConnectionErrorReceived should show network error if no internet connection`() = runTest {
-        val viewModel = createViewModel()
-        viewModel.trySendAction(VaultAction.Internal.InternetConnectionErrorReceived)
-        assertEquals(
-            DEFAULT_STATE.copy(
-                isRefreshing = false,
-                dialog = VaultState.DialogState.Error(
-                    R.string.internet_connection_required_title.asText(),
-                    R.string.internet_connection_required_message.asText(),
+    fun `InternetConnectionErrorReceived should show network error if no internet connection`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.trySendAction(VaultAction.Internal.InternetConnectionErrorReceived)
+            assertEquals(
+                DEFAULT_STATE.copy(
+                    isRefreshing = false,
+                    dialog = VaultState.DialogState.Error(
+                        R.string.internet_connection_required_title.asText(),
+                        R.string.internet_connection_required_message.asText(),
+                    ),
                 ),
-            ),
-            viewModel.stateFlow.value,
-        )
-    }
+                viewModel.stateFlow.value,
+            )
+        }
 
     private fun createViewModel(): VaultViewModel =
         VaultViewModel(
@@ -2083,4 +2165,5 @@ private fun createMockVaultState(
         hasMasterPassword = true,
         showImportActionCard = true,
         isRefreshing = false,
+        flightRecorderSnackBar = null,
     )

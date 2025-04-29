@@ -1,28 +1,28 @@
 package com.x8bit.bitwarden.data.tools.generator.repository
 
 import app.cash.turbine.test
+import com.bitwarden.core.data.util.asFailure
+import com.bitwarden.core.data.util.asSuccess
+import com.bitwarden.data.datasource.disk.base.FakeDispatcherManager
+import com.bitwarden.data.datasource.disk.model.EnvironmentUrlDataJson
 import com.bitwarden.generators.AppendType
 import com.bitwarden.generators.ForwarderServiceType
 import com.bitwarden.generators.PassphraseGeneratorRequest
 import com.bitwarden.generators.PasswordGeneratorRequest
 import com.bitwarden.generators.UsernameGeneratorRequest
+import com.bitwarden.network.model.KdfTypeJson
+import com.bitwarden.network.model.KeyConnectorUserDecryptionOptionsJson
+import com.bitwarden.network.model.TrustedDeviceUserDecryptionOptionsJson
+import com.bitwarden.network.model.UserDecryptionOptionsJson
 import com.bitwarden.vault.PasswordHistory
 import com.bitwarden.vault.PasswordHistoryView
 import com.x8bit.bitwarden.data.auth.datasource.disk.AuthDiskSource
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
-import com.x8bit.bitwarden.data.auth.datasource.disk.model.EnvironmentUrlDataJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.KdfTypeJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.KeyConnectorUserDecryptionOptionsJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TrustedDeviceUserDecryptionOptionsJson
-import com.x8bit.bitwarden.data.auth.datasource.network.model.UserDecryptionOptionsJson
-import com.x8bit.bitwarden.data.platform.base.FakeDispatcherManager
 import com.x8bit.bitwarden.data.platform.manager.ReviewPromptManager
 import com.x8bit.bitwarden.data.platform.repository.model.LocalDataState
-import com.x8bit.bitwarden.data.platform.util.asFailure
-import com.x8bit.bitwarden.data.platform.util.asSuccess
 import com.x8bit.bitwarden.data.tools.generator.datasource.disk.GeneratorDiskSource
 import com.x8bit.bitwarden.data.tools.generator.datasource.disk.PasswordHistoryDiskSource
 import com.x8bit.bitwarden.data.tools.generator.datasource.disk.entity.PasswordHistoryEntity
@@ -199,7 +199,9 @@ class GeneratorRepositoryTest {
 
         val result = repository.generatePassword(request, true)
 
-        assertEquals(GeneratedPasswordResult.InvalidRequest, result)
+        assertEquals(
+            GeneratedPasswordResult.InvalidRequest(error = exception), result,
+        )
         coVerify { generatorSdkSource.generatePassword(request) }
     }
 
@@ -257,7 +259,9 @@ class GeneratorRepositoryTest {
 
             val result = repository.generatePassphrase(request)
 
-            assertEquals(GeneratedPassphraseResult.InvalidRequest, result)
+            assertEquals(
+                GeneratedPassphraseResult.InvalidRequest(error = exception), result,
+            )
             coVerify { generatorSdkSource.generatePassphrase(request) }
         }
 
@@ -296,7 +300,9 @@ class GeneratorRepositoryTest {
 
         val result = repository.generatePlusAddressedEmail(request)
 
-        assertEquals(GeneratedPlusAddressedUsernameResult.InvalidRequest, result)
+        assertEquals(
+            GeneratedPlusAddressedUsernameResult.InvalidRequest(error = exception), result,
+        )
         coVerify { generatorSdkSource.generatePlusAddressedEmail(request) }
     }
 
@@ -331,7 +337,9 @@ class GeneratorRepositoryTest {
 
         val result = repository.generateCatchAllEmail(request)
 
-        assertEquals(GeneratedCatchAllUsernameResult.InvalidRequest, result)
+        assertEquals(
+            GeneratedCatchAllUsernameResult.InvalidRequest(error = exception), result,
+        )
         coVerify { generatorSdkSource.generateCatchAllEmail(request) }
     }
 
@@ -366,7 +374,9 @@ class GeneratorRepositoryTest {
 
         val result = repository.generateRandomWordUsername(request)
 
-        assertEquals(GeneratedRandomWordUsernameResult.InvalidRequest, result)
+        assertEquals(
+            GeneratedRandomWordUsernameResult.InvalidRequest(error = exception), result,
+        )
         coVerify { generatorSdkSource.generateRandomWord(request) }
     }
 
@@ -409,7 +419,10 @@ class GeneratorRepositoryTest {
             val result = repository.generateForwardedServiceUsername(request)
 
             assertEquals(
-                GeneratedForwardedServiceUsernameResult.InvalidRequest(exception.message),
+                GeneratedForwardedServiceUsernameResult.InvalidRequest(
+                    message = exception.message,
+                    error = exception,
+                ),
                 result,
             )
             coVerify { generatorSdkSource.generateForwardedServiceEmail(request) }

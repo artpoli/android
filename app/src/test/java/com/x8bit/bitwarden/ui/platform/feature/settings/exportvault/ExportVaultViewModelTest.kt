@@ -3,7 +3,11 @@ package com.x8bit.bitwarden.ui.platform.feature.settings.exportvault
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.data.repository.model.Environment
 import com.bitwarden.exporters.ExportFormat
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.createMockPolicy
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.sdk.model.PasswordStrength
@@ -15,15 +19,11 @@ import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.VerifyOtpResult
 import com.x8bit.bitwarden.data.platform.manager.PolicyManager
 import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockPolicy
 import com.x8bit.bitwarden.data.vault.manager.FileManager
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.ExportVaultDataResult
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.PasswordStrengthState
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.feature.settings.exportvault.model.ExportVaultFormat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -146,11 +146,12 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
             passwordInput = passcode,
             showSendCodeButton = true,
         )
+        val error = Throwable("Fail!")
         coEvery {
             authRepository.verifyOneTimePasscode(
                 oneTimePasscode = passcode,
             )
-        } returns VerifyOtpResult.NotVerified("Wrong")
+        } returns VerifyOtpResult.NotVerified(errorMessage = "Wrong", error = error)
 
         val viewModel = createViewModel(initialState)
 
@@ -161,6 +162,7 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
                 dialogState = ExportVaultState.DialogState.Error(
                     title = R.string.an_error_has_occurred.asText(),
                     message = R.string.generic_error_message.asText(),
+                    error = error,
                 ),
             ),
             viewModel.stateFlow.value,
@@ -385,11 +387,12 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
     @Test
     fun `ConfirmExportVaultClicked error checking password should show an error`() {
         val password = "password"
+        val error = Throwable("Fail!")
         coEvery {
             authRepository.validatePassword(
                 password = password,
             )
-        } returns ValidatePasswordResult.Error
+        } returns ValidatePasswordResult.Error(error = error)
 
         val viewModel = createViewModel()
         viewModel.trySendAction(ExportVaultAction.PasswordInputChanged(password))
@@ -400,6 +403,7 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
                 dialogState = ExportVaultState.DialogState.Error(
                     title = R.string.an_error_has_occurred.asText(),
                     message = R.string.generic_error_message.asText(),
+                    error = error,
                 ),
                 passwordInput = password,
             ),
@@ -507,10 +511,11 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
     @Test
     fun `SendCodeClick should call requestOneTimePasscode and update dialog state to sending then back to null when request completes and send correct event on error`() =
         runTest {
+            val error = Throwable("Fail!")
             val viewModel = createViewModel()
             coEvery {
                 authRepository.requestOneTimePasscode()
-            } returns RequestOtpResult.Error(message = null)
+            } returns RequestOtpResult.Error(message = null, error = error)
             viewModel.stateEventFlow(backgroundScope) { stateTurbine, eventTurbine ->
                 assertEquals(DEFAULT_STATE, stateTurbine.awaitItem())
                 viewModel.trySendAction(ExportVaultAction.SendCodeClick)
@@ -536,10 +541,10 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
     @Test
     fun `ReceiveExportVaultDataToStringResult should update state to error if result is error`() {
         val viewModel = createViewModel()
-
+        val error = Throwable("Fail")
         viewModel.trySendAction(
             ExportVaultAction.Internal.ReceiveExportVaultDataToStringResult(
-                result = ExportVaultDataResult.Error,
+                result = ExportVaultDataResult.Error(error = error),
             ),
         )
 
@@ -548,6 +553,7 @@ class ExportVaultViewModelTest : BaseViewModelTest() {
                 dialogState = ExportVaultState.DialogState.Error(
                     title = R.string.an_error_has_occurred.asText(),
                     message = R.string.export_vault_failure.asText(),
+                    error = error,
                 ),
             ),
             viewModel.stateFlow.value,

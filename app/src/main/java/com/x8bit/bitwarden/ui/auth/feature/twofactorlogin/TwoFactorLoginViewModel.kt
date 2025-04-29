@@ -6,13 +6,16 @@ import androidx.annotation.DrawableRes
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.bitwarden.data.repository.util.baseWebVaultUrlOrDefault
+import com.bitwarden.network.model.TwoFactorAuthMethod
+import com.bitwarden.network.model.TwoFactorDataModel
+import com.bitwarden.network.util.availableAuthMethods
+import com.bitwarden.network.util.preferredAuthMethod
+import com.bitwarden.network.util.twoFactorDisplayEmail
+import com.bitwarden.network.util.twoFactorDuoAuthUrl
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorAuthMethod
-import com.x8bit.bitwarden.data.auth.datasource.network.model.TwoFactorDataModel
-import com.x8bit.bitwarden.data.auth.datasource.network.util.availableAuthMethods
-import com.x8bit.bitwarden.data.auth.datasource.network.util.preferredAuthMethod
-import com.x8bit.bitwarden.data.auth.datasource.network.util.twoFactorDisplayEmail
-import com.x8bit.bitwarden.data.auth.datasource.network.util.twoFactorDuoAuthUrl
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
 import com.x8bit.bitwarden.data.auth.repository.model.LoginResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResendEmailResult
@@ -23,15 +26,12 @@ import com.x8bit.bitwarden.data.auth.repository.util.generateUriForCaptcha
 import com.x8bit.bitwarden.data.auth.repository.util.generateUriForWebAuth
 import com.x8bit.bitwarden.data.auth.util.YubiKeyResult
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.util.baseWebVaultUrlOrDefault
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.util.button
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.util.imageRes
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.util.isContinueButtonEnabled
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.util.shouldUseNfc
 import com.x8bit.bitwarden.ui.auth.feature.twofactorlogin.util.showPasswordInput
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.resource.ResourceManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.launchIn
@@ -308,6 +308,7 @@ class TwoFactorLoginViewModel @Inject constructor(
                             title = R.string.an_error_has_occurred.asText(),
                             message = loginResult.errorMessage?.asText()
                                 ?: R.string.invalid_verification_code.asText(),
+                            error = loginResult.error,
                         ),
                     )
                 }
@@ -349,6 +350,9 @@ class TwoFactorLoginViewModel @Inject constructor(
                     )
                 }
             }
+
+            // NO-OP: This result should not be possible here
+            is LoginResult.ConfirmKeyConnectorDomain -> Unit
         }
     }
 
@@ -403,11 +407,12 @@ class TwoFactorLoginViewModel @Inject constructor(
         action: TwoFactorLoginAction.Internal.ReceiveWebAuthResult,
     ) {
         when (val result = action.webAuthResult) {
-            WebAuthResult.Failure -> {
+            is WebAuthResult.Failure -> {
                 mutableStateFlow.update {
                     it.copy(
                         dialogState = TwoFactorLoginState.DialogState.Error(
-                            message = R.string.generic_error_message.asText(),
+                            message = result.message?.asText()
+                                ?: R.string.generic_error_message.asText(),
                         ),
                     )
                 }
@@ -429,7 +434,7 @@ class TwoFactorLoginViewModel @Inject constructor(
         // Dismiss the loading overlay.
         mutableStateFlow.update { it.copy(dialogState = null) }
 
-        when (action.resendEmailResult) {
+        when (val result = action.resendEmailResult) {
             // Display a dialog for an error result.
             is ResendEmailResult.Error -> {
                 mutableStateFlow.update {
@@ -437,6 +442,7 @@ class TwoFactorLoginViewModel @Inject constructor(
                         dialogState = TwoFactorLoginState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.verification_email_not_sent.asText(),
+                            error = result.error,
                         ),
                     )
                 }
@@ -658,6 +664,7 @@ data class TwoFactorLoginState(
         data class Error(
             val title: Text? = null,
             val message: Text,
+            val error: Throwable? = null,
         ) : DialogState()
 
         /**

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +31,7 @@ import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenTextButton
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenBasicDialog
 import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenLoadingDialog
+import com.x8bit.bitwarden.ui.platform.components.dialog.BitwardenTwoButtonDialog
 import com.x8bit.bitwarden.ui.platform.components.field.BitwardenTextField
 import com.x8bit.bitwarden.ui.platform.components.model.CardStyle
 import com.x8bit.bitwarden.ui.platform.components.scaffold.BitwardenScaffold
@@ -78,6 +78,12 @@ fun EnterpriseSignOnScreen(
 
     EnterpriseSignOnDialogs(
         dialogState = state.dialogState,
+        onConfirmKeyConnectorDomain = remember(viewModel) {
+            { viewModel.trySendAction(EnterpriseSignOnAction.ConfirmKeyConnectorDomainClick) }
+        },
+        onDismissKeyConnectorDomain = remember(viewModel) {
+            { viewModel.trySendAction(EnterpriseSignOnAction.CancelKeyConnectorDomainClick) }
+        },
         onDismissRequest = remember(viewModel) {
             { viewModel.trySendAction(EnterpriseSignOnAction.DialogDismiss) }
         },
@@ -128,7 +134,6 @@ private fun EnterpriseSignOnScreenContent(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .imePadding()
             .verticalScroll(rememberScrollState())
             .fillMaxWidth(),
     ) {
@@ -165,18 +170,36 @@ private fun EnterpriseSignOnScreenContent(
 private fun EnterpriseSignOnDialogs(
     dialogState: EnterpriseSignOnState.DialogState?,
     onDismissRequest: () -> Unit,
+    onConfirmKeyConnectorDomain: () -> Unit,
+    onDismissKeyConnectorDomain: () -> Unit,
 ) {
     when (dialogState) {
         is EnterpriseSignOnState.DialogState.Error -> {
             BitwardenBasicDialog(
                 title = dialogState.title(),
                 message = dialogState.message(),
+                throwable = dialogState.error,
                 onDismissRequest = onDismissRequest,
             )
         }
 
         is EnterpriseSignOnState.DialogState.Loading -> {
             BitwardenLoadingDialog(text = dialogState.message())
+        }
+
+        is EnterpriseSignOnState.DialogState.KeyConnectorDomain -> {
+            BitwardenTwoButtonDialog(
+                title = stringResource(R.string.confirm_key_connector_domain),
+                message = stringResource(
+                    R.string.please_confirm_domain_with_admin,
+                    dialogState.keyConnectorDomain,
+                ),
+                confirmButtonText = stringResource(R.string.confirm),
+                dismissButtonText = stringResource(R.string.cancel),
+                onConfirmClick = onConfirmKeyConnectorDomain,
+                onDismissRequest = onDismissKeyConnectorDomain,
+                onDismissClick = onDismissKeyConnectorDomain,
+            )
         }
 
         null -> Unit

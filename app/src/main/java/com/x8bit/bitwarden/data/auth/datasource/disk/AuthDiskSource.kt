@@ -1,11 +1,11 @@
 package com.x8bit.bitwarden.data.auth.datasource.disk
 
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.network.provider.AppIdProvider
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.AccountTokensJson
-import com.x8bit.bitwarden.data.auth.datasource.disk.model.NewDeviceNoticeState
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.PendingAuthRequestJson
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.UserStateJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
@@ -13,20 +13,13 @@ import java.time.Instant
  * Primary access point for disk information.
  */
 @Suppress("TooManyFunctions")
-interface AuthDiskSource {
+interface AuthDiskSource : AppIdProvider {
 
     /**
      * The currently persisted authenticator sync symmetric key. This key is used for
      * encrypting IPC traffic.
      */
     var authenticatorSyncSymmetricKey: ByteArray?
-
-    /**
-     * Retrieves a unique ID for the application that is stored locally. This will generate a new
-     * one if it does not yet exist and it will only be reset for new installs or when clearing
-     * application data.
-     */
-    val uniqueAppId: String
 
     /**
      * The currently persisted saved email address (or `null` if not set).
@@ -343,16 +336,6 @@ interface AuthDiskSource {
      * Emits updates that track [getShowImportLogins]. This will replay the last known value.
      */
     fun getShowImportLoginsFlow(userId: String): Flow<Boolean?>
-
-    /**
-     * Gets the new device notice state for the given [userId].
-     */
-    fun getNewDeviceNoticeState(userId: String): NewDeviceNoticeState
-
-    /**
-     * Stores the new device notice state for the given [userId].
-     */
-    fun storeNewDeviceNoticeState(userId: String, newState: NewDeviceNoticeState?)
 
     /**
      * Gets the last lock timestamp for the given [userId].

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,12 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeout
 import com.x8bit.bitwarden.data.platform.repository.model.VaultTimeoutAction
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.components.appbar.BitwardenTopAppBar
 import com.x8bit.bitwarden.ui.platform.components.badge.NotificationBadge
@@ -232,7 +233,8 @@ fun AccountSecurityScreen(
             val biometricSupportStatus = biometricsManager.biometricSupportStatus
             if (biometricSupportStatus != BiometricSupportStatus.NOT_SUPPORTED ||
                 !state.removeUnlockWithPinPolicyEnabled ||
-                state.isUnlockWithPinEnabled) {
+                state.isUnlockWithPinEnabled
+            ) {
                 Spacer(Modifier.height(16.dp))
                 BitwardenListHeaderText(
                     label = stringResource(id = R.string.unlock_options),
@@ -433,6 +435,7 @@ fun AccountSecurityScreen(
                     .fillMaxWidth(),
             )
             Spacer(modifier = Modifier.height(height = 16.dp))
+            Spacer(modifier = Modifier.navigationBarsPadding())
         }
     }
 }
@@ -700,7 +703,7 @@ private fun ColumnScope.SyncWithAuthenticatorRow(
         cardStyle = CardStyle.Full,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .standardHorizontalMargin(),
     )
 }
 

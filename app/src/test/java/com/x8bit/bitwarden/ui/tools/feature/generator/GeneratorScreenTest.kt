@@ -30,10 +30,10 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.core.net.toUri
+import com.bitwarden.core.data.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.data.platform.manager.util.AppResumeStateManager
-import com.x8bit.bitwarden.data.platform.repository.util.bufferedMutableSharedFlow
 import com.x8bit.bitwarden.ui.platform.base.BaseComposeTest
-import com.x8bit.bitwarden.ui.platform.base.util.asText
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.tools.feature.generator.model.GeneratorMode
 import com.x8bit.bitwarden.ui.util.isCoachMarkToolTip
@@ -1064,7 +1064,7 @@ class GeneratorScreenTest : BaseComposeTest() {
         val newAccessToken = "accessToken"
 
         composeTestRule
-            .onNodeWithText("API access token")
+            .onNodeWithText("API access token (required)")
             .performScrollTo()
             .performTextInput(newAccessToken)
 
@@ -1306,7 +1306,7 @@ class GeneratorScreenTest : BaseComposeTest() {
         val newAccessToken = "accessToken"
 
         composeTestRule
-            .onNodeWithText("API access token")
+            .onNodeWithText("API access token (required)")
             .performScrollTo()
             .performTextInput(newAccessToken)
 

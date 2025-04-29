@@ -7,14 +7,15 @@ import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.ForcePasswordResetReason
 import com.x8bit.bitwarden.data.auth.datasource.sdk.model.PasswordStrength
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
+import com.x8bit.bitwarden.data.auth.repository.model.LogoutReason
 import com.x8bit.bitwarden.data.auth.repository.model.PasswordStrengthResult
 import com.x8bit.bitwarden.data.auth.repository.model.ResetPasswordResult
 import com.x8bit.bitwarden.data.auth.repository.model.ValidatePasswordResult
 import com.x8bit.bitwarden.ui.auth.feature.completeregistration.PasswordStrengthState
 import com.x8bit.bitwarden.ui.auth.feature.resetpassword.util.toDisplayLabels
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModel
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.orNullIfBlank
 import com.x8bit.bitwarden.ui.tools.feature.generator.util.toStrictestPolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -152,7 +153,7 @@ class ResetPasswordViewModel @Inject constructor(
                 }
             }
 
-            PasswordStrengthResult.Error -> Unit
+            is PasswordStrengthResult.Error -> Unit
         }
     }
 
@@ -160,7 +161,7 @@ class ResetPasswordViewModel @Inject constructor(
      * Dismiss the view if the user confirms logging out.
      */
     private fun handleConfirmLogoutClick() {
-        authRepository.logout()
+        authRepository.logout(reason = LogoutReason.Click(source = "ResetPasswordViewModel"))
     }
 
     /**
@@ -284,14 +285,15 @@ class ResetPasswordViewModel @Inject constructor(
         // End the loading state.
         mutableStateFlow.update { it.copy(dialogState = null) }
 
-        when (action.result) {
+        when (val result = action.result) {
             // Display an alert if there was an error.
-            ResetPasswordResult.Error -> {
+            is ResetPasswordResult.Error -> {
                 mutableStateFlow.update {
                     it.copy(
                         dialogState = ResetPasswordState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.generic_error_message.asText(),
+                            error = result.error,
                         ),
                     )
                 }
@@ -309,14 +311,15 @@ class ResetPasswordViewModel @Inject constructor(
     private fun handleReceiveValidatePasswordResult(
         action: ResetPasswordAction.Internal.ReceiveValidatePasswordResult,
     ) {
-        when (action.result) {
+        when (val result = action.result) {
             // Display an alert if there was an error.
-            ValidatePasswordResult.Error -> {
+            is ValidatePasswordResult.Error -> {
                 mutableStateFlow.update {
                     it.copy(
                         dialogState = ResetPasswordState.DialogState.Error(
                             title = R.string.an_error_has_occurred.asText(),
                             message = R.string.generic_error_message.asText(),
+                            error = result.error,
                         ),
                     )
                 }
@@ -441,6 +444,7 @@ data class ResetPasswordState(
         data class Error(
             val title: Text?,
             val message: Text,
+            val error: Throwable? = null,
         ) : DialogState()
 
         /**

@@ -20,9 +20,19 @@ sealed class LoginResult {
     data object TwoFactorRequired : LoginResult()
 
     /**
+     * User should confirm KeyConnector domain
+     */
+    data class ConfirmKeyConnectorDomain(
+        val domain: String,
+    ) : LoginResult()
+
+    /**
      * There was an error logging in.
      */
-    data class Error(val errorMessage: String?) : LoginResult()
+    data class Error(
+        val errorMessage: String?,
+        val error: Throwable?,
+    ) : LoginResult()
 
     /**
      * There was an error while logging into an unofficial Bitwarden server.

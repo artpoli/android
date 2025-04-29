@@ -3,7 +3,14 @@ package com.x8bit.bitwarden.ui.tools.feature.send.addsend
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.bitwarden.core.data.repository.model.DataState
+import com.bitwarden.data.repository.model.Environment
+import com.bitwarden.network.model.PolicyTypeJson
+import com.bitwarden.network.model.SyncResponseJson
+import com.bitwarden.network.model.createMockPolicy
 import com.bitwarden.send.SendView
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.data.auth.datasource.disk.model.OnboardingStatus
 import com.x8bit.bitwarden.data.auth.repository.AuthRepository
@@ -15,11 +22,6 @@ import com.x8bit.bitwarden.data.platform.manager.clipboard.BitwardenClipboardMan
 import com.x8bit.bitwarden.data.platform.manager.model.FirstTimeState
 import com.x8bit.bitwarden.data.platform.manager.network.NetworkConnectionManager
 import com.x8bit.bitwarden.data.platform.repository.EnvironmentRepository
-import com.x8bit.bitwarden.data.platform.repository.model.DataState
-import com.x8bit.bitwarden.data.platform.repository.model.Environment
-import com.x8bit.bitwarden.data.vault.datasource.network.model.PolicyTypeJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.SyncResponseJson
-import com.x8bit.bitwarden.data.vault.datasource.network.model.createMockPolicy
 import com.x8bit.bitwarden.data.vault.datasource.sdk.model.createMockSendView
 import com.x8bit.bitwarden.data.vault.repository.VaultRepository
 import com.x8bit.bitwarden.data.vault.repository.model.CreateSendResult
@@ -27,8 +29,6 @@ import com.x8bit.bitwarden.data.vault.repository.model.DeleteSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.RemovePasswordSendResult
 import com.x8bit.bitwarden.data.vault.repository.model.UpdateSendResult
 import com.x8bit.bitwarden.ui.platform.base.BaseViewModelTest
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.manager.intent.IntentManager
 import com.x8bit.bitwarden.ui.tools.feature.send.addsend.model.AddSendType
 import com.x8bit.bitwarden.ui.tools.feature.send.addsend.util.toSendView
@@ -242,7 +242,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
         every { viewState.toSendView(clock) } returns mockSendView
         coEvery {
             vaultRepository.createSend(sendView = mockSendView, fileUri = null)
-        } returns CreateSendResult.Error("Fail")
+        } returns CreateSendResult.Error(message = "Fail", error = null)
         val viewModel = createViewModel(initialState)
 
         viewModel.stateFlow.test {
@@ -337,7 +337,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
         every { viewState.toSendView(clock) } returns mockSendView
         coEvery {
             vaultRepository.updateSend(sendId = sendId, sendView = mockSendView)
-        } returns UpdateSendResult.Error(errorMessage = errorMessage)
+        } returns UpdateSendResult.Error(errorMessage = errorMessage, error = null)
         mutableSendDataStateFlow.value = DataState.Loaded(mockSendView)
         val viewModel = createViewModel(initialState, AddSendType.EditItem(sendId))
 
@@ -493,7 +493,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
             val sendId = "mockId-1"
             coEvery {
                 vaultRepository.removePasswordSend(sendId)
-            } returns RemovePasswordSendResult.Error(errorMessage = null)
+            } returns RemovePasswordSendResult.Error(errorMessage = null, error = null)
             val initialState = DEFAULT_STATE.copy(
                 addSendType = AddSendType.EditItem(sendItemId = sendId),
             )
@@ -542,7 +542,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
             val errorMessage = "Fail"
             coEvery {
                 vaultRepository.removePasswordSend(sendId)
-            } returns RemovePasswordSendResult.Error(errorMessage = errorMessage)
+            } returns RemovePasswordSendResult.Error(errorMessage = errorMessage, error = null)
             val mockSendView = createMockSendView(number = 1)
             every {
                 mockSendView.toViewState(
@@ -608,8 +608,11 @@ class AddSendViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `DeleteClick vaultRepository deleteSend Error should show error dialog`() = runTest {
+        val error = Throwable("Ooops")
         val sendId = "mockId-1"
-        coEvery { vaultRepository.deleteSend(sendId) } returns DeleteSendResult.Error
+        coEvery { vaultRepository.deleteSend(sendId) } returns DeleteSendResult.Error(
+            error = error,
+        )
         val initialState = DEFAULT_STATE.copy(
             addSendType = AddSendType.EditItem(sendItemId = sendId),
         )
@@ -643,6 +646,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
                     dialogState = AddSendState.DialogState.Error(
                         title = R.string.an_error_has_occurred.asText(),
                         message = R.string.generic_error_message.asText(),
+                        throwable = error,
                     ),
                 ),
                 awaitItem(),
@@ -1058,7 +1062,7 @@ class AddSendViewModelTest : BaseViewModelTest() {
             selectedType = DEFAULT_SELECTED_TYPE_STATE,
         )
 
-        private const val DEFAULT_ENVIRONMENT_URL = "https://vault.bitwarden.com/#/send/"
+        private const val DEFAULT_ENVIRONMENT_URL = "https://send.bitwarden.com/#"
 
         private val DEFAULT_STATE = AddSendState(
             addSendType = AddSendType.AddItem,

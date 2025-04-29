@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -38,10 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitwarden.ui.util.Text
 import com.x8bit.bitwarden.R
 import com.x8bit.bitwarden.ui.autofill.fido2.manager.Fido2CompletionManager
 import com.x8bit.bitwarden.ui.platform.base.util.EventsEffect
-import com.x8bit.bitwarden.ui.platform.base.util.Text
 import com.x8bit.bitwarden.ui.platform.base.util.cardStyle
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.base.util.toListItemCardStyle
@@ -122,6 +121,7 @@ fun VaultAddEditScreen(
         lazyListState = lazyListState,
         orderedList = AddEditItemCoachMark.entries,
     )
+    val scope = rememberCoroutineScope()
     EventsEffect(viewModel = viewModel) { event ->
         when (event) {
             is VaultAddEditEvent.NavigateToQrCodeScan -> {
@@ -181,9 +181,11 @@ fun VaultAddEditScreen(
             }
 
             VaultAddEditEvent.StartAddLoginItemCoachMarkTour -> {
-                coachMarkState.showCoachMark(
-                    coachMarkToShow = AddEditItemCoachMark.GENERATE_PASSWORD,
-                )
+                scope.launch {
+                    coachMarkState.showCoachMark(
+                        coachMarkToShow = AddEditItemCoachMark.GENERATE_PASSWORD,
+                    )
+                }
             }
         }
     }
@@ -418,7 +420,6 @@ fun VaultAddEditScreen(
                         onCoachMarkDismissed = scrollBackToTop,
                         shouldShowLearnAboutLoginsCard = state.shouldShowLearnAboutNewLogins,
                         modifier = Modifier
-                            .imePadding()
                             .fillMaxSize(),
                     )
 
@@ -663,7 +664,9 @@ private fun FolderSelectionBottomSheetContent(
                     text = option,
                     color = BitwardenTheme.colorScheme.text.primary,
                     style = BitwardenTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 16.dp),
                 )
                 BitwardenRadioButton(
                     isSelected = selectedOption == option,

@@ -42,20 +42,8 @@ class FlagKeyTest {
             "cxp-export-mobile",
         )
         assertEquals(
-            FlagKey.AppReviewPrompt.keyName,
-            "app-review-prompt",
-        )
-        assertEquals(
             FlagKey.CipherKeyEncryption.keyName,
             "cipher-key-encryption",
-        )
-        assertEquals(
-            FlagKey.NewDeviceTemporaryDismiss.keyName,
-            "new-device-temporary-dismiss",
-        )
-        assertEquals(
-            FlagKey.NewDevicePermanentDismiss.keyName,
-            "new-device-permanent-dismiss",
         )
         assertEquals(
             FlagKey.SingleTapPasskeyCreation.keyName,
@@ -81,6 +69,18 @@ class FlagKeyTest {
             FlagKey.ChromeAutofill.keyName,
             "android-chrome-autofill",
         )
+        assertEquals(
+            FlagKey.MobileErrorReporting.keyName,
+            "mobile-error-reporting",
+        )
+        assertEquals(
+            FlagKey.FlightRecorder.keyName,
+            "enable-pm-flight-recorder",
+        )
+        assertEquals(
+            FlagKey.PreAuthSettings.keyName,
+            "enable-pm-prelogin-settings",
+        )
     }
 
     @Test
@@ -95,15 +95,15 @@ class FlagKeyTest {
                 FlagKey.VerifiedSsoDomainEndpoint,
                 FlagKey.CredentialExchangeProtocolImport,
                 FlagKey.CredentialExchangeProtocolExport,
-                FlagKey.AppReviewPrompt,
-                FlagKey.NewDeviceTemporaryDismiss,
-                FlagKey.NewDevicePermanentDismiss,
                 FlagKey.SingleTapPasskeyCreation,
                 FlagKey.SingleTapPasskeyAuthentication,
                 FlagKey.AnonAddySelfHostAlias,
                 FlagKey.SimpleLoginSelfHostAlias,
                 FlagKey.CipherKeyEncryption,
                 FlagKey.ChromeAutofill,
+                FlagKey.MobileErrorReporting,
+                FlagKey.FlightRecorder,
+                FlagKey.PreAuthSettings,
             ).all {
                 !it.defaultValue
             },
@@ -122,16 +122,14 @@ class FlagKeyTest {
                 FlagKey.VerifiedSsoDomainEndpoint,
                 FlagKey.CredentialExchangeProtocolImport,
                 FlagKey.CredentialExchangeProtocolExport,
-                FlagKey.AppReviewPrompt,
                 FlagKey.CipherKeyEncryption,
-                FlagKey.NewDeviceTemporaryDismiss,
-                FlagKey.NewDevicePermanentDismiss,
                 FlagKey.SingleTapPasskeyCreation,
                 FlagKey.SingleTapPasskeyAuthentication,
                 FlagKey.MutualTls,
                 FlagKey.AnonAddySelfHostAlias,
                 FlagKey.SimpleLoginSelfHostAlias,
                 FlagKey.ChromeAutofill,
+                FlagKey.MobileErrorReporting,
             ).all {
                 it.isRemotelyConfigured
             },
@@ -140,6 +138,8 @@ class FlagKeyTest {
         assertTrue(
             listOf(
                 FlagKey.IgnoreEnvironmentCheck,
+                FlagKey.FlightRecorder,
+                FlagKey.PreAuthSettings,
             ).all {
                 !it.isRemotelyConfigured
             },

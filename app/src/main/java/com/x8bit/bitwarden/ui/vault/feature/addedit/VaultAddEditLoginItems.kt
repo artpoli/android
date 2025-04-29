@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,9 +19,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.bitwarden.ui.util.Text
+import com.bitwarden.ui.util.asText
 import com.x8bit.bitwarden.R
-import com.x8bit.bitwarden.ui.platform.base.util.Text
-import com.x8bit.bitwarden.ui.platform.base.util.asText
 import com.x8bit.bitwarden.ui.platform.base.util.cardStyle
 import com.x8bit.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.x8bit.bitwarden.ui.platform.components.button.BitwardenStandardIconButton
@@ -46,6 +47,7 @@ fun LazyListScope.vaultAddEditLoginItems(
     coachMarkScope: CoachMarkScope<AddEditItemCoachMark>,
     loginState: VaultAddEditState.ViewState.Content.ItemType.Login,
     loginItemTypeHandlers: VaultAddEditLoginTypeHandlers,
+    windowAdaptiveInfo: WindowAdaptiveInfo,
     onTotpSetupClick: () -> Unit,
     onNextCoachMark: () -> Unit,
     onPreviousCoachMark: () -> Unit,
@@ -124,7 +126,7 @@ fun LazyListScope.vaultAddEditLoginItems(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .standardHorizontalMargin(),
+            .standardHorizontalMargin(windowAdaptiveInfo = windowAdaptiveInfo),
     ) {
         TotpRow(
             totpKey = loginState.totp,
@@ -182,7 +184,7 @@ fun LazyListScope.vaultAddEditLoginItems(
         },
         items = loginState.uriList,
         modifier = Modifier
-            .standardHorizontalMargin(),
+            .standardHorizontalMargin(windowAdaptiveInfo = windowAdaptiveInfo),
     ) { uriItem, cardStyle ->
         VaultAddEditUriItem(
             uriItem = uriItem,
@@ -230,8 +232,7 @@ private fun UsernameRow(
         BitwardenTwoButtonDialog(
             title = stringResource(id = R.string.username),
             message = stringResource(
-                id =
-                R.string.are_you_sure_you_want_to_overwrite_the_current_username,
+                id = R.string.are_you_sure_you_want_to_overwrite_the_current_username,
             ),
             confirmButtonText = stringResource(id = R.string.yes),
             dismissButtonText = stringResource(id = R.string.no),
@@ -323,10 +324,7 @@ private fun CoachMarkScope<AddEditItemCoachMark>.PasswordRow(
             if (shouldShowDialog) {
                 BitwardenTwoButtonDialog(
                     title = stringResource(id = R.string.password),
-                    message = stringResource(
-                        id =
-                        R.string.password_override_alert,
-                    ),
+                    message = stringResource(id = R.string.password_override_alert),
                     confirmButtonText = stringResource(id = R.string.yes),
                     dismissButtonText = stringResource(id = R.string.no),
                     onConfirmClick = {
