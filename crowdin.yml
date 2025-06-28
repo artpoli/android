@@ -1,0 +1,5 @@
+files:
+  - source: authenticator/src/main/res/values/strings.xml
+    translation: authenticator/src/main/res/values-uk-rUA/strings.xml
+  - source: app/src/main/res/values/strings.xml
+    translation: app/src/main/res/values-uk-rUA/strings.xml
