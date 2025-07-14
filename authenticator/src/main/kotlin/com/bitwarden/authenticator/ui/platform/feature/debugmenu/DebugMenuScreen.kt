@@ -34,6 +34,7 @@ import com.bitwarden.ui.platform.base.util.standardHorizontalMargin
 import com.bitwarden.ui.platform.components.appbar.NavigationIcon
 import com.bitwarden.ui.platform.components.divider.BitwardenHorizontalDivider
 import com.bitwarden.ui.platform.components.util.rememberVectorPainter
+import com.bitwarden.ui.platform.resource.BitwardenDrawable
 
 /**
  * Top level screen for the debug menu.
@@ -62,7 +63,7 @@ fun DebugMenuScreen(
                 title = stringResource(R.string.debug_menu),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = NavigationIcon(
-                    navigationIcon = rememberVectorPainter(R.drawable.ic_back),
+                    navigationIcon = rememberVectorPainter(BitwardenDrawable.ic_back),
                     navigationIconContentDescription = stringResource(id = R.string.back),
                     onNavigationIconClick = remember(viewModel) {
                         {
@@ -146,7 +147,6 @@ private fun FeatureFlagContent_preview() {
         FeatureFlagContent(
             featureFlagMap = mapOf(
                 FlagKey.BitwardenAuthenticationEnabled to true,
-                FlagKey.PasswordManagerSync to false,
             ),
             onValueChange = { _, _ -> },
             onResetValues = { },

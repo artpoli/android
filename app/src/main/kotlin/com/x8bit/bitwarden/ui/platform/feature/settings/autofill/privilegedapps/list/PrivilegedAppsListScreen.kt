@@ -181,10 +181,8 @@ private fun PrivilegedAppsListContent(
             ) { index, item ->
                 BitwardenTextRow(
                     text = item.label,
-                    description = stringResource(
-                        R.string.trusted_by_x,
-                        stringResource(item.trustAuthority.displayName),
-                    ),
+                    description = stringResource(item.trustAuthority.description),
+                    clickable = false,
                     onClick = {},
                     cardStyle = state.installedApps
                         .toListItemCardStyle(index),
@@ -251,6 +249,7 @@ private fun PrivilegedAppsListContent(
                     BitwardenTextRow(
                         text = item.label,
                         onClick = {},
+                        clickable = false,
                         cardStyle = state.notInstalledUserTrustedApps
                             .toListItemCardStyle(index),
                         modifier = Modifier
@@ -303,6 +302,7 @@ private fun PrivilegedAppsListContent(
                     BitwardenTextRow(
                         text = item.label,
                         onClick = {},
+                        clickable = false,
                         cardStyle = state.notInstalledCommunityTrustedApps
                             .toListItemCardStyle(index),
                         modifier = Modifier
@@ -336,6 +336,7 @@ private fun PrivilegedAppsListContent(
                     BitwardenTextRow(
                         text = item.label,
                         onClick = {},
+                        clickable = false,
                         cardStyle = state.notInstalledGoogleTrustedApps
                             .toListItemCardStyle(index),
                         modifier = Modifier

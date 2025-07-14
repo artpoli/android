@@ -69,6 +69,7 @@ import com.bitwarden.ui.platform.base.util.mirrorIfRtl
 import com.bitwarden.ui.platform.base.util.spanStyleOf
 import com.bitwarden.ui.platform.components.util.rememberVectorPainter
 import com.bitwarden.ui.platform.feature.settings.appearance.model.AppTheme
+import com.bitwarden.ui.platform.resource.BitwardenDrawable
 import com.bitwarden.ui.util.Text
 import com.bitwarden.ui.util.asText
 
@@ -310,7 +311,7 @@ private fun VaultSettings(
                 modifier = Modifier
                     .mirrorIfRtl()
                     .size(24.dp),
-                painter = painterResource(id = R.drawable.ic_navigate_next),
+                painter = painterResource(id = BitwardenDrawable.ic_navigate_next),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface,
             )
@@ -328,7 +329,7 @@ private fun VaultSettings(
                 modifier = Modifier
                     .mirrorIfRtl()
                     .size(24.dp),
-                painter = painterResource(id = R.drawable.ic_navigate_next),
+                painter = painterResource(id = BitwardenDrawable.ic_navigate_next),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface,
             )
@@ -350,7 +351,7 @@ private fun VaultSettings(
         BitwardenTextRow(
             text = stringResource(id = R.string.sync_with_bitwarden_app),
             description = annotatedStringResource(
-                id = R.string.this_feature_is_not_not_yet_available_for_self_hosted_users,
+                id = R.string.learn_more_link,
                 style = spanStyleOf(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textStyle = MaterialTheme.typography.bodyMedium,
@@ -370,10 +371,8 @@ private fun VaultSettings(
             withDivider = true,
             content = {
                 Icon(
-                    modifier = Modifier
-                        .mirrorIfRtl()
-                        .size(24.dp),
-                    painter = painterResource(id = R.drawable.ic_external_link),
+                    modifier = Modifier.mirrorIfRtl(),
+                    painter = painterResource(id = BitwardenDrawable.ic_external_link),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
@@ -510,7 +509,7 @@ private fun ThemeSelectionRow(
                 .mirrorIfRtl()
                 .size(24.dp),
             painter = painterResource(
-                id = R.drawable.ic_navigate_next,
+                id = BitwardenDrawable.ic_navigate_next,
             ),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface,
@@ -647,7 +646,7 @@ private fun CopyRow(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Icon(
-                painter = rememberVectorPainter(id = R.drawable.ic_copy),
+                painter = rememberVectorPainter(id = BitwardenDrawable.ic_copy),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface,
             )
